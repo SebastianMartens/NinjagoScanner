@@ -247,8 +247,140 @@ body {
     border: 1px solid rgba(96, 78, 42, 0.14);
 }
 
+.table-page {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1.5rem;
+    margin-bottom: 1.8rem;
+}
+
+.table-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.table-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-weight: 700;
+    color: #5b5649;
+}
+
+.table-controls select,
+.table-controls input {
+    min-width: 220px;
+    padding: 0.75rem 0.9rem;
+    border-radius: 14px;
+    border: 1px solid rgba(96, 78, 42, 0.22);
+    background: rgba(255, 255, 255, 0.86);
+}
+
+.table-group {
+    margin-bottom: 2rem;
+}
+
+.table-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.table-group-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.cards-table-wrapper {
+    overflow: auto;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(96, 78, 42, 0.14);
+    box-shadow: 0 22px 44px rgba(59, 46, 20, 0.08);
+}
+
+.cards-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+}
+
+.cards-table th,
+.cards-table td {
+    padding: 1rem;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(96, 78, 42, 0.1);
+}
+
+.cards-table th {
+    text-align: left;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7f7157;
+    background: rgba(244, 239, 228, 0.95);
+    position: sticky;
+    top: 0;
+}
+
+.table-thumb {
+    width: 78px;
+    height: 98px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block;
+    box-shadow: 0 12px 24px rgba(59, 46, 20, 0.14);
+}
+
+.table-primary {
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.table-secondary {
+    font-size: 0.84rem;
+    color: #6f6556;
+}
+
+.table-status {
+    display: inline-flex;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.table-details {
+    max-width: 38rem;
+    color: #473f32;
+    font-size: 0.92rem;
+    line-height: 1.4;
+}
+
+.table-error {
+    max-width: 32rem;
+    color: #963b30;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
 @media (max-width: 700px) {
     .cards-header {
+        flex-direction: column;
+        align-items: start;
+    }
+
+    .table-header {
         flex-direction: column;
         align-items: start;
     }
