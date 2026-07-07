@@ -1,7 +1,8 @@
-**/bin/
-**/obj/
-**/Debug/
-**/Release/
+**/bin/**
+**/obj/**
+**/Debug/**
+**/Release/**
+**/cardFotos/**
 out/
 build/
 
