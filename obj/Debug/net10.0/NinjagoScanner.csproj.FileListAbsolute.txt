@@ -12,3 +12,8 @@ C:\sma\github\NinjagoScanner\obj\Debug\net10.0\refint\NinjagoScanner.dll
 C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.pdb
 C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.genruntimeconfig.cache
 C:\sma\github\NinjagoScanner\obj\Debug\net10.0\ref\NinjagoScanner.dll
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\OpenCvSharp.dll
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\runtimes\win-x64\native\OpenCvSharpExtern.dll
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\runtimes\win-x64\native\opencv_videoio_ffmpeg4130_64.dll
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.csproj.AssemblyReference.cache
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoS.EE04B501.Up2Date

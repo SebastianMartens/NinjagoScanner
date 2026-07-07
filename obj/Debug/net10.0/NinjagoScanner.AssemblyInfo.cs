@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c80e27139836df85297081a3880805567c491850")]
 [assembly: System.Reflection.AssemblyProductAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
