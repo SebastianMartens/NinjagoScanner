@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NinjagoScanner.Desktop (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "NinjagoScanner.Desktop (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

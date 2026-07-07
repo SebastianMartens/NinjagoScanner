@@ -1,0 +1,188 @@
+{
+  "Ninjago_Sammelkarten_Serien": [
+    {
+      "Serie": "Serie 1",
+      "Jahr": 2016,
+      "Besonderheiten": [
+        "Erste Serie mit 180 Karten, später um 10 Karten (181-190) erweitert",
+        "Kein Logo auf den Karten",
+        "Ultra-Karten (181-184) als erste Platin-Karten"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 2",
+      "Jahr": 2017,
+      "Besonderheiten": [
+        "Einführung von Puzzle-Karten",
+        "Zeitklingen als neue Spielmechanik"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 3",
+      "Jahr": 2018,
+      "Besonderheiten": [
+        "Logo: Silhouette einer Oni-Maske (Maske der Täuschung)",
+        "Garmadons Motorrad-Gang als Thema"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 4",
+      "Jahr": 2019,
+      "Besonderheiten": [
+        "Logo: Auge eines Drachen",
+        "Drachenkarten (bestehen aus zwei Karten)",
+        "Sofortiger Sieg bei Platzierung eines Drachen mit passendem Drachenmeister"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 5",
+      "Jahr": 2020,
+      "Besonderheiten": [
+        "Logo: Verpixelter Totenkopf (verschiedene Farben, nie rot oder gelb)",
+        "Einführung von Fallenkarten",
+        "Digitale Videospiel-Welt als Thema"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 5 Next Level",
+      "Jahr": 2020,
+      "Besonderheiten": [
+        "Logo: Pixel-Totenkopf (gelb auf rotem Grund, bei Fallenkarten rot auf sandigem Grund)",
+        "Erste Next-Level-Serie mit 126 Hauptkarten",
+        "Einführung von Level-Up-Karten",
+        "Erster LEGO Ninjago Adventskalender mit 4 exklusiven LE-Karten"
+      ],
+      "Sondereditionen": [
+        "Adventskalender-LE-Karten"
+      ]
+    },
+    {
+      "Serie": "Serie 6",
+      "Jahr": 2021,
+      "Besonderheiten": [
+        "Logo: Einfacher Totenkopf",
+        "18 Mega-Kreaturen als starke Karten",
+        "Booster ab Serie 6 in Papierhüllen"
+      ],
+      "Sondereditionen": []
+    },
+     {
+      "Serie": "Serie 6 Next Level",
+      "Jahr": 2021,
+      "Besonderheiten": [
+        "Logo: Aufgemalte Totenköpfe auf den Masken der Wächter",
+        "Level-Up-Karten"
+      ],
+      "Sondereditionen": []
+    },
+    {
+      "Serie": "Serie 7",
+      "Jahr": 2022,
+      "Besonderheiten": [
+        "Logo: Amulett (Wasser- und Sturmamulett)",
+        "Erste Serie mit Platin-Karten (Karten 253-256, Wert: 500)",
+        "18 Epic-Battle-Karten (8 Helden, 8 Schurken)"
+      ],
+      "Sondereditionen": [
+        "Platin-Karten"
+      ]
+    },
+    {
+      "Serie": "Serie 7 Next Level",
+      "Jahr": 2022,
+      "Besonderheiten": [
+        "Logo: Kopf von Wojira",
+        "Zweiter LEGO Ninjago Adventskalender mit 4 LE-Karten",
+        "X-MAS Edition Karten (Weihnachtsstimmung)"
+      ],
+      "Sondereditionen": [
+        "Adventskalender-LE-Karten",
+        "X-MAS Edition"
+      ]
+    },
+    {
+      "Serie": "Serie 8",
+      "Jahr": 2023,
+      "Besonderheiten": [
+        "Logo: Einfaches, erkennbares Logo",
+        "Platin-Karten (Oni Garmadon, Kristallkönig Overlord)",
+        "6 Karten pro Booster, Preis auf 1,50€ erhöht"
+      ],
+      "Sondereditionen": [
+        "Platin-Karten"
+      ]
+    },
+    {
+      "Serie": "Serie 8 Next Level",
+      "Jahr": 2023,
+      "Besonderheiten": [
+        "Logo: An Serie 8 angelehnt",
+        "Erste Next-Level-Serie mit Platin-Karten (Golddrachen-Jay, Golddrachen-Cole)",
+        "204 Basis-Karten"
+      ],
+      "Sondereditionen": [
+        "Platin-Karten"
+      ]
+    },
+    {
+      "Serie": "Serie 9",
+      "Jahr": 2024,
+      "Besonderheiten": [
+        "Logo: Drache (Quelldrache der Bewegung)",
+        "Overpower-Goldkarten statt Platin-Karten",
+        "Drachenkarten (zwei einzelne Karten)"
+      ],
+      "Sondereditionen": [
+        "Overpower-Goldkarten"
+      ]
+    },
+    {
+      "Serie": "Serie 9 Next Level",
+      "Jahr": 2024,
+      "Besonderheiten": [
+        "Logo: Quelldrache der Bewegung",
+        "4 Platin-Karten",
+        "LE19 exklusiv beim Hersteller Blue-Ocean bestellbar"
+      ],
+      "Sondereditionen": [
+        "Platin-Karten"
+      ]
+    },
+    {
+      "Serie": "Serie 10",
+      "Jahr": 2025,
+      "Besonderheiten": [
+        "Logo: Drache aus der Serie Aufstieg der Drachen",
+        "22 Ultra Rare Rubinkarten",
+        "310 Karten (278 Common/Uncommon/Rare/Ultra Rare + 32 LE-Karten)",
+        "Kunstkarten (ohne Spielwerte)",
+        "Starterset in umweltfreundlichem Papier"
+      ],
+      "Sondereditionen": [
+        "Rubinkarten",
+        "Kunstkarten"
+      ]
+    },
+    {
+      "Serie": "Serie 11",
+      "Jahr": 2026,
+      "Besonderheiten": [
+        "Logo: Zerstörerdrache des Chaos (Shatter Dragon)",
+        "Shattered-Karten als Ultra Rare",
+        "20 Ultra Rare Karten, 50 Basiskarten, 8 LE-Karten weniger als Serie 10",
+        "Puzzle Finaler Showdown (18 Karten)",
+        "5x5 Spielplan im Starter-Pack",
+        "Fotos von echten LEGO-Figuren und Steinen auf Charakterkarten"
+      ],
+      "Sondereditionen": [
+        "Shattered-Karten",
+        "Gold-Druck-Karten"
+      ]
+    }
+  ]
+}

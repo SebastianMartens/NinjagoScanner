@@ -11,6 +11,7 @@ var configuration = new ConfigurationBuilder()
 	.Build();
 
 var config = AppConfig.Load(configuration);
+var seriesCatalog = LoadSeriesCatalog(config.SeriesCatalogPath);
 
 if (string.IsNullOrWhiteSpace(config.ApiKey))
 {
@@ -22,8 +23,16 @@ if (string.IsNullOrWhiteSpace(config.ApiKey))
 if (!Directory.Exists(config.CardPhotosDirectory))
 {
 	Console.WriteLine($"Der Ordner '{config.CardPhotosDirectory}' wurde nicht gefunden.");
+	Console.WriteLine("Gepruefte Standardpfade:");
+	foreach (var candidate in AppConfig.GetDefaultCardPhotosCandidates())
+	{
+		Console.WriteLine($"- {candidate}");
+	}
 	return;
 }
+
+Console.WriteLine($"Verwende Kartenordner: {config.CardPhotosDirectory}");
+Console.WriteLine($"Verwende Serienkatalog: {config.SeriesCatalogPath}");
 
 var cardImages = Directory
 	.EnumerateFiles(config.CardPhotosDirectory)
@@ -67,7 +76,7 @@ for (var index = 0; index < cardImages.Count; index++)
 	CardAnalysisResult result;
 	try
 	{
-		result = await AnalyzeCardAsync(httpClient, config, imagePath, sidecarPath, CancellationToken.None);
+		result = await AnalyzeCardAsync(httpClient, config, seriesCatalog, imagePath, sidecarPath, CancellationToken.None);
 	}
 	catch (Exception exception)
 	{
@@ -103,10 +112,10 @@ Console.WriteLine($"Fehlgeschlagen: {failedCount}");
 
 return;
 
-static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, AppConfig config, string imagePath, string sidecarPath, CancellationToken cancellationToken)
+static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, AppConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string imagePath, string sidecarPath, CancellationToken cancellationToken)
 {
 	var imageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-	var requestBody = CreateGeminiRequest(config, imagePath, imageBytes);
+	var requestBody = CreateGeminiRequest(config, seriesCatalog, imagePath, imageBytes);
 	var requestUri = $"https://generativelanguage.googleapis.com/v1beta/models/{config.Model}:generateContent?key={Uri.EscapeDataString(config.ApiKey)}";
 
 	for (var attempt = 1; attempt <= config.MaxAttempts; attempt++)
@@ -116,7 +125,7 @@ static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, Ap
 
 		if (response.IsSuccessStatusCode)
 		{
-			return ParseSuccessResponse(imagePath, sidecarPath, config.Model, responseText);
+			return ParseSuccessResponse(imagePath, sidecarPath, config.Model, seriesCatalog, responseText);
 		}
 
 		if ((int)response.StatusCode == 429 || response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
@@ -139,13 +148,16 @@ static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, Ap
 	return CreateFailureResult(imagePath, sidecarPath, config.Model, "Unbekannter API-Fehler.");
 }
 
-static object CreateGeminiRequest(AppConfig config, string imagePath, byte[] imageBytes)
+static object CreateGeminiRequest(AppConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string imagePath, byte[] imageBytes)
 {
+	var seriesPrompt = BuildSeriesPrompt(seriesCatalog);
 	var prompt = """
 	Du analysierst genau ein Foto einer Lego Ninjago Sammelkarte.
 	Gib ausschliesslich gueltiges JSON ohne Markdown oder Codeblock zurueck.
 	Wenn du dir nicht sicher bist, setze status auf \"uncertain\" und confidence entsprechend niedrig.
 	Wenn das Bild keine klar lesbare einzelne Karte zeigt, setze status auf \"failed\".
+	Bestimme setName primaer ueber das Symbol in der unteren rechten Ecke der Karte.
+	Wenn kein Symbol vorhanden ist, gehoert die Karte zu Serie 1.
 
 	Verwende exakt dieses JSON-Schema:
 	{
@@ -159,8 +171,11 @@ static object CreateGeminiRequest(AppConfig config, string imagePath, byte[] ima
 	  "detectedText": ["string"]
 	}
 
-	Nutze sichtbare Kartennummern, Charakternamen, Set-Hinweise und Seltenheitsmerkmale.
+	Nutze sichtbare Kartennummern, Charakternamen, Set-Hinweise, das Symbol unten rechts und Seltenheitsmerkmale.
+	Fuelle setName nur mit einem gueltigen Seriennamen aus der folgenden Liste:
 	""";
+
+	prompt += Environment.NewLine + seriesPrompt;
 
 	return new
 	{
@@ -190,7 +205,7 @@ static object CreateGeminiRequest(AppConfig config, string imagePath, byte[] ima
 	};
 }
 
-static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarPath, string model, string responseText)
+static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarPath, string model, IReadOnlyList<SeriesInfo> seriesCatalog, string responseText)
 {
 	try
 	{
@@ -212,6 +227,7 @@ static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarP
 		}
 
 		var normalizedStatus = NormalizeStatus(payload.Status, payload.Confidence);
+		var resolvedSetName = ResolveSetName(payload, seriesCatalog);
 		return new CardAnalysisResult
 		{
 			Status = normalizedStatus,
@@ -220,7 +236,7 @@ static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarP
 			SidecarFilePath = sidecarPath,
 			CardName = payload.CardName,
 			CardNumber = payload.CardNumber,
-			SetName = payload.SetName,
+			SetName = normalizedStatus == AnalysisStatuses.Failed ? null : resolvedSetName,
 			Rarity = payload.Rarity,
 			Confidence = ClampConfidence(payload.Confidence),
 			ReasoningSummary = payload.ReasoningSummary,
@@ -234,6 +250,217 @@ static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarP
 	{
 		return CreateFailureResult(imagePath, sidecarPath, model, $"Gemini-Antwort war kein gueltiges JSON: {exception.Message}", responseText);
 	}
+}
+
+static IReadOnlyList<SeriesInfo> LoadSeriesCatalog(string seriesCatalogPath)
+{
+	if (!File.Exists(seriesCatalogPath))
+	{
+		Console.WriteLine($"Warnung: Serienkatalog '{seriesCatalogPath}' wurde nicht gefunden.");
+		return Array.Empty<SeriesInfo>();
+	}
+
+	try
+	{
+		var json = File.ReadAllText(seriesCatalogPath, Encoding.UTF8);
+		var catalog = JsonSerializer.Deserialize<SeriesCatalogRoot>(json, JsonOptions.Default);
+		return catalog?.Series?
+			.Where(series => !string.IsNullOrWhiteSpace(series.Serie))
+			.ToArray() ?? Array.Empty<SeriesInfo>();
+	}
+	catch (Exception exception)
+	{
+		Console.WriteLine($"Warnung: Serienkatalog konnte nicht geladen werden: {exception.Message}");
+		return Array.Empty<SeriesInfo>();
+	}
+}
+
+static string BuildSeriesPrompt(IReadOnlyList<SeriesInfo> seriesCatalog)
+{
+	if (seriesCatalog.Count == 0)
+	{
+		return "- Serie 1: kein Symbol";
+	}
+
+	var builder = new StringBuilder();
+
+	foreach (var series in seriesCatalog)
+	{
+		var symbolHint = ExtractSeriesSymbolHint(series);
+		builder.Append("- ")
+			.Append(series.Serie)
+			.Append(": ")
+			.Append(symbolHint);
+
+		if (series.Jahr > 0)
+		{
+			builder.Append(" (")
+				.Append(series.Jahr)
+				.Append(')');
+		}
+
+		builder.AppendLine();
+	}
+
+	return builder.ToString().TrimEnd();
+}
+
+static string? ResolveSetName(GeminiCardPayload payload, IReadOnlyList<SeriesInfo> seriesCatalog)
+{
+	if (seriesCatalog.Count == 0)
+	{
+		return payload.SetName?.Trim();
+	}
+
+	var exactMatch = FindSeriesByName(seriesCatalog, payload.SetName);
+	if (exactMatch is not null)
+	{
+		return exactMatch.Serie;
+	}
+
+	var inferredMatch = FindSeriesByEvidence(seriesCatalog, payload.SetName, payload.ReasoningSummary, payload.DetectedText);
+	return inferredMatch?.Serie;
+}
+
+static SeriesInfo? FindSeriesByName(IReadOnlyList<SeriesInfo> seriesCatalog, string? candidate)
+{
+	if (string.IsNullOrWhiteSpace(candidate))
+	{
+		return null;
+	}
+
+	var normalizedCandidate = NormalizeLookupText(candidate);
+	return seriesCatalog.FirstOrDefault(series => NormalizeLookupText(series.Serie) == normalizedCandidate);
+}
+
+static SeriesInfo? FindSeriesByEvidence(IReadOnlyList<SeriesInfo> seriesCatalog, string? setName, string? reasoningSummary, string[]? detectedText)
+{
+	var evidence = new List<string>();
+	AddEvidence(evidence, setName);
+	AddEvidence(evidence, reasoningSummary);
+
+	if (detectedText is not null)
+	{
+		foreach (var text in detectedText)
+		{
+			AddEvidence(evidence, text);
+		}
+	}
+
+	if (evidence.Count == 0)
+	{
+		return null;
+	}
+
+	SeriesInfo? bestMatch = null;
+	var bestScore = 0;
+	var tie = false;
+
+	foreach (var series in seriesCatalog)
+	{
+		var score = ScoreSeriesMatch(series, evidence);
+		if (score <= 0)
+		{
+			continue;
+		}
+
+		if (score > bestScore)
+		{
+			bestScore = score;
+			bestMatch = series;
+			tie = false;
+		}
+		else if (score == bestScore)
+		{
+			tie = true;
+		}
+	}
+
+	return tie ? null : bestMatch;
+}
+
+static void AddEvidence(List<string> evidence, string? text)
+{
+	if (string.IsNullOrWhiteSpace(text))
+	{
+		return;
+	}
+
+	var normalizedText = NormalizeLookupText(text);
+	if (normalizedText.Length > 0)
+	{
+		evidence.Add(normalizedText);
+	}
+}
+
+static int ScoreSeriesMatch(SeriesInfo series, IReadOnlyList<string> evidence)
+{
+	var score = 0;
+	var normalizedName = NormalizeLookupText(series.Serie);
+	var symbolHint = NormalizeLookupText(ExtractSeriesSymbolHint(series));
+	var year = series.Jahr > 0 ? series.Jahr.ToString() : null;
+
+	foreach (var text in evidence)
+	{
+		if (text.Contains(normalizedName, StringComparison.Ordinal))
+		{
+			score = Math.Max(score, 100);
+		}
+
+		if (!string.IsNullOrWhiteSpace(symbolHint) && text.Contains(symbolHint, StringComparison.Ordinal))
+		{
+			score = Math.Max(score, 70);
+		}
+
+		if (year is not null && text.Contains(year, StringComparison.Ordinal))
+		{
+			score = Math.Max(score, 20);
+		}
+
+		if (string.Equals(series.Serie, "Serie 1", StringComparison.OrdinalIgnoreCase)
+			&& (text.Contains("kein symbol", StringComparison.Ordinal)
+				|| text.Contains("ohne symbol", StringComparison.Ordinal)
+				|| text.Contains("kein logo", StringComparison.Ordinal)
+				|| text.Contains("ohne logo", StringComparison.Ordinal)))
+		{
+			score = Math.Max(score, 90);
+		}
+	}
+
+	return score;
+}
+
+static string ExtractSeriesSymbolHint(SeriesInfo series)
+{
+	var logoEntry = series.Besonderheiten
+		.FirstOrDefault(entry => entry.StartsWith("Logo:", StringComparison.OrdinalIgnoreCase));
+
+	if (!string.IsNullOrWhiteSpace(logoEntry))
+	{
+		return logoEntry["Logo:".Length..].Trim();
+	}
+
+	if (string.Equals(series.Serie, "Serie 1", StringComparison.OrdinalIgnoreCase))
+	{
+		return "kein Symbol";
+	}
+
+	return "Symbol siehe Serienbeschreibung";
+}
+
+static string NormalizeLookupText(string value)
+{
+	var builder = new StringBuilder(value.Length);
+
+	foreach (var character in value.Trim().ToLowerInvariant())
+	{
+		if (char.IsLetterOrDigit(character) || char.IsWhiteSpace(character))
+		{
+			builder.Append(character);
+		}
+	}
+
+	return string.Join(' ', builder.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 }
 
 static CardAnalysisResult CreateFailureResult(string imagePath, string sidecarPath, string model, string errorMessage, string? rawModelResponse = null)
@@ -337,6 +564,7 @@ internal sealed class AppConfig
 	public required string ApiKey { get; init; }
 	public required string Model { get; init; }
 	public required string CardPhotosDirectory { get; init; }
+	public required string SeriesCatalogPath { get; init; }
 	public required bool OverwriteExistingSidecars { get; init; }
 	public required int DelayBetweenRequestsMs { get; init; }
 	public required int RetryDelayMs { get; init; }
@@ -350,6 +578,7 @@ internal sealed class AppConfig
 			ApiKey = configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
 			Model = configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-2.5-flash",
 			CardPhotosDirectory = configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? ResolveDefaultCardPhotosDirectory(),
+			SeriesCatalogPath = configuration["CardSeries:Path"] ?? configuration["CARD_SERIES_PATH"] ?? ResolveDefaultSeriesCatalogPath(),
 			OverwriteExistingSidecars = bool.TryParse(configuration["Scanner:OverwriteSidecars"] ?? configuration["OVERWRITE_SIDECARS"], out var overwrite) && overwrite,
 			DelayBetweenRequestsMs = TryParseInt(configuration["Scanner:DelayBetweenRequestsMs"] ?? configuration["DELAY_BETWEEN_REQUESTS_MS"], 1000),
 			RetryDelayMs = TryParseInt(configuration["Scanner:RetryDelayMs"] ?? configuration["RETRY_DELAY_MS"], 3000),
@@ -365,26 +594,56 @@ internal sealed class AppConfig
 
 	private static string ResolveDefaultCardPhotosDirectory()
 	{
-		var candidateDirectories = new[]
-		{
-			Path.Combine(Environment.CurrentDirectory, "cardFotos"),
-			Path.Combine(Environment.CurrentDirectory, "..", "cardFotos"),
-			Path.Combine(AppContext.BaseDirectory, "cardFotos"),
-			Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardFotos")
-		};
+		var candidateDirectories = GetDefaultCardPhotosCandidates();
 
 		foreach (var candidate in candidateDirectories)
 		{
-			var fullPath = Path.GetFullPath(candidate);
-			if (Directory.Exists(fullPath))
+			if (Directory.Exists(candidate))
 			{
-				return fullPath;
+				return candidate;
 			}
 		}
 
-		return Path.GetFullPath(candidateDirectories[0]);
+		return candidateDirectories[0];
 	}
+
+	private static string ResolveDefaultSeriesCatalogPath()
+	{
+		var candidatePaths = GetDefaultSeriesCatalogCandidates();
+
+		foreach (var candidate in candidatePaths)
+		{
+			if (File.Exists(candidate))
+			{
+				return candidate;
+			}
+		}
+
+		return candidatePaths[0];
 	}
+
+	public static IReadOnlyList<string> GetDefaultCardPhotosCandidates()
+	{
+		return new[]
+		{
+			Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "cardFotos")),
+			Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "cardFotos")),
+			Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "..", "cardFotos")),
+			Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardFotos"))
+		};
+	}
+
+	public static IReadOnlyList<string> GetDefaultSeriesCatalogCandidates()
+	{
+		return new[]
+		{
+			Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "cardInfos", "series.json")),
+			Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "cardInfos", "series.json")),
+			Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "..", "cardInfos", "series.json")),
+			Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardInfos", "series.json"))
+		};
+	}
+}
 
 internal sealed class CardAnalysisResult
 {
@@ -415,6 +674,27 @@ internal sealed class GeminiCardPayload
 	public double Confidence { get; init; }
 	public string? ReasoningSummary { get; init; }
 	public string[]? DetectedText { get; init; }
+}
+
+internal sealed class SeriesCatalogRoot
+{
+	[JsonPropertyName("Ninjago_Sammelkarten_Serien")]
+	public SeriesInfo[]? Series { get; init; }
+}
+
+internal sealed class SeriesInfo
+{
+	[JsonPropertyName("Serie")]
+	public required string Serie { get; init; }
+
+	[JsonPropertyName("Jahr")]
+	public int Jahr { get; init; }
+
+	[JsonPropertyName("Besonderheiten")]
+	public string[] Besonderheiten { get; init; } = Array.Empty<string>();
+
+	[JsonPropertyName("Sondereditionen")]
+	public string[] Sondereditionen { get; init; } = Array.Empty<string>();
 }
 
 internal sealed class GeminiResponseEnvelope
