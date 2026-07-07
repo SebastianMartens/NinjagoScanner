@@ -70,4 +70,28 @@
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
+
+  <Target Name="PublishWebAppForDesktopBuild"
+          AfterTargets="Build"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <DesktopBuildWebOutputDir>$([System.IO.Path]::GetFullPath('$(TargetDir)NinjagoScanner.Web\'))</DesktopBuildWebOutputDir>
+    </PropertyGroup>
+
+    <MSBuild Projects="..\NinjagoScanner.Web\NinjagoScanner.Web.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(DesktopBuildWebOutputDir)" />
+  </Target>
+
+  <Target Name="PublishWebAppForDesktopPublish"
+          AfterTargets="Publish"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <DesktopPublishWebOutputDir>$([System.IO.Path]::GetFullPath('$(PublishDir)NinjagoScanner.Web\'))</DesktopPublishWebOutputDir>
+    </PropertyGroup>
+
+    <MSBuild Projects="..\NinjagoScanner.Web\NinjagoScanner.Web.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(DesktopPublishWebOutputDir)" />
+  </Target>
 </Project>
