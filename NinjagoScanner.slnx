@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NinjagoScanner.Console/NinjagoScanner.Console.csproj" />
+  <Project Path="NinjagoScanner.Web/NinjagoScanner.Web.csproj" />
+</Solution>

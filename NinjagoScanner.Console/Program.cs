@@ -349,7 +349,7 @@ internal sealed class AppConfig
 		{
 			ApiKey = configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
 			Model = configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-2.5-flash",
-			CardPhotosDirectory = configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? Path.Combine(Environment.CurrentDirectory, "cardFotos"),
+			CardPhotosDirectory = configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? ResolveDefaultCardPhotosDirectory(),
 			OverwriteExistingSidecars = bool.TryParse(configuration["Scanner:OverwriteSidecars"] ?? configuration["OVERWRITE_SIDECARS"], out var overwrite) && overwrite,
 			DelayBetweenRequestsMs = TryParseInt(configuration["Scanner:DelayBetweenRequestsMs"] ?? configuration["DELAY_BETWEEN_REQUESTS_MS"], 1000),
 			RetryDelayMs = TryParseInt(configuration["Scanner:RetryDelayMs"] ?? configuration["RETRY_DELAY_MS"], 3000),
@@ -361,6 +361,28 @@ internal sealed class AppConfig
 	private static int TryParseInt(string? value, int fallback)
 	{
 		return int.TryParse(value, out var parsedValue) ? parsedValue : fallback;
+	}
+
+	private static string ResolveDefaultCardPhotosDirectory()
+	{
+		var candidateDirectories = new[]
+		{
+			Path.Combine(Environment.CurrentDirectory, "cardFotos"),
+			Path.Combine(Environment.CurrentDirectory, "..", "cardFotos"),
+			Path.Combine(AppContext.BaseDirectory, "cardFotos"),
+			Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardFotos")
+		};
+
+		foreach (var candidate in candidateDirectories)
+		{
+			var fullPath = Path.GetFullPath(candidate);
+			if (Directory.Exists(fullPath))
+			{
+				return fullPath;
+			}
+		}
+
+		return Path.GetFullPath(candidateDirectories[0]);
 	}
 	}
 
