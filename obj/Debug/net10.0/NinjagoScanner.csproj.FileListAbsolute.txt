@@ -1,0 +1,14 @@
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\NinjagoScanner.exe
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\NinjagoScanner.deps.json
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\NinjagoScanner.runtimeconfig.json
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\NinjagoScanner.dll
+C:\sma\github\NinjagoScanner\bin\Debug\net10.0\NinjagoScanner.pdb
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.GeneratedMSBuildEditorConfig.editorconfig
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.AssemblyInfoInputs.cache
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.AssemblyInfo.cs
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.csproj.CoreCompileInputs.cache
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.dll
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\refint\NinjagoScanner.dll
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.pdb
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\NinjagoScanner.genruntimeconfig.cache
+C:\sma\github\NinjagoScanner\obj\Debug\net10.0\ref\NinjagoScanner.dll

@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Set-Location 'c:\\\\sma\\\\github\\\\NinjagoScanner'; dotnet --info; dotnet --list-sdks$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
