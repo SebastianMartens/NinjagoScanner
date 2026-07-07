@@ -1,5 +1,9 @@
-bin/
-obj/
+**/bin/
+**/obj/
+**/Debug/
+**/Release/
+out/
+build/
 
 .vs/
 .vscode/
