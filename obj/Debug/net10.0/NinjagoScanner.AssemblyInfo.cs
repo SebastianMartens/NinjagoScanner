@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("NinjagoScanner-3f1f764a-45f7-4c6d-b32d-d56e448d21c7")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c80e27139836df85297081a3880805567c491850")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+865a729bd89a592c9b577d163cf2394c2126fe48")]
 [assembly: System.Reflection.AssemblyProductAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("NinjagoScanner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
