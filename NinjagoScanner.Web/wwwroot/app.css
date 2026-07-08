@@ -360,6 +360,22 @@ body {
     color: #fff;
 }
 
+.table-set-select {
+    min-width: 10rem;
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border-radius: 12px;
+    border: 1px solid rgba(96, 78, 42, 0.22);
+    background: rgba(255, 255, 255, 0.9);
+    color: #1f1d19;
+}
+
+.table-set-hint {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: #6f6556;
+}
+
 .table-details-toggle {
     padding: 0.45rem 0.7rem;
     border: 1px solid rgba(96, 78, 42, 0.18);

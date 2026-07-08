@@ -76,7 +76,23 @@
 										<div class="table-secondary">@card.ImageFileName</div>
 									</td>
 									<td>@(card.CardNumber ?? "-")</td>
-									<td>@(card.SetName ?? "-")</td>
+									<td>
+										<select
+											class="table-set-select"
+											value="@GetSetSelectionValue(card)"
+											@onchange="async args => await OnSetChangedAsync(card, args)"
+											disabled="@IsSaving(card)">
+											<option value="">Ohne Set</option>
+											@foreach (var series in knownSeries)
+											{
+												<option value="@series">@series</option>
+											}
+										</select>
+										@if (IsSaving(card))
+										{
+											<div class="table-set-hint">Speichert...</div>
+										}
+									</td>
 									<td><span class="table-status @GetStatusClass(card.Status)">@GetStatusLabel(card.Status)</span></td>
 									<td>@(card.Rarity ?? "-")</td>
 									<td>@card.Confidence.ToString("0.00")</td>
@@ -121,9 +137,12 @@
 	private string groupBy = "set";
 	private string searchText = string.Empty;
 	private string? expandedCardKey;
+	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
+	private string? savingCardKey;
 
 	protected override async Task OnInitializedAsync()
 	{
+		knownSeries = await CardCatalogService.GetKnownSeriesAsync();
 		cards = (await CardCatalogService.GetCardsAsync()).ToList();
 		isLoading = false;
 	}
@@ -185,6 +204,53 @@
 	private void ToggleDetails(CardListItem card)
 	{
 		expandedCardKey = IsExpanded(card) ? null : card.ImageFileName;
+	}
+
+	private string GetSetSelectionValue(CardListItem card)
+	{
+		return knownSeries.Contains(card.SetName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+			? card.SetName ?? string.Empty
+			: string.Empty;
+	}
+
+	private bool IsSaving(CardListItem card)
+	{
+		return string.Equals(savingCardKey, card.ImageFileName, StringComparison.Ordinal);
+	}
+
+	private async Task OnSetChangedAsync(CardListItem card, ChangeEventArgs args)
+	{
+		var newSetName = args.Value?.ToString();
+		savingCardKey = card.ImageFileName;
+
+		try
+		{
+			await CardCatalogService.UpdateSetNameAsync(card.ImageFileName, newSetName);
+
+			var index = cards.FindIndex(entry => string.Equals(entry.ImageFileName, card.ImageFileName, StringComparison.Ordinal));
+			if (index >= 0)
+			{
+				cards[index] = new CardListItem
+				{
+					ImageFileName = card.ImageFileName,
+					ImageUrl = card.ImageUrl,
+					Status = card.Status,
+					CardName = card.CardName,
+					CardNumber = card.CardNumber,
+					SetName = string.IsNullOrWhiteSpace(newSetName) ? null : newSetName,
+					Rarity = card.Rarity,
+					Confidence = card.Confidence,
+					ReasoningSummary = card.ReasoningSummary,
+					DetectedText = card.DetectedText,
+					ScannedAtUtc = card.ScannedAtUtc,
+					ErrorMessage = card.ErrorMessage
+				};
+			}
+		}
+		finally
+		{
+			savingCardKey = null;
+		}
 	}
 
 	private string GetGroupKey(CardListItem card) => groupBy switch
