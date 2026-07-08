@@ -360,7 +360,29 @@ body {
     color: #fff;
 }
 
+.table-details-toggle {
+    padding: 0.45rem 0.7rem;
+    border: 1px solid rgba(96, 78, 42, 0.18);
+    border-radius: 999px;
+    background: rgba(242, 236, 223, 0.78);
+    color: #473f32;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.table-details-toggle:hover {
+    background: rgba(231, 221, 196, 0.92);
+}
+
+.table-details-toggle:focus-visible {
+    outline: 2px solid #8b3f1f;
+    outline-offset: 2px;
+}
+
 .table-details {
+    margin-top: 0.65rem;
     max-width: 38rem;
     color: #473f32;
     font-size: 0.92rem;
@@ -368,10 +390,15 @@ body {
 }
 
 .table-error {
+    margin-top: 0.65rem;
     max-width: 32rem;
     color: #963b30;
     font-weight: 700;
     font-size: 0.92rem;
+}
+
+.table-details-empty {
+    color: #8d8372;
 }
 
 @media (max-width: 700px) {

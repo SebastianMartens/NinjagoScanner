@@ -264,8 +264,18 @@ static IReadOnlyList<SeriesInfo> LoadSeriesCatalog(string seriesCatalogPath)
 	{
 		var json = File.ReadAllText(seriesCatalogPath, Encoding.UTF8);
 		var catalog = JsonSerializer.Deserialize<SeriesCatalogRoot>(json, JsonOptions.Default);
+		var cardNamesBySeries = LoadSeriesCardNames(seriesCatalogPath);
+
 		return catalog?.Series?
 			.Where(series => !string.IsNullOrWhiteSpace(series.Serie))
+			.Select(series => new SeriesInfo
+			{
+				Serie = series.Serie,
+				Jahr = series.Jahr,
+				Besonderheiten = series.Besonderheiten,
+				Sondereditionen = series.Sondereditionen,
+				CardNames = ResolveSeriesCardNames(series, cardNamesBySeries)
+			})
 			.ToArray() ?? Array.Empty<SeriesInfo>();
 	}
 	catch (Exception exception)
@@ -273,6 +283,95 @@ static IReadOnlyList<SeriesInfo> LoadSeriesCatalog(string seriesCatalogPath)
 		Console.WriteLine($"Warnung: Serienkatalog konnte nicht geladen werden: {exception.Message}");
 		return Array.Empty<SeriesInfo>();
 	}
+}
+
+static IReadOnlyDictionary<string, string[]> LoadSeriesCardNames(string seriesCatalogPath)
+{
+	var seriesDirectory = Path.GetDirectoryName(seriesCatalogPath);
+	if (string.IsNullOrWhiteSpace(seriesDirectory) || !Directory.Exists(seriesDirectory))
+	{
+		return new Dictionary<string, string[]>(StringComparer.Ordinal);
+	}
+
+	var cardNamesBySeries = new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+	foreach (var detailFilePath in Directory.EnumerateFiles(seriesDirectory, "series_*.json"))
+	{
+		try
+		{
+			using var document = JsonDocument.Parse(File.ReadAllText(detailFilePath, Encoding.UTF8));
+			if (document.RootElement.ValueKind != JsonValueKind.Object)
+			{
+				continue;
+			}
+
+			foreach (var property in document.RootElement.EnumerateObject())
+			{
+				if (property.Value.ValueKind != JsonValueKind.Object)
+				{
+					continue;
+				}
+
+				var cardNames = ExtractSeriesCardNames(property.Value);
+				if (cardNames.Length == 0)
+				{
+					continue;
+				}
+
+				cardNamesBySeries[NormalizeLookupText(property.Name.Replace('_', ' '))] = cardNames;
+			}
+		}
+		catch (Exception exception)
+		{
+			Console.WriteLine($"Warnung: Serien-Detaildatei '{detailFilePath}' konnte nicht geladen werden: {exception.Message}");
+		}
+	}
+
+	return cardNamesBySeries;
+}
+
+static string[] ExtractSeriesCardNames(JsonElement rootElement)
+{
+	var cardNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+	CollectSeriesCardNames(rootElement, cardNames);
+
+	return cardNames
+		.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+		.ToArray();
+}
+
+static void CollectSeriesCardNames(JsonElement element, HashSet<string> cardNames)
+{
+	switch (element.ValueKind)
+	{
+		case JsonValueKind.Object:
+			foreach (var property in element.EnumerateObject())
+			{
+				if (property.NameEquals("Name")
+					&& property.Value.ValueKind == JsonValueKind.String
+					&& !string.IsNullOrWhiteSpace(property.Value.GetString()))
+				{
+					cardNames.Add(property.Value.GetString()!.Trim());
+				}
+
+				CollectSeriesCardNames(property.Value, cardNames);
+			}
+			break;
+
+		case JsonValueKind.Array:
+			foreach (var child in element.EnumerateArray())
+			{
+				CollectSeriesCardNames(child, cardNames);
+			}
+			break;
+	}
+}
+
+static string[] ResolveSeriesCardNames(SeriesInfo series, IReadOnlyDictionary<string, string[]> cardNamesBySeries)
+{
+	return cardNamesBySeries.TryGetValue(NormalizeLookupText(series.Serie), out var cardNames)
+		? cardNames
+		: Array.Empty<string>();
 }
 
 static string BuildSeriesPrompt(IReadOnlyList<SeriesInfo> seriesCatalog)
@@ -299,6 +398,12 @@ static string BuildSeriesPrompt(IReadOnlyList<SeriesInfo> seriesCatalog)
 				.Append(')');
 		}
 
+		if (series.CardNames.Length > 0)
+		{
+			builder.Append(" | Bekannte Kartennamen: ")
+				.Append(string.Join(", ", series.CardNames));
+		}
+
 		builder.AppendLine();
 	}
 
@@ -318,7 +423,7 @@ static string? ResolveSetName(GeminiCardPayload payload, IReadOnlyList<SeriesInf
 		return exactMatch.Serie;
 	}
 
-	var inferredMatch = FindSeriesByEvidence(seriesCatalog, payload.SetName, payload.ReasoningSummary, payload.DetectedText);
+	var inferredMatch = FindSeriesByEvidence(seriesCatalog, payload.SetName, payload.CardName, payload.ReasoningSummary, payload.DetectedText);
 	return inferredMatch?.Serie;
 }
 
@@ -333,10 +438,11 @@ static SeriesInfo? FindSeriesByName(IReadOnlyList<SeriesInfo> seriesCatalog, str
 	return seriesCatalog.FirstOrDefault(series => NormalizeLookupText(series.Serie) == normalizedCandidate);
 }
 
-static SeriesInfo? FindSeriesByEvidence(IReadOnlyList<SeriesInfo> seriesCatalog, string? setName, string? reasoningSummary, string[]? detectedText)
+static SeriesInfo? FindSeriesByEvidence(IReadOnlyList<SeriesInfo> seriesCatalog, string? setName, string? cardName, string? reasoningSummary, string[]? detectedText)
 {
 	var evidence = new List<string>();
 	AddEvidence(evidence, setName);
+	AddEvidence(evidence, cardName);
 	AddEvidence(evidence, reasoningSummary);
 
 	if (detectedText is not null)
@@ -399,6 +505,10 @@ static int ScoreSeriesMatch(SeriesInfo series, IReadOnlyList<string> evidence)
 	var normalizedName = NormalizeLookupText(series.Serie);
 	var symbolHint = NormalizeLookupText(ExtractSeriesSymbolHint(series));
 	var year = series.Jahr > 0 ? series.Jahr.ToString() : null;
+	var normalizedCardNames = series.CardNames
+		.Select(NormalizeLookupText)
+		.Where(name => !string.IsNullOrWhiteSpace(name))
+		.ToArray();
 
 	foreach (var text in evidence)
 	{
@@ -415,6 +525,11 @@ static int ScoreSeriesMatch(SeriesInfo series, IReadOnlyList<string> evidence)
 		if (year is not null && text.Contains(year, StringComparison.Ordinal))
 		{
 			score = Math.Max(score, 20);
+		}
+
+		if (normalizedCardNames.Any(cardName => text.Contains(cardName, StringComparison.Ordinal)))
+		{
+			score = Math.Max(score, 35);
 		}
 
 		if (string.Equals(series.Serie, "Serie 1", StringComparison.OrdinalIgnoreCase)
@@ -695,6 +810,8 @@ internal sealed class SeriesInfo
 
 	[JsonPropertyName("Sondereditionen")]
 	public string[] Sondereditionen { get; init; } = Array.Empty<string>();
+
+	public string[] CardNames { get; init; } = Array.Empty<string>();
 }
 
 internal sealed class GeminiResponseEnvelope

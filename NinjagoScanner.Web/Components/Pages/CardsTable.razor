@@ -81,13 +81,28 @@
 									<td>@(card.Rarity ?? "-")</td>
 									<td>@card.Confidence.ToString("0.00")</td>
 									<td>
-										@if (!string.IsNullOrWhiteSpace(card.ErrorMessage))
+										@if (HasDetails(card))
 										{
-											<div class="table-error">@card.ErrorMessage</div>
+											var isExpanded = IsExpanded(card);
+											<button type="button" class="table-details-toggle" @onclick="() => ToggleDetails(card)">
+												@(isExpanded ? "Details ausblenden" : "Details anzeigen")
+											</button>
+
+											@if (isExpanded)
+											{
+												@if (!string.IsNullOrWhiteSpace(card.ErrorMessage))
+												{
+													<div class="table-error">@card.ErrorMessage</div>
+												}
+												else if (!string.IsNullOrWhiteSpace(card.ReasoningSummary))
+												{
+													<div class="table-details">@card.ReasoningSummary</div>
+												}
+											}
 										}
-										else if (!string.IsNullOrWhiteSpace(card.ReasoningSummary))
+										else
 										{
-											<div class="table-details">@card.ReasoningSummary</div>
+											<span class="table-details-empty">-</span>
 										}
 									</td>
 								</tr>
@@ -105,6 +120,7 @@
 	private bool isLoading = true;
 	private string groupBy = "set";
 	private string searchText = string.Empty;
+	private string? expandedCardKey;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -153,6 +169,22 @@
 			}.Where(value => !string.IsNullOrWhiteSpace(value)));
 
 		return haystack.Contains(query, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private static bool HasDetails(CardListItem card)
+	{
+		return !string.IsNullOrWhiteSpace(card.ErrorMessage)
+			|| !string.IsNullOrWhiteSpace(card.ReasoningSummary);
+	}
+
+	private bool IsExpanded(CardListItem card)
+	{
+		return string.Equals(expandedCardKey, card.ImageFileName, StringComparison.Ordinal);
+	}
+
+	private void ToggleDetails(CardListItem card)
+	{
+		expandedCardKey = IsExpanded(card) ? null : card.ImageFileName;
 	}
 
 	private string GetGroupKey(CardListItem card) => groupBy switch
