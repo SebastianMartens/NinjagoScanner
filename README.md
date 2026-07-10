@@ -2,7 +2,7 @@
 
 Dieses Repository enthaelt drei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
 
-- `NinjagoScanner.Console`: Konsolenanwendung fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
+- `NinjagoScanner.Backend`: Scanner-Backendbibliothek fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
 - `NinjagoScanner.Web`: Blazor-Webanwendung zur Anzeige der Karten als Kacheln und in Tabellenform.
 - `NinjagoScanner.Desktop`: WinUI-Desktopanwendung mit einem einzelnen Fenster und eingebettetem WebView fuer die Webanwendung.
 
@@ -13,7 +13,7 @@ Die Projektmappe im Root ist `NinjagoScanner.slnx`.
 ```text
 NinjagoScanner/
 |-- cardFotos/
-|-- NinjagoScanner.Console/
+|-- NinjagoScanner.Backend/
 |-- NinjagoScanner.Desktop/
 |-- NinjagoScanner.Web/
 |-- NinjagoScanner.slnx
@@ -22,7 +22,7 @@ NinjagoScanner/
 ## Voraussetzungen
 
 - .NET SDK 10
-- Ein Gemini-API-Key fuer die Konsolenanwendung
+- Ein Gemini-API-Key fuer das Backend
 
 ## Kartenbilder
 
@@ -33,25 +33,21 @@ In diesem Ordner liegen:
 - die Bilddateien, zum Beispiel `IMG_20260707_162946.jpg`
 - die Sidecar-Dateien, zum Beispiel `IMG_20260707_162946.jpg.json`
 
-## Konsolenanwendung
+## Backend
 
 Projektpfad:
 
-- [NinjagoScanner.Console/NinjagoScanner.Console.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Console/NinjagoScanner.Console.csproj)
+- [NinjagoScanner.Backend/NinjagoScanner.Backend.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Backend/NinjagoScanner.Backend.csproj)
 
-### Entwicklung starten
-
-```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Console
-dotnet run
-```
+Das Backend ist eine Library und wird von der Webanwendung genutzt.
+Der Gemini-Scan wird aus der Weboberflaeche gestartet.
 
 ### Gemini konfigurieren
 
 Empfohlen ueber User Secrets:
 
 ```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Console
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Backend
 dotnet user-secrets set "Gemini:ApiKey" "DEIN_KEY"
 dotnet user-secrets set "Gemini:Model" "gemini-2.5-flash"
 ```
@@ -65,7 +61,7 @@ $env:GEMINI_MODEL="gemini-2.5-flash"
 
 ### Verhalten bei `cardFotos`
 
-Die Konsolenanwendung sucht standardmaessig in dieser Reihenfolge nach dem Bildordner:
+Das Backend sucht standardmaessig in dieser Reihenfolge nach dem Bildordner:
 
 1. `cardFotos` direkt neben der EXE
 2. `cardFotos` im aktuellen Arbeitsverzeichnis
@@ -77,18 +73,18 @@ Zusatzlich kann der Bildordner explizit gesetzt werden:
 - `CardPhotos:Directory`
 - `CARD_PHOTOS_DIRECTORY`
 
-### Publish
+### Build
 
 ```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Console
-dotnet publish -c Release
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Backend
+dotnet build
 ```
 
-Der Publish-Ordner liegt standardmaessig unter:
+Der Build-Ordner liegt standardmaessig unter:
 
-- `NinjagoScanner.Console\bin\Release\net10.0\publish`
+- `NinjagoScanner.Backend\bin\Debug\net10.0`
 
-Wichtig: `cardFotos` wird beim Build und Publish automatisch mitkopiert und liegt danach direkt neben der EXE im Publish-Ordner.
+Wichtig: Die Sidecar-Dateien werden im konfigurierten `cardFotos`-Ordner geschrieben.
 
 ## Webanwendung
 
@@ -114,11 +110,16 @@ Danach ist die App lokal erreichbar, typischerweise unter einer URL wie:
 
 ### Verhalten bei `cardFotos`
 
-Die Webanwendung liest den Ordner aktuell relativ zum Projektinhalt:
+Die Webanwendung nutzt einen konfigurierbaren Bildordner und versucht standardmaessig den gemeinsamen `cardFotos`-Ordner ausserhalb von `bin` zu finden.
 
-- `..\cardFotos` relativ zum Content Root der Webanwendung
+Konfigurationsreihenfolge:
 
-Das funktioniert in der Entwicklungsstruktur dieses Repositorys direkt mit dem gemeinsamen Root-Ordner `cardFotos`.
+1. `CardPhotos:Directory`
+2. `CardPhotosDirectory`
+3. `NINJAGO_CARD_PHOTOS_DIR`
+4. `CARD_PHOTOS_DIRECTORY`
+
+Wenn nichts gesetzt ist, wird der naechste vorhandene `cardFotos`-Ordner in den uebergeordneten Verzeichnissen gesucht (mit Praeferenz ausserhalb von `bin`).
 
 ## Desktopanwendung
 
@@ -147,8 +148,10 @@ Optional kann die Desktopanwendung explizit konfiguriert werden:
 
 - `NINJAGO_WEB_URL` : feste URL der Webanwendung
 - `NINJAGO_WEB_EXE` : expliziter Pfad zur `NinjagoScanner.Web.exe`
+- `NINJAGO_CARD_PHOTOS_DIR` : expliziter Pfad zum gemeinsamen `cardFotos`-Ordner
 
 Ohne Konfiguration sucht die Desktopanwendung standardmaessig nach der Web-EXE in typischen Build- und Publish-Pfaden des Repositorys.
+Beim automatischen Start der Webanwendung uebergibt Desktop den ermittelten `cardFotos`-Pfad per `NINJAGO_CARD_PHOTOS_DIR`.
 
 ## Root-Build
 

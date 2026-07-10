@@ -1,5 +1,6 @@
 <Solution>
-  <Project Path="NinjagoScanner.Console/NinjagoScanner.Console.csproj" />
+  <Project Path="NinjagoScanner.Scanner.Abstractions/NinjagoScanner.Scanner.Abstractions.csproj" />
+  <Project Path="NinjagoScanner.Backend/NinjagoScanner.Backend.csproj" />
   <Project Path="NinjagoScanner.Desktop/NinjagoScanner.Desktop.csproj">
     <Platform Project="x86" />
   </Project>

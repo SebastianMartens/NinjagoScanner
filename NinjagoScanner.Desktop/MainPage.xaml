@@ -20,13 +20,14 @@
             Padding="24"
             Background="#CC1B232B"
             CornerRadius="18">
-            <StackPanel Spacing="12" HorizontalAlignment="Center">
-                <ProgressRing IsActive="True" Width="42" Height="42" HorizontalAlignment="Center" />
+            <StackPanel Spacing="12" HorizontalAlignment="Center" MaxWidth="760">
+                <ProgressRing x:Name="LoadingProgressRing" IsActive="True" Width="42" Height="42" HorizontalAlignment="Center" />
                 <TextBlock
                     x:Name="StatusTextBlock"
                     HorizontalAlignment="Center"
                     Foreground="White"
                     FontSize="16"
+                    TextWrapping="WrapWholeWords"
                     Text="Starte Web-Anwendung..." />
             </StackPanel>
         </Border>

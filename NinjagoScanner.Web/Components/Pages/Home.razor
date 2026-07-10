@@ -1,5 +1,6 @@
 ﻿@page "/"
 @inject CardCatalogService CardCatalogService
+@inject IGeminiCardScanner GeminiCardScanner
 
 <PageTitle>Ninjago Karten</PageTitle>
 
@@ -9,6 +10,15 @@
 			<p class="eyebrow">Ninjago Scanner</p>
 			<h1>Kartenuebersicht</h1>
 			<p class="lede">Bilder und analysierte Kartendetails aus dem Ordner <strong>cardFotos</strong>.</p>
+			<div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
+				<button class="btn btn-primary" type="button" disabled="@isScanning" @onclick="StartGeminiScanAsync">
+					@(isScanning ? "Gemini-Scan laeuft..." : "Gemini-Suche starten")
+				</button>
+				@if (!string.IsNullOrWhiteSpace(scanStatusMessage))
+				{
+					<span>@scanStatusMessage</span>
+				}
+			</div>
 		</div>
 		<div class="cards-stats">
 			<span>@cards.Count Karte(n)</span>
@@ -91,11 +101,38 @@
 @code {
 	private List<CardListItem> cards = [];
 	private bool isLoading = true;
+	private bool isScanning;
+	private string? scanStatusMessage;
 
 	protected override async Task OnInitializedAsync()
 	{
 		cards = (await CardCatalogService.GetCardsAsync()).ToList();
 		isLoading = false;
+	}
+
+	private async Task StartGeminiScanAsync()
+	{
+		isScanning = true;
+		scanStatusMessage = null;
+
+		try
+		{
+			var summary = await GeminiCardScanner.ScanAsync(new GeminiScanRequest
+			{
+				CardPhotosDirectory = CardCatalogService.CardPhotosDirectory,
+				SeriesCatalogPath = CardCatalogService.SeriesCatalogPath
+			});
+
+			scanStatusMessage = summary.HasConfigurationError
+				? summary.Message ?? "Scan konnte nicht gestartet werden."
+				: $"Scan fertig: {summary.Processed} verarbeitet, {summary.Skipped} uebersprungen, {summary.Uncertain} unsicher, {summary.Failed} fehlgeschlagen.";
+
+			cards = (await CardCatalogService.GetCardsAsync()).ToList();
+		}
+		finally
+		{
+			isScanning = false;
+		}
 	}
 
 	private static string GetStatusClass(string status) => status.ToLowerInvariant() switch

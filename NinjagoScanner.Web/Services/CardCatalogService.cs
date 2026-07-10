@@ -24,6 +24,10 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
 
     private readonly string seriesCatalogPath = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos", "series.json"));
 
+    public string CardPhotosDirectory => cardPhotosDirectory;
+
+    public string SeriesCatalogPath => seriesCatalogPath;
+
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(cardPhotosDirectory))
