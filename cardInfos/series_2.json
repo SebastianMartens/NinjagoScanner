@@ -3,6 +3,10 @@
     "Jahr": 2017,
     "Logo": "Silhouette einer Schlange",
     "Thema": "Hands of Time (Zeitklingen und Zeitmeister)",
+    "Besonderheiten": [
+        "Einführung von Puzzle-Karten",
+        "Zeitklingen als neue Spielmechanik"
+      ],
     "Kategorien": {
       "Good_Guys": [
         {"Karten-Nr.": 1, "Name": "Undercover Kai"},

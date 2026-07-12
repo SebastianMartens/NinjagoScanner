@@ -1,0 +1,159 @@
+@page "/collection"
+@inject CardCatalogService CardCatalogService
+
+<PageTitle>Sammlungsuebersicht</PageTitle>
+
+<div class="collection-page">
+    <header class="collection-header">
+        <div>
+            <p class="eyebrow">Ninjago Scanner</p>
+            <h1>Alle Karten im Ueberblick</h1>
+            <p class="lede">Kompakte Listenansicht aller Karten aus den series_x.json Dateien mit Besitzstatus basierend auf Fotos im Ordner <strong>cardFotos</strong>.</p>
+        </div>
+
+        @if (!isLoading)
+        {
+            <div class="collection-stats">
+                <span>@allCards.Count Karte(n) gesamt</span>
+                <span>@allCards.Count(card => card.IsOwned) im Besitz</span>
+                <span>@allCards.Count(card => card.IsDuplicateOwned) mehrfach</span>
+                <span>@overview.TotalPhotos Fotos</span>
+                <span>@overview.MappedPhotos zugeordnet</span>
+                @if (overview.UnmappedPhotos > 0)
+                {
+                    <span>@overview.UnmappedPhotos nicht zugeordnet</span>
+                }
+            </div>
+        }
+    </header>
+
+    <div class="collection-controls">
+        <label>
+            <span>Serie</span>
+            <select @bind="selectedSeries">
+                <option value="">Alle Serien</option>
+                @foreach (var series in availableSeries)
+                {
+                    <option value="@series">@series</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <span>Suche</span>
+            <input @bind="searchText" @bind:event="oninput" placeholder="Kartennummer oder Kartenname" />
+        </label>
+
+        <label class="collection-checkbox">
+            <input type="checkbox" @bind="showOnlyMissing" />
+            <span>Nur fehlende Karten</span>
+        </label>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Lade Sammlungsdaten...</p>
+    }
+    else if (!FilteredCards.Any())
+    {
+        <div class="empty-state">
+            <h2>Keine Treffer</h2>
+            <p>Fuer die aktuelle Filterkombination wurden keine Karten gefunden.</p>
+        </div>
+    }
+    else
+    {
+        <div class="collection-table-wrapper">
+            <table class="collection-table">
+                <thead>
+                    <tr>
+                        <th>Serie</th>
+                        <th>Nr.</th>
+                        <th>Name</th>
+                        <th>Besitz</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var card in FilteredCards)
+                    {
+                        <tr class="@(card.IsOwned ? "owned-row" : "missing-row")">
+                            <td>@card.Series</td>
+                            <td>@card.CardNumber</td>
+                            <td>@card.CardName</td>
+                            <td>
+                                @if (!card.IsOwned)
+                                {
+                                    <span class="ownership-badge ownership-missing">Fehlt</span>
+                                }
+                                else if (card.IsDuplicateOwned)
+                                {
+                                    <span class="ownership-badge ownership-duplicate">Mehrfach (@card.OwnedCopies)</span>
+                                }
+                                else
+                                {
+                                    <span class="ownership-badge ownership-owned">Vorhanden</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private CollectionOverviewResult overview = new CollectionOverviewResult
+    {
+        Cards = Array.Empty<CollectionCardItem>()
+    };
+
+    private List<CollectionCardItem> allCards = [];
+    private List<string> availableSeries = [];
+
+    private bool isLoading = true;
+    private bool showOnlyMissing;
+    private string selectedSeries = string.Empty;
+    private string searchText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        overview = await CardCatalogService.GetCollectionOverviewAsync();
+        allCards = overview.Cards.ToList();
+        availableSeries = allCards
+            .Select(card => card.Series)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(series => series, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        isLoading = false;
+    }
+
+    private IEnumerable<CollectionCardItem> FilteredCards
+    {
+        get
+        {
+            IEnumerable<CollectionCardItem> query = allCards;
+
+            if (!string.IsNullOrWhiteSpace(selectedSeries))
+            {
+                query = query.Where(card => string.Equals(card.Series, selectedSeries, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (showOnlyMissing)
+            {
+                query = query.Where(card => !card.IsOwned);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var term = searchText.Trim();
+                query = query.Where(card =>
+                    card.CardNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || card.CardName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return query;
+        }
+    }
+}

@@ -3,23 +3,12 @@
     {
       "Serie": "Serie 1",
       "Jahr": 2016,
-      "Besonderheiten": [
-        "Erste Serie mit 180 Karten, später um 10 Karten (181-190) erweitert",
-        "Kein Logo auf den Karten",
-        "Ultra-Karten (181-184) als erste Platin-Karten"
-      ],
-      "Sondereditionen": [],
-      "Limitierte_Karten": []
+      "Sondereditionen": []      
     },
     {
       "Serie": "Serie 2",
-      "Jahr": 2017,
-      "Besonderheiten": [
-        "Einführung von Puzzle-Karten",
-        "Zeitklingen als neue Spielmechanik"
-      ],
-      "Sondereditionen": [],
-      "Limitierte_Karten": []
+      "Jahr": 2017,    
+      "Sondereditionen": []
     },
     {
       "Serie": "Serie 3",
@@ -28,28 +17,16 @@
         "Logo: Silhouette einer Oni-Maske (Maske der Täuschung)",
         "Garmadons Motorrad-Gang als Thema"
       ],
-      "Sondereditionen": [],
-      "Limitierte_Karten": []
+      "Sondereditionen": []      
     },
     {
       "Serie": "Serie 4",
       "Jahr": 2019,
-      "Besonderheiten": [
-        "Logo: Auge eines Drachen",
-        "Drachenkarten (bestehen aus zwei Karten)",
-        "Sofortiger Sieg bei Platzierung eines Drachen mit passendem Drachenmeister"
-      ],
-      "Sondereditionen": [],
-      "Limitierte_Karten": []
+      "Sondereditionen": []
     },
     {
       "Serie": "Serie 5",
-      "Jahr": 2020,
-      "Besonderheiten": [
-        "Logo: Verpixelter Totenkopf (verschiedene Farben, nie rot oder gelb)",
-        "Einführung von Fallenkarten",
-        "Digitale Videospiel-Welt als Thema"
-      ],
+      "Jahr": 2020,      
       "Sondereditionen": [],
       "Limitierte_Karten": [
         {"Karte": "LE1 – Digi Lloyd", "Fundort": "Starter-Pack", "Erscheinungsdatum": "21.01.2020"},
@@ -76,12 +53,6 @@
     {
       "Serie": "Serie 5 Next Level",
       "Jahr": 2020,
-      "Besonderheiten": [
-        "Logo: Pixel-Totenkopf (gelb auf rotem Grund, bei Fallenkarten rot auf sandigem Grund)",
-        "Erste Next-Level-Serie mit 126 Hauptkarten",
-        "Einführung von Level-Up-Karten",
-        "Erster LEGO Ninjago Adventskalender mit 4 exklusiven LE-Karten"
-      ],
       "Sondereditionen": ["Adventskalender-LE-Karten"],
       "Limitierte_Karten": [
         {"Karte": "LE1 – Arcade Kai", "Fundort": "Starter-Pack", "Erscheinungsdatum": "04.08.2020"},

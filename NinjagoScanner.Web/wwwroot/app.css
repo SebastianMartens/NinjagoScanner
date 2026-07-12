@@ -480,6 +480,123 @@ body {
     text-align: center;
 }
 
+.collection-page {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+}
+
+.collection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1.5rem;
+    margin-bottom: 1.2rem;
+}
+
+.collection-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.collection-stats span {
+    padding: 0.5rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(128, 104, 59, 0.16);
+    font-size: 0.88rem;
+}
+
+.collection-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.collection-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #5b5649;
+    font-weight: 700;
+}
+
+.collection-controls select,
+.collection-controls input {
+    min-width: 220px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid rgba(96, 78, 42, 0.22);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.collection-checkbox {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 0.5rem !important;
+    padding-bottom: 0.55rem;
+}
+
+.collection-table-wrapper {
+    overflow: auto;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(96, 78, 42, 0.14);
+    box-shadow: 0 20px 40px rgba(59, 46, 20, 0.08);
+}
+
+.collection-table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+}
+
+.collection-table th,
+.collection-table td {
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid rgba(96, 78, 42, 0.1);
+}
+
+.collection-table th {
+    text-align: left;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7f7157;
+    background: rgba(244, 239, 228, 0.95);
+    position: sticky;
+    top: 0;
+}
+
+.owned-row {
+    background: rgba(222, 240, 227, 0.4);
+}
+
+.ownership-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.28rem 0.62rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.ownership-owned {
+    background: #2b7a44;
+}
+
+.ownership-duplicate {
+    background: #8f5d13;
+}
+
+.ownership-missing {
+    background: #7a3940;
+}
+
 @media (max-width: 700px) {
     .cards-header {
         flex-direction: column;
@@ -497,5 +614,10 @@ body {
 
     .table-image-preview-backdrop {
         padding: 1rem;
+    }
+
+    .collection-header {
+        flex-direction: column;
+        align-items: start;
     }
 }
