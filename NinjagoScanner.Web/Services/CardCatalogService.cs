@@ -116,12 +116,14 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
                 return new CollectionCardItem
                 {
                     Series = card.Series,
+                    Category = card.Category,
                     CardNumber = card.CardNumber,
                     CardName = card.CardName,
                     OwnedCopies = ownedCopies
                 };
             })
             .OrderBy(card => card.Series, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
             .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -132,6 +134,91 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
             TotalPhotos = totalPhotos,
             MappedPhotos = mappedPhotos
         });
+    }
+
+    public Task<CollectionCardDetails?> GetCollectionCardDetailsAsync(
+        string series,
+        string category,
+        string cardNumber,
+        string cardName,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cardsFromSeries = LoadCardsFromSeriesFiles(cancellationToken);
+        var card = cardsFromSeries.FirstOrDefault(entry =>
+            string.Equals(NormalizeSeriesKey(entry.Series), NormalizeSeriesKey(series), StringComparison.Ordinal)
+            && string.Equals(entry.CardNumber, NormalizeCardNumber(cardNumber), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(entry.CardName, cardName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase));
+
+        if (string.IsNullOrWhiteSpace(card.Series))
+        {
+            return Task.FromResult<CollectionCardDetails?>(null);
+        }
+
+        var metadata = LoadSeriesMetadata(series, cancellationToken);
+        var photos = LoadCardPhotos(series, cardNumber, cancellationToken);
+
+        return Task.FromResult<CollectionCardDetails?>(new CollectionCardDetails
+        {
+            Series = card.Series,
+            Category = card.Category,
+            CardNumber = card.CardNumber,
+            CardName = card.CardName,
+            Year = metadata.Year,
+            Logo = metadata.Logo,
+            Theme = metadata.Theme,
+            Highlights = metadata.Highlights,
+            Photos = photos
+        });
+    }
+
+    public async Task UpdateCardSidecarAsync(
+        string imageFileName,
+        CollectionCardSidecarUpdate update,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var imagePath = Path.Combine(cardPhotosDirectory, imageFileName);
+        var sidecarPath = imagePath + ".json";
+
+        CardSidecar existing;
+        if (File.Exists(sidecarPath))
+        {
+            await using var readStream = File.OpenRead(sidecarPath);
+            existing = await JsonSerializer.DeserializeAsync<CardSidecar>(readStream, JsonOptions, cancellationToken)
+                ?? new CardSidecar();
+        }
+        else
+        {
+            existing = new CardSidecar
+            {
+                SourceFileName = imageFileName,
+                SourceFilePath = imagePath,
+                SidecarFilePath = sidecarPath
+            };
+        }
+
+        var updated = existing with
+        {
+            Status = NormalizeNullable(update.Status),
+            CardName = NormalizeNullable(update.CardName),
+            CardNumber = NormalizeNullable(update.CardNumber),
+            SetName = NormalizeNullable(update.SetName),
+            Rarity = NormalizeNullable(update.Rarity),
+            Confidence = update.Confidence,
+            ReasoningSummary = NormalizeNullable(update.ReasoningSummary),
+            DetectedText = update.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).ToArray(),
+            ErrorMessage = NormalizeNullable(update.ErrorMessage),
+            SourceFileName = existing.SourceFileName ?? imageFileName,
+            SourceFilePath = existing.SourceFilePath ?? imagePath,
+            SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
+        };
+
+        await using var writeStream = File.Create(sidecarPath);
+        await JsonSerializer.SerializeAsync(writeStream, updated, JsonOptions, cancellationToken);
     }
 
     public Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
@@ -163,12 +250,12 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
         }
     }
 
-    private IReadOnlyList<(string Series, string CardNumber, string CardName)> LoadCardsFromSeriesFiles(CancellationToken cancellationToken)
+    private IReadOnlyList<(string Series, string Category, string CardNumber, string CardName)> LoadCardsFromSeriesFiles(CancellationToken cancellationToken)
     {
         var cardInfosDirectory = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos"));
         if (!Directory.Exists(cardInfosDirectory))
         {
-            return Array.Empty<(string Series, string CardNumber, string CardName)>();
+            return Array.Empty<(string Series, string Category, string CardNumber, string CardName)>();
         }
 
         var files = Directory
@@ -177,7 +264,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
             .ToArray();
 
         var uniqueCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var cards = new List<(string Series, string CardNumber, string CardName)>();
+        var cards = new List<(string Series, string Category, string CardNumber, string CardName)>();
 
         foreach (var file in files)
         {
@@ -193,7 +280,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
 
             var seriesName = ToSeriesDisplayName(document.RootElement.EnumerateObject().First().Name);
 
-            foreach (var card in EnumerateCardEntries(seriesRoot))
+            foreach (var card in EnumerateCardEntries(seriesRoot, []))
             {
                 var normalizedNumber = NormalizeCardNumber(card.CardNumber);
                 if (string.IsNullOrWhiteSpace(normalizedNumber) || string.IsNullOrWhiteSpace(card.CardName))
@@ -201,17 +288,140 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
                     continue;
                 }
 
-                var uniqueKey = string.Join('|', seriesName, normalizedNumber, card.CardName.Trim());
+                var normalizedCategory = string.IsNullOrWhiteSpace(card.Category)
+                    ? "Unkategorisiert"
+                    : card.Category.Trim();
+
+                var uniqueKey = string.Join('|', seriesName, normalizedCategory, normalizedNumber, card.CardName.Trim());
                 if (!uniqueCards.Add(uniqueKey))
                 {
                     continue;
                 }
 
-                cards.Add((seriesName, normalizedNumber, card.CardName.Trim()));
+                cards.Add((seriesName, normalizedCategory, normalizedNumber, card.CardName.Trim()));
             }
         }
 
         return cards;
+    }
+
+    private IReadOnlyList<CollectionCardPhotoItem> LoadCardPhotos(
+        string series,
+        string cardNumber,
+        CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(cardPhotosDirectory))
+        {
+            return Array.Empty<CollectionCardPhotoItem>();
+        }
+
+        var ownershipKey = BuildOwnershipKey(series, cardNumber);
+        if (string.IsNullOrWhiteSpace(ownershipKey))
+        {
+            return Array.Empty<CollectionCardPhotoItem>();
+        }
+
+        var photos = new List<CollectionCardPhotoItem>();
+        var imageFiles = Directory
+            .EnumerateFiles(cardPhotosDirectory)
+            .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var imagePath in imageFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var imageFileName = Path.GetFileName(imagePath);
+            var sidecarPath = imagePath + ".json";
+            if (!File.Exists(sidecarPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var stream = File.OpenRead(sidecarPath);
+                var sidecar = JsonSerializer.Deserialize<CardSidecar>(stream, JsonOptions);
+                if (sidecar is null)
+                {
+                    continue;
+                }
+
+                var sidecarKey = BuildOwnershipKey(sidecar.SetName, sidecar.CardNumber);
+                if (!string.Equals(sidecarKey, ownershipKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                photos.Add(new CollectionCardPhotoItem
+                {
+                    ImageFileName = imageFileName,
+                    ImageUrl = $"/cardFotos/{Uri.EscapeDataString(imageFileName)}",
+                    Sidecar = ToCollectionSidecar(sidecar)
+                });
+            }
+            catch
+            {
+                // Ignore invalid sidecars in detail view aggregation.
+            }
+        }
+
+        return photos;
+    }
+
+    private SeriesMetadata LoadSeriesMetadata(string series, CancellationToken cancellationToken)
+    {
+        var cardInfosDirectory = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos"));
+        if (!Directory.Exists(cardInfosDirectory))
+        {
+            return new SeriesMetadata();
+        }
+
+        var targetSeriesKey = NormalizeSeriesKey(series);
+        var files = Directory
+            .EnumerateFiles(cardInfosDirectory, "series_*.json")
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var stream = File.OpenRead(file);
+            using var document = JsonDocument.Parse(stream);
+            var rootProperty = document.RootElement.EnumerateObject().FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(rootProperty.Name))
+            {
+                continue;
+            }
+
+            var currentSeriesName = ToSeriesDisplayName(rootProperty.Name);
+            if (!string.Equals(NormalizeSeriesKey(currentSeriesName), targetSeriesKey, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var root = rootProperty.Value;
+            var metadata = new SeriesMetadata
+            {
+                Year = root.TryGetProperty("Jahr", out var yearProperty) && yearProperty.ValueKind == JsonValueKind.Number
+                    ? yearProperty.GetInt32()
+                    : null,
+                Logo = root.TryGetProperty("Logo", out var logoProperty) && logoProperty.ValueKind == JsonValueKind.String
+                    ? logoProperty.GetString()
+                    : null,
+                Theme = root.TryGetProperty("Thema", out var themeProperty) && themeProperty.ValueKind == JsonValueKind.String
+                    ? themeProperty.GetString()
+                    : null,
+                Highlights = root.TryGetProperty("Besonderheiten", out var highlightsProperty) && highlightsProperty.ValueKind == JsonValueKind.Array
+                    ? highlightsProperty.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString() ?? string.Empty).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray()
+                    : Array.Empty<string>()
+            };
+
+            return metadata;
+        }
+
+        return new SeriesMetadata();
     }
 
     private Dictionary<string, int> LoadOwnedCopiesByCardKey(
@@ -274,7 +484,9 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
         return ownership;
     }
 
-    private static IEnumerable<(string CardNumber, string CardName)> EnumerateCardEntries(JsonElement element)
+    private static IEnumerable<(string CardNumber, string CardName, string Category)> EnumerateCardEntries(
+        JsonElement element,
+        IReadOnlyList<string> categoryPath)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -293,13 +505,24 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
                 var name = nameProperty.GetString();
                 if (!string.IsNullOrWhiteSpace(number) && !string.IsNullOrWhiteSpace(name))
                 {
-                    yield return (number, name);
+                    yield return (number, name, BuildCategoryLabel(categoryPath));
                 }
             }
 
             foreach (var property in element.EnumerateObject())
             {
-                foreach (var entry in EnumerateCardEntries(property.Value))
+                if (property.NameEquals("Karten-Nr.") || property.NameEquals("Name"))
+                {
+                    continue;
+                }
+
+                var nextCategoryPath = categoryPath;
+                if (ShouldTrackCategory(property.Name))
+                {
+                    nextCategoryPath = [.. categoryPath, ToCategoryDisplayName(property.Name)];
+                }
+
+                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath))
                 {
                     yield return entry;
                 }
@@ -309,12 +532,50 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
         {
             foreach (var item in element.EnumerateArray())
             {
-                foreach (var entry in EnumerateCardEntries(item))
+                foreach (var entry in EnumerateCardEntries(item, categoryPath))
                 {
                     yield return entry;
                 }
             }
         }
+    }
+
+    private static bool ShouldTrackCategory(string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return false;
+        }
+
+        var normalized = propertyName.Trim();
+        return !normalized.Equals("Jahr", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Logo", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Thema", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
+               && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ToCategoryDisplayName(string rawCategory)
+    {
+        if (string.IsNullOrWhiteSpace(rawCategory))
+        {
+            return "Unkategorisiert";
+        }
+
+        var normalized = rawCategory.Trim().Replace('_', ' ');
+        normalized = Regex.Replace(normalized, "\\s+", " ").Trim();
+        return normalized;
+    }
+
+    private static string BuildCategoryLabel(IReadOnlyList<string> categoryPath)
+    {
+        if (categoryPath.Count == 0)
+        {
+            return "Unkategorisiert";
+        }
+
+        return string.Join(" / ", categoryPath);
     }
 
     private static string ToSeriesDisplayName(string rawSeriesName)
@@ -426,6 +687,28 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
         return $"9-{cardNumber}";
     }
 
+    private static CollectionCardSidecarData ToCollectionSidecar(CardSidecar sidecar)
+    {
+        return new CollectionCardSidecarData
+        {
+            Status = sidecar.Status,
+            CardName = sidecar.CardName,
+            CardNumber = sidecar.CardNumber,
+            SetName = sidecar.SetName,
+            Rarity = sidecar.Rarity,
+            Confidence = sidecar.Confidence,
+            ReasoningSummary = sidecar.ReasoningSummary,
+            DetectedText = sidecar.DetectedText ?? Array.Empty<string>(),
+            ScannedAtUtc = sidecar.ScannedAtUtc,
+            ErrorMessage = sidecar.ErrorMessage
+        };
+    }
+
+    private static string? NormalizeNullable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
     public async Task UpdateSetNameAsync(string imageFileName, string? setName, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -487,5 +770,13 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
     {
         [JsonPropertyName("Serie")]
         public string? Serie { get; init; }
+    }
+
+    private sealed class SeriesMetadata
+    {
+        public int? Year { get; init; }
+        public string? Logo { get; init; }
+        public string? Theme { get; init; }
+        public IReadOnlyList<string> Highlights { get; init; } = Array.Empty<string>();
     }
 }
