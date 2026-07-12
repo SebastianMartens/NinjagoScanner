@@ -108,7 +108,9 @@
                                 </TemplateColumn>
                                 <PropertyColumn Property="@(card => card.Series)" Title="Serie" Sortable="true" />
                                 <PropertyColumn Property="@(card => card.Category)" Title="Kategorie" Sortable="true" />
-                                <PropertyColumn Property="@(card => card.CardNumber)" Title="Nr." Sortable="true" />
+                                <TemplateColumn Title="Nr." SortBy="GridSort<CollectionCardItem>.ByAscending(card => BuildCardNumberSortKey(card.CardNumber))">
+                                    @context.CardNumber
+                                </TemplateColumn>
                                 <PropertyColumn Property="@(card => card.CardName)" Title="Name" Sortable="true" />
                                 <TemplateColumn Title="Besitz" SortBy="GridSort<CollectionCardItem>.ByAscending(card => card.OwnedCopies)">
                                     @if (!context.IsOwned)
@@ -507,6 +509,61 @@
         }
 
         return card.IsDuplicateOwned ? "Mehrfach vorhanden" : "Einmal vorhanden";
+    }
+
+    private static string BuildCardNumberSortKey(string cardNumber)
+    {
+        if (TryExtractNumber(cardNumber, out var number))
+        {
+            return $"{number:D9}-{cardNumber}";
+        }
+
+        return $"999999999-{cardNumber}";
+    }
+
+    private static bool TryExtractNumber(string? value, out int number)
+    {
+        number = 0;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var text = value.Trim();
+        var start = -1;
+        var end = -1;
+
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (!char.IsDigit(text[index]))
+            {
+                if (start >= 0)
+                {
+                    end = index;
+                    break;
+                }
+
+                continue;
+            }
+
+            if (start < 0)
+            {
+                start = index;
+            }
+        }
+
+        if (start < 0)
+        {
+            return false;
+        }
+
+        if (end < 0)
+        {
+            end = text.Length;
+        }
+
+        var digits = text[start..end];
+        return int.TryParse(digits, out number);
     }
 
     private static SidecarDraft BuildDraft(CollectionCardSidecarData? sidecar, CollectionCardItem? fallbackCard)
