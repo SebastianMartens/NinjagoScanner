@@ -1,13 +1,13 @@
 @page "/collection"
 @inject CardCatalogService CardCatalogService
 
-<PageTitle>Sammlungsuebersicht</PageTitle>
+<PageTitle>Sammlungsübersicht</PageTitle>
 
 <div class="collection-page">
     <header class="collection-header">
         <div>
             <p class="eyebrow">Ninjago Scanner</p>
-            <h1>Alle Karten im Ueberblick</h1>
+            <h1>Alle Karten im Überblick</h1>
             <p class="lede">Kompakte Listenansicht aller Karten aus den series_x.json Dateien mit Besitzstatus basierend auf Fotos im Ordner <strong>cardFotos</strong>.</p>
         </div>
 
@@ -40,7 +40,7 @@
 
         <label>
             <span>Serie</span>
-            <select @bind="selectedSeries">
+            <select @bind="SelectedSeries">
                 <option value="">Alle Serien</option>
                 @foreach (var series in availableSeries)
                 {
@@ -53,7 +53,7 @@
             <span>Kategorie</span>
             <select @bind="selectedCategory">
                 <option value="">Alle Kategorien</option>
-                @foreach (var category in availableCategories)
+                @foreach (var category in AvailableCategories)
                 {
                     <option value="@category">@category</option>
                 }
@@ -302,8 +302,6 @@
 
     private List<CollectionCardItem> allCards = [];
     private List<string> availableSeries = [];
-    private List<string> availableCategories = [];
-
     private bool isLoading = true;
     private bool showOnlyMissing;
     private bool showOnlyDuplicates;
@@ -330,13 +328,34 @@
             .OrderBy(series => series, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        availableCategories = allCards
-            .Select(card => card.Category)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
         isLoading = false;
+    }
+
+    private IEnumerable<string> AvailableCategories => allCards
+        .Where(card => string.IsNullOrWhiteSpace(selectedSeries)
+            || string.Equals(card.Series, selectedSeries, StringComparison.OrdinalIgnoreCase))
+        .Select(card => card.Category)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(category => category, StringComparer.OrdinalIgnoreCase);
+
+    private string SelectedSeries
+    {
+        get => selectedSeries;
+        set
+        {
+            if (string.Equals(selectedSeries, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            selectedSeries = value;
+
+            if (!string.IsNullOrWhiteSpace(selectedCategory)
+                && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
+            {
+                selectedCategory = string.Empty;
+            }
+        }
     }
 
     private IEnumerable<CollectionCardItem> FilteredCards
@@ -484,11 +503,11 @@
             .OrderBy(series => series, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        availableCategories = allCards
-            .Select(card => card.Category)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(category => category, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        if (!string.IsNullOrWhiteSpace(selectedCategory)
+            && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedCategory = string.Empty;
+        }
     }
 
     private static IEnumerable<CardGroup> BuildGroups(
