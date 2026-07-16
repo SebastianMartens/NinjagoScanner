@@ -1,5 +1,6 @@
 @page "/collection"
 @inject CardCatalogService CardCatalogService
+@inject IJSRuntime JS
 
 <PageTitle>Sammlungsübersicht</PageTitle>
 
@@ -100,33 +101,46 @@
                         </div>
 
                         <div class="collection-table-wrapper">
-                            <QuickGrid Items="group.Items.AsQueryable()" Class="collection-grid">
-                                <TemplateColumn Title="Auswahl">
-                                    <button type="button" class="select-card-button @(IsCardSelected(context) ? "is-selected" : string.Empty)" @onclick="() => SelectCardAsync(context)">
-                                        @(IsCardSelected(context) ? "Ausgewaehlt" : "Ansehen")
-                                    </button>
-                                </TemplateColumn>
-                                <PropertyColumn Property="@(card => card.Series)" Title="Serie" Sortable="true" />
-                                <PropertyColumn Property="@(card => card.Category)" Title="Kategorie" Sortable="true" />
-                                <TemplateColumn Title="Nr." SortBy="GridSort<CollectionCardItem>.ByAscending(card => BuildCardNumberSortKey(card.CardNumber))">
-                                    @context.CardNumber
-                                </TemplateColumn>
-                                <PropertyColumn Property="@(card => card.CardName)" Title="Name" Sortable="true" />
-                                <TemplateColumn Title="Besitz" SortBy="GridSort<CollectionCardItem>.ByAscending(card => card.OwnedCopies)">
-                                    @if (!context.IsOwned)
+                            <table class="collection-grid">
+                                <thead>
+                                    <tr>
+                                        <th>Serie</th>
+                                        <th>Kategorie</th>
+                                        <th>Nr.</th>
+                                        <th>Name</th>
+                                        <th>Besitz</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var card in group.Items)
                                     {
-                                        <span class="ownership-badge ownership-missing">Fehlt</span>
+                                        <tr class="collection-row @(IsCardSelected(card) ? "is-selected" : string.Empty)"
+                                            data-card-key="@CardRowKey(card)"
+                                            tabindex="0"
+                                            @onclick="() => SelectCardAsync(card)"
+                                            @onkeydown="(e) => HandleRowKeyDown(e, card)">
+                                            <td>@card.Series</td>
+                                            <td>@card.Category</td>
+                                            <td>@card.CardNumber</td>
+                                            <td>@card.CardName</td>
+                                            <td>
+                                                @if (!card.IsOwned)
+                                                {
+                                                    <span class="ownership-badge ownership-missing">Fehlt</span>
+                                                }
+                                                else if (card.IsDuplicateOwned)
+                                                {
+                                                    <span class="ownership-badge ownership-duplicate">Mehrfach (@card.OwnedCopies)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="ownership-badge ownership-owned">Vorhanden</span>
+                                                }
+                                            </td>
+                                        </tr>
                                     }
-                                    else if (context.IsDuplicateOwned)
-                                    {
-                                        <span class="ownership-badge ownership-duplicate">Mehrfach (@context.OwnedCopies)</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="ownership-badge ownership-owned">Vorhanden</span>
-                                    }
-                                </TemplateColumn>
-                            </QuickGrid>
+                                </tbody>
+                            </table>
                         </div>
                     </section>
                 }
@@ -155,38 +169,6 @@
                         <h3>@selectedDetails.CardName</h3>
                         <p>@selectedDetails.Series | @selectedDetails.Category | Nr. @selectedDetails.CardNumber</p>
                     </div>
-
-                    <dl class="detail-list">
-                        <div>
-                            <dt>Jahr</dt>
-                            <dd>@(selectedDetails.Year?.ToString() ?? "-")</dd>
-                        </div>
-                        <div>
-                            <dt>Logo</dt>
-                            <dd>@(selectedDetails.Logo ?? "-")</dd>
-                        </div>
-                        <div>
-                            <dt>Thema</dt>
-                            <dd>@(selectedDetails.Theme ?? "-")</dd>
-                        </div>
-                        <div>
-                            <dt>Fotos</dt>
-                            <dd>@selectedDetails.Photos.Count</dd>
-                        </div>
-                    </dl>
-
-                    @if (selectedDetails.Highlights.Count > 0)
-                    {
-                        <div class="detail-section">
-                            <h4>Serien-Zusammenfassung</h4>
-                            <ul class="detail-highlight-list">
-                                @foreach (var highlight in selectedDetails.Highlights)
-                                {
-                                    <li>@highlight</li>
-                                }
-                            </ul>
-                        </div>
-                    }
 
                     <div class="detail-section">
                         <h4>Kartenfoto</h4>
@@ -238,7 +220,13 @@
                                     </label>
                                     <label>
                                         <span>Setname</span>
-                                        <input @bind="sidecarDraft.SetName" />
+                                        <select @bind="sidecarDraft.SetName">
+                                            <option value="">– bitte wählen –</option>
+                                            @foreach (var series in availableSeries)
+                                            {
+                                                <option value="@series">@series</option>
+                                            }
+                                        </select>
                                     </label>
                                     <label>
                                         <span>Seltenheit</span>
@@ -414,6 +402,30 @@
             && string.Equals(selectedCard.Category, card.Category, StringComparison.OrdinalIgnoreCase)
             && string.Equals(selectedCard.CardNumber, card.CardNumber, StringComparison.OrdinalIgnoreCase)
             && string.Equals(selectedCard.CardName, card.CardName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CardRowKey(CollectionCardItem card) =>
+        $"{card.Series}|{card.CardNumber}|{card.CardName}";
+
+    private async Task HandleRowKeyDown(KeyboardEventArgs e, CollectionCardItem card)
+    {
+        if (e.Key is not ("ArrowDown" or "ArrowUp"))
+        {
+            return;
+        }
+
+        var flat = FilteredCards.ToList();
+        var currentIndex = flat.FindIndex(c => CardRowKey(c) == CardRowKey(card));
+        var nextIndex = e.Key == "ArrowDown" ? currentIndex + 1 : currentIndex - 1;
+
+        if (nextIndex < 0 || nextIndex >= flat.Count)
+        {
+            return;
+        }
+
+        var next = flat[nextIndex];
+        await SelectCardAsync(next);
+        await JS.InvokeVoidAsync("focusCardRow", CardRowKey(next));
     }
 
     private async Task SelectCardAsync(CollectionCardItem card)

@@ -1,0 +1,16 @@
+{
+  "Serie_3": {
+    "Jahr": 2018,
+    "Logo": "",
+    "Thema": "",
+    "Besonderheiten": [
+        "Logo: Silhouette einer Oni-Maske (Maske der Täuschung)",
+        "Garmadons Motorrad-Gang als Thema"
+      ],
+    "Kategorien": {       
+      "Good_Guys": [
+        {"Karten-Nr.": 1, "Name": "unbekannt"}
+      ]
+    }
+  }
+}
