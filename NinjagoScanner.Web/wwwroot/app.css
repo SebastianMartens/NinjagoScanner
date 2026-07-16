@@ -699,27 +699,26 @@ body {
     min-width: 980px;
 }
 
-.collection-row {
+.collection-grid tbody tr {
     cursor: pointer;
-    outline: none;
     transition: background 0.1s;
 }
 
-.collection-row:hover {
+.collection-grid tbody tr:hover td {
     background: rgba(139, 63, 31, 0.06);
 }
 
-.collection-row:focus {
-    background: rgba(139, 63, 31, 0.1);
-    box-shadow: inset 0 0 0 2px rgba(139, 63, 31, 0.35);
-}
-
-.collection-row.is-selected {
+.collection-grid tbody tr.is-selected td {
     background: rgba(139, 63, 31, 0.13);
+    font-weight: 600;
 }
 
-.collection-row.is-selected td {
-    font-weight: 600;
+.row-click-area {
+    display: block;
+    margin: -0.58rem -0.8rem;
+    padding: 0.58rem 0.8rem;
+    cursor: pointer;
+    user-select: none;
 }
 
 .collection-grid th,
