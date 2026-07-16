@@ -29,7 +29,7 @@ internal sealed class ScannerConfig
         return new ScannerConfig
         {
             ApiKey = request?.ApiKey ?? configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
-            Model = request?.Model ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-2.5-flash",
+            Model = request?.Model ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-3.1-flash-lite",
             CardPhotosDirectory = request?.CardPhotosDirectory ?? configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? ResolveDefaultCardPhotosDirectory(),
             SeriesCatalogPath = request?.SeriesCatalogPath ?? configuration["CardSeries:Path"] ?? configuration["CARD_SERIES_PATH"] ?? ResolveDefaultSeriesCatalogPath(),
             OverwriteExistingSidecars = request?.OverwriteExistingSidecars ?? (bool.TryParse(configuration["Scanner:OverwriteSidecars"] ?? configuration["OVERWRITE_SIDECARS"], out var overwrite) && overwrite),

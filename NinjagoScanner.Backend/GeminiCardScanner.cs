@@ -105,6 +105,16 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
 
             await SidecarStore.WriteAsync(sidecarPath, result, cancellationToken);
 
+            logger.LogDebug(
+                "[{Index}/{Total}] {FileName} → Status: {Status} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
+                index + 1,
+                cardImages.Count,
+                Path.GetFileName(imagePath),
+                result.Status,
+                string.IsNullOrWhiteSpace(result.CardName) ? "(unbekannt)" : result.CardName,
+                result.SetName ?? "-",
+                result.CardNumber ?? "-");
+
             processedCount++;
             if (string.Equals(result.Status, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
             {
