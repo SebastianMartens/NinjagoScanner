@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/NinjagoScanner.csproj",
+                "${workspaceFolder}/NinjagoScanner.slnx",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/NinjagoScanner.csproj",
+                "${workspaceFolder}/NinjagoScanner.Web/NinjagoScanner.Web.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/NinjagoScanner.csproj"
+                "${workspaceFolder}/NinjagoScanner.Web/NinjagoScanner.Web.csproj"
             ],
             "problemMatcher": "$msCompile"
         }
