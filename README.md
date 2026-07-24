@@ -1,10 +1,9 @@
 # NinjagoScanner
 
-Dieses Repository enthaelt drei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
+Dieses Repository enthaelt zwei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
 
 - `NinjagoScanner.Backend`: Scanner-Backendbibliothek fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
 - `NinjagoScanner.Web`: Blazor-Webanwendung zur Anzeige der Karten als Kacheln und in Tabellenform.
-- `NinjagoScanner.Desktop`: WinUI-Desktopanwendung mit einem einzelnen Fenster und eingebettetem WebView fuer die Webanwendung.
 
 Die Projektmappe im Root ist `NinjagoScanner.slnx`.
 
@@ -14,7 +13,6 @@ Die Projektmappe im Root ist `NinjagoScanner.slnx`.
 NinjagoScanner/
 |-- cardFotos/
 |-- NinjagoScanner.Backend/
-|-- NinjagoScanner.Desktop/
 |-- NinjagoScanner.Web/
 |-- NinjagoScanner.slnx
 ```
@@ -120,38 +118,6 @@ Konfigurationsreihenfolge:
 4. `CARD_PHOTOS_DIRECTORY`
 
 Wenn nichts gesetzt ist, wird der naechste vorhandene `cardFotos`-Ordner in den uebergeordneten Verzeichnissen gesucht (mit Praeferenz ausserhalb von `bin`).
-
-## Desktopanwendung
-
-Projektpfad:
-
-- [NinjagoScanner.Desktop/NinjagoScanner.Desktop.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Desktop/NinjagoScanner.Desktop.csproj)
-
-### Entwicklung starten
-
-```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Desktop
-dotnet run
-```
-
-### Verhalten
-
-Die Desktopanwendung besteht aus einem einzigen Fenster mit einem `WebView2`-Steuerelement. Beim Start:
-
-1. prueft sie, ob die Webanwendung bereits unter `http://127.0.0.1:5088/` erreichbar ist
-2. startet sie die Webanwendung automatisch, falls noetig
-3. laedt sie die Weboberflaeche direkt im Fenster
-
-### Konfiguration
-
-Optional kann die Desktopanwendung explizit konfiguriert werden:
-
-- `NINJAGO_WEB_URL` : feste URL der Webanwendung
-- `NINJAGO_WEB_EXE` : expliziter Pfad zur `NinjagoScanner.Web.exe`
-- `NINJAGO_CARD_PHOTOS_DIR` : expliziter Pfad zum gemeinsamen `cardFotos`-Ordner
-
-Ohne Konfiguration sucht die Desktopanwendung standardmaessig nach der Web-EXE in typischen Build- und Publish-Pfaden des Repositorys.
-Beim automatischen Start der Webanwendung uebergibt Desktop den ermittelten `cardFotos`-Pfad per `NINJAGO_CARD_PHOTOS_DIR`.
 
 ## Root-Build
 
