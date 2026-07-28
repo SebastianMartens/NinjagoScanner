@@ -6,11 +6,12 @@ using NinjagoScanner.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var cardPhotosDirectory = ResolveCardPhotosDirectory(builder.Configuration, builder.Environment.ContentRootPath);
+var maxUploadBytes = ResolveMaxUploadBytes(builder.Configuration);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory));
+builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory, maxUploadBytes));
 builder.Services.AddSingleton<IGeminiCardScanner, GeminiCardScanner>();
 
 var app = builder.Build();
@@ -111,4 +112,20 @@ static bool IsInsideBinDirectory(string path)
     var fullPath = Path.GetFullPath(path);
     var segments = fullPath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     return segments.Any(segment => segment.Equals("bin", StringComparison.OrdinalIgnoreCase));
+}
+
+static long ResolveMaxUploadBytes(IConfiguration configuration)
+{
+    const long defaultMaxUploadBytes = 15 * 1024 * 1024;
+
+    var configuredValue = configuration["CardPhotos:MaxUploadBytes"]
+                          ?? configuration["CardPhotosMaxUploadBytes"]
+                          ?? Environment.GetEnvironmentVariable("CARD_PHOTOS_MAX_UPLOAD_BYTES");
+
+    if (long.TryParse(configuredValue, out var parsedValue) && parsedValue > 0)
+    {
+        return parsedValue;
+    }
+
+    return defaultMaxUploadBytes;
 }

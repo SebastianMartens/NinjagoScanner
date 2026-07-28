@@ -105,6 +105,21 @@ Danach ist die App lokal erreichbar, typischerweise unter einer URL wie:
 
 - `/` : Kartenansicht als Kacheln mit Bildvorschau und Details
 - `/table` : tabellarische Ansicht mit Gruppierung und Filter
+- `/upload` : mobiler Foto-Upload direkt nach `cardFotos`
+
+### Mobiler Upload (Android)
+
+1. Starte die Webanwendung auf dem Rechner im lokalen Netzwerk (z. B. `dotnet run --urls "http://0.0.0.0:5000"`).
+2. Oeffne die App auf dem Android-Handy ueber die LAN-Adresse des Rechners.
+3. Gehe auf `/upload` und waehle Kamera oder Galerie.
+4. Das Bild wird direkt in `cardFotos` gespeichert.
+5. Starte danach wie gewohnt manuell den Gemini-Scan.
+
+Optional kann die maximale Upload-Dateigroesse konfiguriert werden:
+
+- `CardPhotos:MaxUploadBytes`
+- `CardPhotosMaxUploadBytes`
+- `CARD_PHOTOS_MAX_UPLOAD_BYTES`
 
 ### Verhalten bei `cardFotos`
 
