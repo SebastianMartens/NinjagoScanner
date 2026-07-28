@@ -696,7 +696,10 @@ body {
 }
 
 .collection-grid {
-    min-width: 980px;
+    width: 100%;
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .collection-grid tbody tr {
@@ -715,19 +718,14 @@ body {
 
 .row-click-area {
     display: block;
-    margin: -0.58rem -0.8rem;
     padding: 0.58rem 0.8rem;
     cursor: pointer;
     user-select: none;
 }
 
-.collection-grid th,
-.collection-grid td {
+.collection-grid th {
     padding: 0.58rem 0.8rem;
     border-bottom: 1px solid rgba(96, 78, 42, 0.1);
-}
-
-.collection-grid th {
     text-align: left;
     font-size: 0.74rem;
     text-transform: uppercase;
@@ -736,7 +734,72 @@ body {
     background: rgba(244, 239, 228, 0.95);
     position: sticky;
     top: 0;
+    z-index: 2;
+}
+
+.collection-grid td {
+    padding: 0;
+    border-bottom: 1px solid rgba(96, 78, 42, 0.1);
+    vertical-align: middle;
+}
+
+.collection-grid th:nth-child(1),
+.collection-grid td:nth-child(1) {
+    min-width: 7rem;
+}
+
+.collection-grid th:nth-child(2),
+.collection-grid td:nth-child(2) {
+    min-width: 6.5rem;
+}
+
+.collection-grid th:nth-child(3),
+.collection-grid td:nth-child(3) {
+    min-width: 5.5rem;
+}
+
+.collection-grid th:nth-child(5),
+.collection-grid td:nth-child(5) {
+    min-width: 9.5rem;
+}
+
+.collection-grid th:nth-child(1),
+.collection-grid th:nth-child(2),
+.collection-grid th:nth-child(3),
+.collection-grid th:nth-child(5),
+.collection-grid td:nth-child(1) .row-click-area,
+.collection-grid td:nth-child(2) .row-click-area,
+.collection-grid td:nth-child(3) .row-click-area {
+    white-space: nowrap;
+}
+
+.collection-grid td:nth-child(4) .row-click-area {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.collection-grid th:last-child,
+.collection-grid td:last-child {
+    position: sticky;
+    right: 0;
+}
+
+.collection-grid th:last-child {
+    z-index: 3;
+}
+
+.collection-grid td:last-child {
     z-index: 1;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.collection-grid tbody tr:hover td:last-child {
+    background: rgba(139, 63, 31, 0.06);
+}
+
+.collection-grid tbody tr.is-selected td:last-child {
+    background: rgba(139, 63, 31, 0.13);
 }
 
 .collection-table th,
