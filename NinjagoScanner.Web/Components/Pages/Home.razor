@@ -27,6 +27,59 @@
 		</div>
 	</header>
 
+	@if (!isLoading && cards.Count > 0)
+	{
+		<div class="cards-controls">
+			<label>
+				<span>Gruppieren nach</span>
+				<select @bind="groupBy">
+					<option value="none">Keine Gruppierung</option>
+					<option value="status">Status</option>
+					<option value="set">Set</option>
+					<option value="rarity">Seltenheit</option>
+				</select>
+			</label>
+
+			<label>
+				<span>Suche</span>
+				<input @bind="searchText" @bind:event="oninput" placeholder="Name, Nummer, Set, Status..." />
+			</label>
+
+			<label>
+				<span>Status</span>
+				<select @bind="selectedStatus">
+					<option value="">Alle Status</option>
+					@foreach (var status in AvailableStatuses)
+					{
+						<option value="@status">@GetStatusLabel(status)</option>
+					}
+				</select>
+			</label>
+
+			<label>
+				<span>Set</span>
+				<select @bind="selectedSet">
+					<option value="">Alle Sets</option>
+					@foreach (var setName in AvailableSets)
+					{
+						<option value="@setName">@setName</option>
+					}
+				</select>
+			</label>
+
+			<label>
+				<span>Seltenheit</span>
+				<select @bind="selectedRarity">
+					<option value="">Alle Seltenheiten</option>
+					@foreach (var rarity in AvailableRarities)
+					{
+						<option value="@rarity">@rarity</option>
+					}
+				</select>
+			</label>
+		</div>
+	}
+
 	@if (isLoading)
 	{
 		<p>Lade Karten...</p>
@@ -38,63 +91,83 @@
 			<p>Im Ordner <strong>cardFotos</strong> sind derzeit keine unterstuetzten Bilddateien vorhanden.</p>
 		</div>
 	}
+	else if (!FilteredCards.Any())
+	{
+		<div class="empty-state">
+			<h2>Keine Treffer</h2>
+			<p>Fuer die aktuelle Filterkombination wurden keine Karten gefunden.</p>
+		</div>
+	}
 	else
 	{
-		<div class="card-grid">
-			@foreach (var card in cards)
-			{
-				<article class="card-tile">
-					<div class="card-preview">
-						<img src="@card.ImageUrl" alt="@card.ImageFileName" loading="lazy" />
-						<span class="status-badge @GetStatusClass(card.Status)">@GetStatusLabel(card.Status)</span>
+		@foreach (var group in GroupedCards)
+		{
+			<section class="cards-group">
+				@if (!string.IsNullOrWhiteSpace(group.Key))
+				{
+					<div class="cards-group-header">
+						<h2>@group.Key</h2>
+						<span>@group.Items.Count Karte(n)</span>
 					</div>
+				}
 
-					<div class="card-body">
-						<h2>@(card.CardName ?? Path.GetFileNameWithoutExtension(card.ImageFileName))</h2>
-						<p class="file-name">@card.ImageFileName</p>
-
-						<dl class="detail-list">
-							<div>
-								<dt>Nummer</dt>
-								<dd>@(card.CardNumber ?? "-")</dd>
+				<div class="card-grid">
+					@foreach (var card in group.Items)
+					{
+						<article class="card-tile">
+							<div class="card-preview">
+								<img src="@card.ImageUrl" alt="@card.ImageFileName" loading="lazy" />
+								<span class="status-badge @GetStatusClass(card.Status)">@GetStatusLabel(card.Status)</span>
 							</div>
-							<div>
-								<dt>Set</dt>
-								<dd>@(card.SetName ?? "-")</dd>
-							</div>
-							<div>
-								<dt>Seltenheit</dt>
-								<dd>@(card.Rarity ?? "-")</dd>
-							</div>
-							<div>
-								<dt>Confidence</dt>
-								<dd>@card.Confidence.ToString("0.00")</dd>
-							</div>
-						</dl>
 
-						@if (!string.IsNullOrWhiteSpace(card.ReasoningSummary))
-						{
-							<p class="summary">@card.ReasoningSummary</p>
-						}
+							<div class="card-body">
+								<h2>@(card.CardName ?? Path.GetFileNameWithoutExtension(card.ImageFileName))</h2>
+								<p class="file-name">@card.ImageFileName</p>
 
-						@if (!string.IsNullOrWhiteSpace(card.ErrorMessage))
-						{
-							<p class="error-text">@card.ErrorMessage</p>
-						}
+								<dl class="detail-list">
+									<div>
+										<dt>Nummer</dt>
+										<dd>@(card.CardNumber ?? "-")</dd>
+									</div>
+									<div>
+										<dt>Set</dt>
+										<dd>@(card.SetName ?? "-")</dd>
+									</div>
+									<div>
+										<dt>Seltenheit</dt>
+										<dd>@(card.Rarity ?? "-")</dd>
+									</div>
+									<div>
+										<dt>Confidence</dt>
+										<dd>@card.Confidence.ToString("0.00")</dd>
+									</div>
+								</dl>
 
-						@if (card.DetectedText.Count > 0)
-						{
-							<div class="tag-list">
-								@foreach (var text in card.DetectedText)
+								@if (!string.IsNullOrWhiteSpace(card.ReasoningSummary))
 								{
-									<span>@text</span>
+									<p class="summary">@card.ReasoningSummary</p>
+								}
+
+								@if (!string.IsNullOrWhiteSpace(card.ErrorMessage))
+								{
+									<p class="error-text">@card.ErrorMessage</p>
+								}
+
+								@if (card.DetectedText.Count > 0)
+								{
+									<div class="tag-list">
+										@foreach (var text in card.DetectedText)
+										{
+											<span>@text</span>
+										}
+									</div>
 								}
 							</div>
-						}
-					</div>
-				</article>
-			}
-		</div>
+						</article>
+					}
+				</div>
+			</section>
+		}
 	}
 </div>
 
@@ -103,6 +176,11 @@
 	private bool isLoading = true;
 	private bool isScanning;
 	private string? scanStatusMessage;
+	private string groupBy = "none";
+	private string searchText = string.Empty;
+	private string selectedStatus = string.Empty;
+	private string selectedSet = string.Empty;
+	private string selectedRarity = string.Empty;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -135,6 +213,99 @@
 		}
 	}
 
+	private IEnumerable<string> AvailableStatuses => cards
+		.Select(card => card.Status)
+		.Where(status => !string.IsNullOrWhiteSpace(status))
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(GetStatusLabel, StringComparer.OrdinalIgnoreCase);
+
+	private IEnumerable<string> AvailableSets => cards
+		.Select(card => card.SetName)
+		.Where(setName => !string.IsNullOrWhiteSpace(setName))
+		.Select(setName => setName!)
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(setName => setName, StringComparer.OrdinalIgnoreCase);
+
+	private IEnumerable<string> AvailableRarities => cards
+		.Select(card => card.Rarity)
+		.Where(rarity => !string.IsNullOrWhiteSpace(rarity))
+		.Select(rarity => rarity!)
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(rarity => rarity, StringComparer.OrdinalIgnoreCase);
+
+	private IEnumerable<CardListItem> FilteredCards
+	{
+		get
+		{
+			IEnumerable<CardListItem> query = cards;
+
+			if (!string.IsNullOrWhiteSpace(selectedStatus))
+			{
+				query = query.Where(card => string.Equals(card.Status, selectedStatus, StringComparison.OrdinalIgnoreCase));
+			}
+
+			if (!string.IsNullOrWhiteSpace(selectedSet))
+			{
+				query = query.Where(card => string.Equals(card.SetName, selectedSet, StringComparison.OrdinalIgnoreCase));
+			}
+
+			if (!string.IsNullOrWhiteSpace(selectedRarity))
+			{
+				query = query.Where(card => string.Equals(card.Rarity, selectedRarity, StringComparison.OrdinalIgnoreCase));
+			}
+
+			if (!string.IsNullOrWhiteSpace(searchText))
+			{
+				var term = searchText.Trim();
+				query = query.Where(card =>
+				{
+					var haystack = string.Join(
+						' ',
+						new[]
+						{
+							card.CardName,
+							card.CardNumber,
+							card.SetName,
+							card.Rarity,
+							card.Status,
+							card.ImageFileName
+						}.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+					return haystack.Contains(term, StringComparison.OrdinalIgnoreCase);
+				});
+			}
+
+			return query
+				.OrderBy(card => card.SetName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+				.ThenBy(card => card.CardNumber ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+				.ThenBy(card => card.CardName ?? card.ImageFileName, StringComparer.OrdinalIgnoreCase);
+		}
+	}
+
+	private IEnumerable<CardGroup> GroupedCards
+	{
+		get
+		{
+			var items = FilteredCards.ToList();
+			if (groupBy == "none")
+			{
+				return [new CardGroup(null, items)];
+			}
+
+			return items
+				.GroupBy(GetGroupKey)
+				.OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+				.Select(group => new CardGroup(group.Key, group.ToList()));
+		}
+	}
+
+	private string GetGroupKey(CardListItem card) => groupBy switch
+	{
+		"status" => GetStatusLabel(card.Status),
+		"rarity" => card.Rarity ?? "Unbekannt",
+		_ => card.SetName ?? "Ohne Set"
+	};
+
 	private static string GetStatusClass(string status) => status.ToLowerInvariant() switch
 	{
 		"ok" => "status-ok",
@@ -150,4 +321,6 @@
 		"pending" => "Kein Sidecar",
 		_ => "Fehler"
 	};
+
+	private sealed record CardGroup(string? Key, List<CardListItem> Items);
 }

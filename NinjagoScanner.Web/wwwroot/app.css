@@ -119,6 +119,47 @@ body {
     box-shadow: 0 12px 24px rgba(77, 62, 29, 0.07);
 }
 
+.cards-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+}
+
+.cards-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #5b5649;
+    font-weight: 700;
+}
+
+.cards-controls select,
+.cards-controls input {
+    min-width: 220px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid rgba(96, 78, 42, 0.22);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.cards-group {
+    margin-bottom: 1.6rem;
+}
+
+.cards-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.85rem;
+}
+
+.cards-group-header h2 {
+    margin: 0;
+    font-size: 1.35rem;
+}
+
 .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
