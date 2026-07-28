@@ -1,11 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Components.Forms;
 using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
 
-internal sealed class CardCatalogService(string cardPhotosDirectory)
+internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes)
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -24,12 +25,71 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
     };
 
     private static readonly Regex NumberOnlyRegex = new("^\\d+$", RegexOptions.Compiled);
+    private static readonly Regex UnsafeFileNameRegex = new("[^A-Za-z0-9_-]+", RegexOptions.Compiled);
 
     private readonly string seriesCatalogPath = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos", "series.json"));
 
     public string CardPhotosDirectory => cardPhotosDirectory;
 
     public string SeriesCatalogPath => seriesCatalogPath;
+
+    public long MaxUploadBytes => maxUploadBytes;
+
+    public async Task<string> SaveUploadedPhotoAsync(IBrowserFile file, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(file);
+
+        if (file.Size <= 0)
+        {
+            throw new InvalidOperationException("Die ausgewaehlte Datei ist leer.");
+        }
+
+        if (file.Size > maxUploadBytes)
+        {
+            throw new InvalidOperationException($"Die Datei ist zu gross. Erlaubt sind maximal {maxUploadBytes / (1024 * 1024)} MB.");
+        }
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!SupportedExtensions.Contains(extension))
+        {
+            throw new InvalidOperationException("Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP.");
+        }
+
+        Directory.CreateDirectory(cardPhotosDirectory);
+
+        var fileNameStem = BuildUploadFileNameStem(file.Name);
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var candidateName = attempt == 0
+                ? $"{fileNameStem}{extension}"
+                : $"{fileNameStem}-{attempt}{extension}";
+            var destinationPath = Path.Combine(cardPhotosDirectory, candidateName);
+
+            try
+            {
+                await using var sourceStream = file.OpenReadStream(maxUploadBytes, cancellationToken);
+                await using var destinationStream = new FileStream(
+                    destinationPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    81920,
+                    useAsync: true);
+                await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+
+                return candidateName;
+            }
+            catch (IOException) when (File.Exists(destinationPath))
+            {
+                continue;
+            }
+        }
+
+        throw new IOException("Es konnte kein eindeutiger Dateiname fuer den Upload erstellt werden.");
+    }
 
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
@@ -707,6 +767,18 @@ internal sealed class CardCatalogService(string cardPhotosDirectory)
     private static string? NormalizeNullable(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string BuildUploadFileNameStem(string originalName)
+    {
+        var rawName = Path.GetFileNameWithoutExtension(originalName);
+        var sanitizedName = UnsafeFileNameRegex.Replace(rawName.Trim(), "-").Trim('-');
+        if (string.IsNullOrWhiteSpace(sanitizedName))
+        {
+            sanitizedName = "mobile-photo";
+        }
+
+        return $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{sanitizedName}";
     }
 
     public async Task UpdateSetNameAsync(string imageFileName, string? setName, CancellationToken cancellationToken = default)

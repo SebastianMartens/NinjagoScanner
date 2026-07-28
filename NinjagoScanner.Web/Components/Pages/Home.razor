@@ -14,6 +14,7 @@
 				<button class="btn btn-primary" type="button" disabled="@isScanning" @onclick="StartGeminiScanAsync">
 					@(isScanning ? "Gemini-Scan laeuft..." : "Gemini-Suche starten")
 				</button>
+				<a class="btn btn-outline-secondary" href="upload">Foto vom Handy hochladen</a>
 				@if (!string.IsNullOrWhiteSpace(scanStatusMessage))
 				{
 					<span>@scanStatusMessage</span>
