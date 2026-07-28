@@ -77,13 +77,47 @@ internal sealed class ScannerConfig
 
     private static IReadOnlyList<string> GetDefaultCardPhotosCandidates()
     {
-        return
-        [
+        var candidates = new List<string>
+        {
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "cardFotos")),
             Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "cardFotos")),
             Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "..", "cardFotos")),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardFotos"))
-        ];
+        };
+
+        var gitMainRepoRoot = TryGetGitMainRepoRoot(Environment.CurrentDirectory)
+                              ?? TryGetGitMainRepoRoot(AppContext.BaseDirectory);
+        if (gitMainRepoRoot is not null)
+        {
+            candidates.Insert(0, Path.GetFullPath(Path.Combine(gitMainRepoRoot, "cardFotos")));
+        }
+
+        return candidates;
+    }
+
+    private static string? TryGetGitMainRepoRoot(string startDirectory)
+    {
+        var dir = new DirectoryInfo(startDirectory);
+        while (dir is not null)
+        {
+            var gitFile = Path.Combine(dir.FullName, ".git");
+            if (File.Exists(gitFile))
+            {
+                var content = File.ReadAllText(gitFile).Trim();
+                if (content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var gitdirPath = content["gitdir:".Length..].Trim();
+                    // Path format: <main_repo>/.git/worktrees/<branch>
+                    var worktreesDir = new DirectoryInfo(gitdirPath)?.Parent?.Parent;
+                    if (worktreesDir?.Parent is { } mainRepoRoot)
+                    {
+                        return mainRepoRoot.FullName;
+                    }
+                }
+            }
+            dir = dir.Parent;
+        }
+        return null;
     }
 
     private static IReadOnlyList<string> GetDefaultSeriesCatalogCandidates()

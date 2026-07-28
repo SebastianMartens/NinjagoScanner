@@ -75,17 +75,48 @@ static string GetAbsolutePath(string directory, string contentRootPath)
 
 static IEnumerable<string> GetSearchRoots(string contentRootPath)
 {
-    var roots = new[]
+    var roots = new List<string>
     {
         contentRootPath,
         AppContext.BaseDirectory,
         Environment.CurrentDirectory
     };
 
+    var gitMainRepoRoot = TryGetGitMainRepoRoot(contentRootPath);
+    if (gitMainRepoRoot is not null)
+    {
+        roots.Add(gitMainRepoRoot);
+    }
+
     return roots
         .Where(path => !string.IsNullOrWhiteSpace(path))
         .Select(Path.GetFullPath)
         .Distinct(StringComparer.OrdinalIgnoreCase);
+}
+
+static string? TryGetGitMainRepoRoot(string startDirectory)
+{
+    var dir = new DirectoryInfo(startDirectory);
+    while (dir is not null)
+    {
+        var gitFile = Path.Combine(dir.FullName, ".git");
+        if (File.Exists(gitFile))
+        {
+            var content = File.ReadAllText(gitFile).Trim();
+            if (content.StartsWith("gitdir:", StringComparison.OrdinalIgnoreCase))
+            {
+                var gitdirPath = content["gitdir:".Length..].Trim();
+                // Path format: <main_repo>/.git/worktrees/<branch>
+                var worktreesDir = new DirectoryInfo(gitdirPath)?.Parent?.Parent;
+                if (worktreesDir?.Parent is { } mainRepoRoot)
+                {
+                    return mainRepoRoot.FullName;
+                }
+            }
+        }
+        dir = dir.Parent;
+    }
+    return null;
 }
 
 static string? TryFindSharedCardPhotosDirectory(string startDirectory)
