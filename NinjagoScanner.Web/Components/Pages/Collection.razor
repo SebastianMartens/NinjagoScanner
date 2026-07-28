@@ -113,7 +113,7 @@
                                     <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.CardNumber</div>
                                 </TemplateColumn>
                                 <TemplateColumn Title="Name" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.CardName)">
-                                    <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.CardName</div>
+                                    <div class="row-click-area" title="@context.CardName" @onclick="() => SelectAndFocusAsync(context)">@context.CardName</div>
                                 </TemplateColumn>
                                 <TemplateColumn Title="Besitz" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.OwnedCopies)">
                                     <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">
