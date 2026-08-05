@@ -1,0 +1,58 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+context: |
+  Tech stack: .NET 10, ASP.NET Core, Blazor, gRPC.
+  Domain: cataloging and scanning Lego Ninjago collectible cards.
+
+  This is a single git repo / single OpenSpec root (NinjagoScanner.slnx) containing
+  three independently runnable .NET projects:
+    - NinjagoScanner.CatalogService: standalone gRPC service, owns the series/card
+      catalog data (cardInfos/*.json), exposes CardCatalog/ListSeries, GetSeries,
+      GetServiceInfo.
+    - NinjagoScanner.PictureService: standalone gRPC service, analyzes card photos
+      via the Gemini API and writes sidecar JSON files next to the images in
+      cardFotos/. Exposes PictureScanner/Scan. Calls CatalogService via gRPC client
+      (CatalogGrpcClient.cs) instead of reading cardInfos locally.
+    - NinjagoScanner.Web: Blazor web app, renders cards as tiles/table, drives
+      mobile photo upload, and triggers scans by calling PictureService over gRPC.
+
+  Specs are kept in ONE openspec/specs/ directory (per OpenSpec convention - do not
+  create a separate openspec/ root per project), but capability names are prefixed
+  with the owning project's short slug so specs stay cleanly separated and easy to
+  filter with `openspec list`/`openspec view`:
+    - catalog-service-<capability>   e.g. catalog-service-series-lookup
+    - picture-service-<capability>   e.g. picture-service-gemini-scan
+    - web-<capability>                e.g. web-card-table-view
+  Use no prefix only for a capability that is genuinely cross-cutting/shared
+  (e.g. the gRPC contracts between services), and call that out explicitly in the
+  proposal's Impact section since it will span multiple projects.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
