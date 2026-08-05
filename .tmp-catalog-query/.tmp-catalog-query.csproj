@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\NinjagoScanner.Backend\NinjagoScanner.Backend.csproj" />
+    <ProjectReference Include="..\NinjagoScanner.PictureService\NinjagoScanner.PictureService.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

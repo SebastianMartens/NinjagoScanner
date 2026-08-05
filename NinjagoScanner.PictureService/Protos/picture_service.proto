@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option csharp_namespace = "NinjagoScanner.PictureService.Protos";
+
+package pictureservice;
+
+service PictureScanner {
+  rpc Scan (ScanRequest) returns (ScanSummary);
+}
+
+message ScanRequest {
+  optional string api_key = 1;
+  optional string model = 2;
+  optional string card_photos_directory = 3;
+  optional string catalog_service_address = 4;
+  optional bool overwrite_existing_sidecars = 5;
+  optional int32 delay_between_requests_ms = 6;
+  optional int32 retry_delay_ms = 7;
+  optional int32 max_attempts = 8;
+  optional int32 timeout_seconds = 9;
+}
+
+message ScanSummary {
+  int32 total_images = 1;
+  int32 processed = 2;
+  int32 skipped = 3;
+  int32 uncertain = 4;
+  int32 failed = 5;
+  bool has_configuration_error = 6;
+  string message = 7;
+}

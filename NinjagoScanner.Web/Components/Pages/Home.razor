@@ -1,6 +1,6 @@
 ﻿@page "/"
 @inject CardCatalogService CardCatalogService
-@inject IGeminiCardScanner GeminiCardScanner
+@inject PictureServiceClient PictureServiceClient
 
 <PageTitle>Ninjago Karten</PageTitle>
 
@@ -196,11 +196,9 @@
 
 		try
 		{
-			var summary = await GeminiCardScanner.ScanAsync(new GeminiScanRequest
-			{
-				CardPhotosDirectory = CardCatalogService.CardPhotosDirectory,
-				CatalogServiceAddress = CardCatalogService.CatalogServiceAddress
-			});
+			var summary = await PictureServiceClient.ScanAsync(
+				CardCatalogService.CardPhotosDirectory,
+				CardCatalogService.CatalogServiceAddress);
 
 			scanStatusMessage = summary.HasConfigurationError
 				? summary.Message ?? "Scan konnte nicht gestartet werden."

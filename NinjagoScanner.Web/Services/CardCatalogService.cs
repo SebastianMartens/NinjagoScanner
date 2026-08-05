@@ -9,6 +9,9 @@ using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
 
+/// <summary>
+/// Provides upload, sidecar persistence, and catalog-backed lookup operations for scanned card photos.
+/// </summary>
 internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes, string catalogServiceAddress)
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)

@@ -1,8 +1,8 @@
 # NinjagoScanner
 
-Dieses Repository enthaelt zwei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
+Dieses Repository enthaelt drei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
 
-- `NinjagoScanner.Backend`: Scanner-Backendbibliothek fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
+- `NinjagoScanner.PictureService`: Eigenstaendiger gRPC-Microservice fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
 - `NinjagoScanner.Web`: Blazor-Webanwendung zur Anzeige der Karten als Kacheln und in Tabellenform.
 - `NinjagoScanner.CatalogService`: Eigenstaendiger gRPC-Microservice, der die Katalogdaten (`cardInfos/*.json`) besitzt und als API bereitstellt.
 
@@ -13,7 +13,7 @@ Die Projektmappe im Root ist `NinjagoScanner.slnx`.
 ```text
 NinjagoScanner/
 |-- cardFotos/
-|-- NinjagoScanner.Backend/
+|-- NinjagoScanner.PictureService/
 |-- NinjagoScanner.Web/
 |-- NinjagoScanner.slnx
 ```
@@ -21,7 +21,7 @@ NinjagoScanner/
 ## Voraussetzungen
 
 - .NET SDK 10
-- Ein Gemini-API-Key fuer das Backend
+- Ein Gemini-API-Key fuer den PictureService
 
 ## Kartenbilder
 
@@ -32,21 +32,41 @@ In diesem Ordner liegen:
 - die Bilddateien, zum Beispiel `IMG_20260707_162946.jpg`
 - die Sidecar-Dateien, zum Beispiel `IMG_20260707_162946.jpg.json`
 
-## Backend
+## PictureService
 
 Projektpfad:
 
-- [NinjagoScanner.Backend/NinjagoScanner.Backend.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Backend/NinjagoScanner.Backend.csproj)
+- [NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj)
 
-Das Backend ist eine Library und wird von der Webanwendung genutzt.
-Der Gemini-Scan wird aus der Weboberflaeche gestartet.
+Der PictureService ist ein eigenstaendiger gRPC-Microservice.
+Die Webanwendung startet den Gemini-Scan ueber einen gRPC-Aufruf (`PictureScanner/Scan`) gegen diesen Service.
+
+### Starten
+
+```powershell
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
+dotnet run
+```
+
+### gRPC-Endpunkte
+
+- `PictureScanner/Scan`
+
+Konfigurierbare Service-Adresse (auf Seite der Webanwendung):
+
+- `PictureService:Address`
+- `PICTURE_SERVICE_ADDRESS`
+
+Default-Adresse:
+
+- `http://localhost:5169`
 
 ### Gemini konfigurieren
 
 Empfohlen ueber User Secrets:
 
 ```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Backend
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
 dotnet user-secrets set "Gemini:ApiKey" "DEIN_KEY"
 dotnet user-secrets set "Gemini:Model" "gemini-2.5-flash"
 ```
@@ -60,7 +80,7 @@ $env:GEMINI_MODEL="gemini-2.5-flash"
 
 ### Verhalten bei `cardFotos`
 
-Das Backend sucht standardmaessig in dieser Reihenfolge nach dem Bildordner:
+Der PictureService sucht standardmaessig in dieser Reihenfolge nach dem Bildordner:
 
 1. `cardFotos` direkt neben der EXE
 2. `cardFotos` im aktuellen Arbeitsverzeichnis
@@ -75,13 +95,13 @@ Zusatzlich kann der Bildordner explizit gesetzt werden:
 ### Build
 
 ```powershell
-Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Backend
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
 dotnet build
 ```
 
 Der Build-Ordner liegt standardmaessig unter:
 
-- `NinjagoScanner.Backend\bin\Debug\net10.0`
+- `NinjagoScanner.PictureService\bin\Debug\net10.0`
 
 Wichtig: Die Sidecar-Dateien werden im konfigurierten `cardFotos`-Ordner geschrieben.
 
@@ -92,6 +112,8 @@ Projektpfad:
 - [NinjagoScanner.Web/NinjagoScanner.Web.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Web/NinjagoScanner.Web.csproj)
 
 ### Entwicklung starten
+
+Fuer den vollen Funktionsumfang (inkl. Gemini-Scan und Katalogdaten) muessen `NinjagoScanner.PictureService` und `NinjagoScanner.CatalogService` zusaetzlich laufen.
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Web
@@ -171,9 +193,9 @@ Konfiguration des Datenordners optional ueber:
 - `Catalog:Directory`
 - `CATALOG_DIRECTORY`
 
-### Nutzung durch Backend und Web
+### Nutzung durch PictureService und Web
 
-Backend-Scanner und Webanwendung lesen die Katalogdaten nicht mehr lokal aus `cardInfos`,
+PictureService-Scanner und Webanwendung lesen die Katalogdaten nicht mehr lokal aus `cardInfos`,
 sondern ausschliesslich ueber gRPC vom CatalogService.
 
 Konfigurierbare Service-Adresse:

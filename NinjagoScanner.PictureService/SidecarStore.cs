@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace NinjagoScanner.Scanner;
+namespace NinjagoScanner.PictureService;
 
 internal static class SidecarStore
 {

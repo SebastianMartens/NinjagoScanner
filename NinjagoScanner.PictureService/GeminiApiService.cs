@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace NinjagoScanner.Scanner;
+namespace NinjagoScanner.PictureService;
 
 internal static class GeminiApiService
 {

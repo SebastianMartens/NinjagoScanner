@@ -1,7 +1,7 @@
 using Grpc.Net.Client;
 using NinjagoScanner.CatalogService.Protos;
 
-namespace NinjagoScanner.Scanner;
+namespace NinjagoScanner.PictureService;
 
 internal static class CatalogGrpcClient
 {

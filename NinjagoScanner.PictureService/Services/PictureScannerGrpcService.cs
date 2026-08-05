@@ -1,25 +1,28 @@
+using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using NinjagoScanner.Scanner.Abstractions;
+using NinjagoScanner.PictureService.Protos;
 
-namespace NinjagoScanner.Scanner;
+namespace NinjagoScanner.PictureService.Services;
 
-public sealed class GeminiCardScanner : IGeminiCardScanner
+public sealed class PictureScannerGrpcService : PictureScanner.PictureScannerBase
 {
     private readonly IConfiguration configuration;
-    private readonly ILogger<GeminiCardScanner> logger;
+    private readonly ILogger<PictureScannerGrpcService> logger;
 
-    public GeminiCardScanner(IConfiguration configuration, ILogger<GeminiCardScanner> logger)
+    public PictureScannerGrpcService(IConfiguration configuration, ILogger<PictureScannerGrpcService> logger)
     {
         this.configuration = configuration;
         this.logger = logger;
     }
 
-    public async Task<GeminiScanSummary> ScanAsync(GeminiScanRequest? request = null, CancellationToken cancellationToken = default)
+    public override async Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
     {
+        var cancellationToken = context.CancellationToken;
+
         var appConfiguration = new ConfigurationBuilder()
             .AddConfiguration(configuration)
-            .AddUserSecrets<GeminiCardScanner>(optional: true)
+            .AddUserSecrets<PictureScannerGrpcService>(optional: true)
             .AddEnvironmentVariables()
             .Build();
 
@@ -27,7 +30,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
 
         if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
-            return new GeminiScanSummary
+            return new ScanSummary
             {
                 HasConfigurationError = true,
                 Message = "GEMINI_API_KEY ist nicht gesetzt."
@@ -36,7 +39,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
 
         if (!Directory.Exists(config.CardPhotosDirectory))
         {
-            return new GeminiScanSummary
+            return new ScanSummary
             {
                 HasConfigurationError = true,
                 Message = $"Der Ordner '{config.CardPhotosDirectory}' wurde nicht gefunden."
@@ -51,7 +54,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
         catch (Exception exception)
         {
             logger.LogError(exception, "Katalog-Service unter {CatalogServiceAddress} nicht erreichbar", config.CatalogServiceAddress);
-            return new GeminiScanSummary
+            return new ScanSummary
             {
                 HasConfigurationError = true,
                 Message = $"Der CatalogService unter '{config.CatalogServiceAddress}' ist nicht erreichbar."
@@ -60,7 +63,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
 
         if (seriesCatalog.Count == 0)
         {
-            return new GeminiScanSummary
+            return new ScanSummary
             {
                 HasConfigurationError = true,
                 Message = "Der CatalogService hat keine Seriendaten geliefert."
@@ -75,7 +78,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
 
         if (cardImages.Count == 0)
         {
-            return new GeminiScanSummary
+            return new ScanSummary
             {
                 TotalImages = 0,
                 Message = $"Im Ordner '{config.CardPhotosDirectory}' wurden keine Kartenbilder gefunden."
@@ -154,7 +157,7 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
             }
         }
 
-        return new GeminiScanSummary
+        return new ScanSummary
         {
             TotalImages = cardImages.Count,
             Processed = processedCount,

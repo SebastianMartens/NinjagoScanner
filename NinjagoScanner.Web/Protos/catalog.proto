@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+option csharp_namespace = "NinjagoScanner.CatalogService.Protos";
+
+package catalog;
+
+import "google/protobuf/empty.proto";
+
+service CardCatalog {
+  rpc ListSeries (ListSeriesRequest) returns (ListSeriesResponse);
+  rpc GetSeries (GetSeriesRequest) returns (GetSeriesResponse);
+  rpc ListAllCards (google.protobuf.Empty) returns (ListAllCardsResponse);
+  rpc GetSeriesMetadata (GetSeriesMetadataRequest) returns (GetSeriesMetadataResponse);
+  rpc GetServiceInfo (google.protobuf.Empty) returns (ServiceInfoResponse);
+}
+
+message ListSeriesRequest {
+  bool include_known_card_names = 1;
+}
+
+message GetSeriesRequest {
+  string series_name = 1;
+  bool include_known_card_names = 2;
+}
+
+message ListSeriesResponse {
+  repeated SeriesEntry series = 1;
+}
+
+message GetSeriesResponse {
+  bool found = 1;
+  SeriesEntry series = 2;
+}
+
+message ServiceInfoResponse {
+  string data_directory = 1;
+  int32 series_count = 2;
+  string loaded_at_utc = 3;
+}
+
+message GetSeriesMetadataRequest {
+  string series_name = 1;
+}
+
+message GetSeriesMetadataResponse {
+  bool found = 1;
+  SeriesMetadata metadata = 2;
+}
+
+message ListAllCardsResponse {
+  repeated CatalogCardEntry cards = 1;
+}
+
+message SeriesEntry {
+  string series_name = 1;
+  int32 year = 2;
+  repeated string special_features = 3;
+  repeated string special_editions = 4;
+  repeated string known_card_names = 5;
+}
+
+message CatalogCardEntry {
+  string series_name = 1;
+  string category = 2;
+  string card_number = 3;
+  string card_name = 4;
+}
+
+message SeriesMetadata {
+  string series_name = 1;
+  int32 year = 2;
+  string logo = 3;
+  string theme = 4;
+  repeated string highlights = 5;
+}

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace NinjagoScanner.Scanner;
+namespace NinjagoScanner.PictureService;
 
 internal static class SeriesCatalogService
 {
