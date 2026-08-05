@@ -6,12 +6,13 @@ using NinjagoScanner.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 var cardPhotosDirectory = ResolveCardPhotosDirectory(builder.Configuration, builder.Environment.ContentRootPath);
+var catalogServiceAddress = ResolveCatalogServiceAddress(builder.Configuration);
 var maxUploadBytes = ResolveMaxUploadBytes(builder.Configuration);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory, maxUploadBytes));
+builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory, maxUploadBytes, catalogServiceAddress));
 builder.Services.AddSingleton<IGeminiCardScanner, GeminiCardScanner>();
 
 var app = builder.Build();
@@ -159,4 +160,11 @@ static long ResolveMaxUploadBytes(IConfiguration configuration)
     }
 
     return defaultMaxUploadBytes;
+}
+
+static string ResolveCatalogServiceAddress(IConfiguration configuration)
+{
+    return configuration["CatalogService:Address"]
+           ?? Environment.GetEnvironmentVariable("CATALOG_SERVICE_ADDRESS")
+           ?? "http://localhost:5073";
 }

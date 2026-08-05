@@ -41,24 +41,14 @@ internal sealed class GeminiCardPayload
     public string[]? DetectedText { get; init; }
 }
 
-internal sealed class SeriesCatalogRoot
-{
-    [JsonPropertyName("Ninjago_Sammelkarten_Serien")]
-    public SeriesInfo[]? Series { get; init; }
-}
-
 internal sealed class SeriesInfo
 {
-    [JsonPropertyName("Serie")]
     public required string Serie { get; init; }
 
-    [JsonPropertyName("Jahr")]
     public int Jahr { get; init; }
 
-    [JsonPropertyName("Besonderheiten")]
     public string[] Besonderheiten { get; init; } = Array.Empty<string>();
 
-    [JsonPropertyName("Sondereditionen")]
     public string[] Sondereditionen { get; init; } = Array.Empty<string>();
 
     public string[] CardNames { get; init; } = Array.Empty<string>();

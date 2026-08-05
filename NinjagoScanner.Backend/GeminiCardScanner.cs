@@ -24,7 +24,6 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
             .Build();
 
         var config = ScannerConfig.Load(appConfiguration, request);
-        var seriesCatalog = SeriesCatalogService.Load(config.SeriesCatalogPath);
 
         if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
@@ -41,6 +40,30 @@ public sealed class GeminiCardScanner : IGeminiCardScanner
             {
                 HasConfigurationError = true,
                 Message = $"Der Ordner '{config.CardPhotosDirectory}' wurde nicht gefunden."
+            };
+        }
+
+        IReadOnlyList<SeriesInfo> seriesCatalog;
+        try
+        {
+            seriesCatalog = await CatalogGrpcClient.LoadSeriesCatalogAsync(config.CatalogServiceAddress, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Katalog-Service unter {CatalogServiceAddress} nicht erreichbar", config.CatalogServiceAddress);
+            return new GeminiScanSummary
+            {
+                HasConfigurationError = true,
+                Message = $"Der CatalogService unter '{config.CatalogServiceAddress}' ist nicht erreichbar."
+            };
+        }
+
+        if (seriesCatalog.Count == 0)
+        {
+            return new GeminiScanSummary
+            {
+                HasConfigurationError = true,
+                Message = "Der CatalogService hat keine Seriendaten geliefert."
             };
         }
 

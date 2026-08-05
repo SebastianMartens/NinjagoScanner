@@ -1,41 +1,9 @@
 using System.Text;
-using System.Text.Json;
 
 namespace NinjagoScanner.Scanner;
 
 internal static class SeriesCatalogService
 {
-    public static IReadOnlyList<SeriesInfo> Load(string seriesCatalogPath)
-    {
-        if (!File.Exists(seriesCatalogPath))
-        {
-            return Array.Empty<SeriesInfo>();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(seriesCatalogPath, Encoding.UTF8);
-            var catalog = JsonSerializer.Deserialize<SeriesCatalogRoot>(json, ScannerJsonOptions.Default);
-            var cardNamesBySeries = LoadSeriesCardNames(seriesCatalogPath);
-
-            return catalog?.Series?
-                .Where(series => !string.IsNullOrWhiteSpace(series.Serie))
-                .Select(series => new SeriesInfo
-                {
-                    Serie = series.Serie,
-                    Jahr = series.Jahr,
-                    Besonderheiten = series.Besonderheiten,
-                    Sondereditionen = series.Sondereditionen,
-                    CardNames = ResolveSeriesCardNames(series, cardNamesBySeries)
-                })
-                .ToArray() ?? Array.Empty<SeriesInfo>();
-        }
-        catch
-        {
-            return Array.Empty<SeriesInfo>();
-        }
-    }
-
     public static string BuildPrompt(IReadOnlyList<SeriesInfo> seriesCatalog)
     {
         if (seriesCatalog.Count == 0)
@@ -87,95 +55,6 @@ internal static class SeriesCatalogService
 
         var inferredMatch = FindSeriesByEvidence(seriesCatalog, payload.SetName, payload.CardName, payload.ReasoningSummary, payload.DetectedText);
         return inferredMatch?.Serie;
-    }
-
-    private static IReadOnlyDictionary<string, string[]> LoadSeriesCardNames(string seriesCatalogPath)
-    {
-        var seriesDirectory = Path.GetDirectoryName(seriesCatalogPath);
-        if (string.IsNullOrWhiteSpace(seriesDirectory) || !Directory.Exists(seriesDirectory))
-        {
-            return new Dictionary<string, string[]>(StringComparer.Ordinal);
-        }
-
-        var cardNamesBySeries = new Dictionary<string, string[]>(StringComparer.Ordinal);
-
-        foreach (var detailFilePath in Directory.EnumerateFiles(seriesDirectory, "series_*.json"))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(File.ReadAllText(detailFilePath, Encoding.UTF8));
-                if (document.RootElement.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                foreach (var property in document.RootElement.EnumerateObject())
-                {
-                    if (property.Value.ValueKind != JsonValueKind.Object)
-                    {
-                        continue;
-                    }
-
-                    var cardNames = ExtractSeriesCardNames(property.Value);
-                    if (cardNames.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    cardNamesBySeries[NormalizeLookupText(property.Name.Replace('_', ' '))] = cardNames;
-                }
-            }
-            catch
-            {
-                // Ignore malformed detail files and continue with other entries.
-            }
-        }
-
-        return cardNamesBySeries;
-    }
-
-    private static string[] ExtractSeriesCardNames(JsonElement rootElement)
-    {
-        var cardNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        CollectSeriesCardNames(rootElement, cardNames);
-
-        return cardNames
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private static void CollectSeriesCardNames(JsonElement element, HashSet<string> cardNames)
-    {
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject())
-                {
-                    if (property.NameEquals("Name")
-                        && property.Value.ValueKind == JsonValueKind.String
-                        && !string.IsNullOrWhiteSpace(property.Value.GetString()))
-                    {
-                        cardNames.Add(property.Value.GetString()!.Trim());
-                    }
-
-                    CollectSeriesCardNames(property.Value, cardNames);
-                }
-                break;
-
-            case JsonValueKind.Array:
-                foreach (var child in element.EnumerateArray())
-                {
-                    CollectSeriesCardNames(child, cardNames);
-                }
-                break;
-        }
-    }
-
-    private static string[] ResolveSeriesCardNames(SeriesInfo series, IReadOnlyDictionary<string, string[]> cardNamesBySeries)
-    {
-        return cardNamesBySeries.TryGetValue(NormalizeLookupText(series.Serie), out var cardNames)
-            ? cardNames
-            : Array.Empty<string>();
     }
 
     private static SeriesInfo? FindSeriesByName(IReadOnlyList<SeriesInfo> seriesCatalog, string? candidate)

@@ -1,12 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Google.Protobuf.WellKnownTypes;
+using Grpc.Net.Client;
 using Microsoft.AspNetCore.Components.Forms;
+using NinjagoScanner.CatalogService.Protos;
 using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
 
-internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes)
+internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes, string catalogServiceAddress)
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -27,11 +30,9 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
     private static readonly Regex NumberOnlyRegex = new("^\\d+$", RegexOptions.Compiled);
     private static readonly Regex UnsafeFileNameRegex = new("[^A-Za-z0-9_-]+", RegexOptions.Compiled);
 
-    private readonly string seriesCatalogPath = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos", "series.json"));
-
     public string CardPhotosDirectory => cardPhotosDirectory;
 
-    public string SeriesCatalogPath => seriesCatalogPath;
+    public string CatalogServiceAddress => catalogServiceAddress;
 
     public long MaxUploadBytes => maxUploadBytes;
 
@@ -162,14 +163,14 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return cards;
     }
 
-    public Task<CollectionOverviewResult> GetCollectionOverviewAsync(CancellationToken cancellationToken = default)
+    public async Task<CollectionOverviewResult> GetCollectionOverviewAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var cardsFromSeries = LoadCardsFromSeriesFiles(cancellationToken);
+        var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
         var ownershipByKey = LoadOwnedCopiesByCardKey(cancellationToken, out var totalPhotos, out var mappedPhotos);
 
-        var cards = cardsFromSeries
+        var cards = cardsFromCatalog
             .Select(card =>
             {
                 ownershipByKey.TryGetValue(BuildOwnershipKey(card.Series, card.CardNumber), out var ownedCopies);
@@ -188,15 +189,15 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        return Task.FromResult(new CollectionOverviewResult
+        return new CollectionOverviewResult
         {
             Cards = cards,
             TotalPhotos = totalPhotos,
             MappedPhotos = mappedPhotos
-        });
+        };
     }
 
-    public Task<CollectionCardDetails?> GetCollectionCardDetailsAsync(
+    public async Task<CollectionCardDetails?> GetCollectionCardDetailsAsync(
         string series,
         string category,
         string cardNumber,
@@ -205,8 +206,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var cardsFromSeries = LoadCardsFromSeriesFiles(cancellationToken);
-        var card = cardsFromSeries.FirstOrDefault(entry =>
+        var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
+        var card = cardsFromCatalog.FirstOrDefault(entry =>
             string.Equals(NormalizeSeriesKey(entry.Series), NormalizeSeriesKey(series), StringComparison.Ordinal)
             && string.Equals(entry.CardNumber, NormalizeCardNumber(cardNumber), StringComparison.OrdinalIgnoreCase)
             && string.Equals(entry.CardName, cardName, StringComparison.OrdinalIgnoreCase)
@@ -214,13 +215,13 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
 
         if (string.IsNullOrWhiteSpace(card.Series))
         {
-            return Task.FromResult<CollectionCardDetails?>(null);
+            return null;
         }
 
-        var metadata = LoadSeriesMetadata(series, cancellationToken);
+        var metadata = await LoadSeriesMetadataAsync(series, cancellationToken);
         var photos = LoadCardPhotos(series, cardNumber, cancellationToken);
 
-        return Task.FromResult<CollectionCardDetails?>(new CollectionCardDetails
+        return new CollectionCardDetails
         {
             Series = card.Series,
             Category = card.Category,
@@ -231,7 +232,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             Theme = metadata.Theme,
             Highlights = metadata.Highlights,
             Photos = photos
-        });
+        };
     }
 
     public async Task UpdateCardSidecarAsync(
@@ -281,88 +282,71 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         await JsonSerializer.SerializeAsync(writeStream, updated, JsonOptions, cancellationToken);
     }
 
-    public Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!File.Exists(seriesCatalogPath))
-        {
-            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
-        }
+        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
+        var client = new CardCatalog.CardCatalogClient(channel);
+        var response = await client.ListSeriesAsync(
+            new ListSeriesRequest { IncludeKnownCardNames = false },
+            cancellationToken: cancellationToken);
 
-        try
-        {
-            var json = File.ReadAllText(seriesCatalogPath);
-            var catalog = JsonSerializer.Deserialize<SeriesCatalogRoot>(json, JsonOptions);
-            var series = catalog?.Series?
-                .Select(entry => entry.Serie?.Trim())
-                .Where(name => !string.IsNullOrWhiteSpace(name))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .Cast<string>()
-                .ToArray() ?? Array.Empty<string>();
-
-            return Task.FromResult<IReadOnlyList<string>>(series);
-        }
-        catch
-        {
-            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
-        }
+        return response.Series
+            .Select(entry => entry.SeriesName.Trim())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
-    private IReadOnlyList<(string Series, string Category, string CardNumber, string CardName)> LoadCardsFromSeriesFiles(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName)>> LoadCardsFromCatalogServiceAsync(CancellationToken cancellationToken)
     {
-        var cardInfosDirectory = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos"));
-        if (!Directory.Exists(cardInfosDirectory))
-        {
-            return Array.Empty<(string Series, string Category, string CardNumber, string CardName)>();
-        }
+        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
+        var client = new CardCatalog.CardCatalogClient(channel);
+        var response = await client.ListAllCardsAsync(new Empty(), cancellationToken: cancellationToken);
 
-        var files = Directory
-            .EnumerateFiles(cardInfosDirectory, "series_*.json")
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var uniqueCards = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var cards = new List<(string Series, string Category, string CardNumber, string CardName)>();
-
-        foreach (var file in files)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            using var stream = File.OpenRead(file);
-            using var document = JsonDocument.Parse(stream);
-
-            if (!document.RootElement.TryGetProperty(document.RootElement.EnumerateObject().FirstOrDefault().Name, out var seriesRoot))
-            {
-                continue;
-            }
-
-            var seriesName = ToSeriesDisplayName(document.RootElement.EnumerateObject().First().Name);
-
-            foreach (var card in EnumerateCardEntries(seriesRoot, []))
+        return response.Cards
+            .Select(card =>
             {
                 var normalizedNumber = NormalizeCardNumber(card.CardNumber);
-                if (string.IsNullOrWhiteSpace(normalizedNumber) || string.IsNullOrWhiteSpace(card.CardName))
-                {
-                    continue;
-                }
+                return (
+                    Series: card.SeriesName?.Trim() ?? string.Empty,
+                    Category: string.IsNullOrWhiteSpace(card.Category) ? "Unkategorisiert" : card.Category.Trim(),
+                    CardNumber: normalizedNumber,
+                    CardName: card.CardName?.Trim() ?? string.Empty
+                );
+            })
+            .Where(card =>
+                !string.IsNullOrWhiteSpace(card.Series)
+                && !string.IsNullOrWhiteSpace(card.CardNumber)
+                && !string.IsNullOrWhiteSpace(card.CardName))
+            .ToArray();
+    }
 
-                var normalizedCategory = string.IsNullOrWhiteSpace(card.Category)
-                    ? "Unkategorisiert"
-                    : card.Category.Trim();
+    private async Task<SeriesMetadata> LoadSeriesMetadataAsync(string series, CancellationToken cancellationToken)
+    {
+        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
+        var client = new CardCatalog.CardCatalogClient(channel);
+        var response = await client.GetSeriesMetadataAsync(
+            new GetSeriesMetadataRequest { SeriesName = series },
+            cancellationToken: cancellationToken);
 
-                var uniqueKey = string.Join('|', seriesName, normalizedCategory, normalizedNumber, card.CardName.Trim());
-                if (!uniqueCards.Add(uniqueKey))
-                {
-                    continue;
-                }
-
-                cards.Add((seriesName, normalizedCategory, normalizedNumber, card.CardName.Trim()));
-            }
+        if (!response.Found || response.Metadata is null)
+        {
+            return new SeriesMetadata();
         }
 
-        return cards;
+        return new SeriesMetadata
+        {
+            Year = response.Metadata.Year > 0 ? response.Metadata.Year : null,
+            Logo = string.IsNullOrWhiteSpace(response.Metadata.Logo) ? null : response.Metadata.Logo,
+            Theme = string.IsNullOrWhiteSpace(response.Metadata.Theme) ? null : response.Metadata.Theme,
+            Highlights = response.Metadata.Highlights
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Select(text => text.Trim())
+                .ToArray()
+        };
     }
 
     private IReadOnlyList<CollectionCardPhotoItem> LoadCardPhotos(
@@ -429,61 +413,6 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return photos;
     }
 
-    private SeriesMetadata LoadSeriesMetadata(string series, CancellationToken cancellationToken)
-    {
-        var cardInfosDirectory = Path.GetFullPath(Path.Combine(cardPhotosDirectory, "..", "cardInfos"));
-        if (!Directory.Exists(cardInfosDirectory))
-        {
-            return new SeriesMetadata();
-        }
-
-        var targetSeriesKey = NormalizeSeriesKey(series);
-        var files = Directory
-            .EnumerateFiles(cardInfosDirectory, "series_*.json")
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var file in files)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            using var stream = File.OpenRead(file);
-            using var document = JsonDocument.Parse(stream);
-            var rootProperty = document.RootElement.EnumerateObject().FirstOrDefault();
-
-            if (string.IsNullOrWhiteSpace(rootProperty.Name))
-            {
-                continue;
-            }
-
-            var currentSeriesName = ToSeriesDisplayName(rootProperty.Name);
-            if (!string.Equals(NormalizeSeriesKey(currentSeriesName), targetSeriesKey, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var root = rootProperty.Value;
-            var metadata = new SeriesMetadata
-            {
-                Year = root.TryGetProperty("Jahr", out var yearProperty) && yearProperty.ValueKind == JsonValueKind.Number
-                    ? yearProperty.GetInt32()
-                    : null,
-                Logo = root.TryGetProperty("Logo", out var logoProperty) && logoProperty.ValueKind == JsonValueKind.String
-                    ? logoProperty.GetString()
-                    : null,
-                Theme = root.TryGetProperty("Thema", out var themeProperty) && themeProperty.ValueKind == JsonValueKind.String
-                    ? themeProperty.GetString()
-                    : null,
-                Highlights = root.TryGetProperty("Besonderheiten", out var highlightsProperty) && highlightsProperty.ValueKind == JsonValueKind.Array
-                    ? highlightsProperty.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString() ?? string.Empty).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray()
-                    : Array.Empty<string>()
-            };
-
-            return metadata;
-        }
-
-        return new SeriesMetadata();
-    }
-
     private Dictionary<string, int> LoadOwnedCopiesByCardKey(
         CancellationToken cancellationToken,
         out int totalPhotos,
@@ -542,129 +471,6 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         }
 
         return ownership;
-    }
-
-    private static IEnumerable<(string CardNumber, string CardName, string Category)> EnumerateCardEntries(
-        JsonElement element,
-        IReadOnlyList<string> categoryPath)
-    {
-        if (element.ValueKind == JsonValueKind.Object)
-        {
-            if (element.TryGetProperty("Karten-Nr.", out var numberProperty)
-                && element.TryGetProperty("Name", out var nameProperty)
-                && numberProperty.ValueKind != JsonValueKind.Object
-                && nameProperty.ValueKind == JsonValueKind.String)
-            {
-                var number = numberProperty.ValueKind switch
-                {
-                    JsonValueKind.Number => numberProperty.GetRawText(),
-                    JsonValueKind.String => numberProperty.GetString(),
-                    _ => null
-                };
-
-                var name = nameProperty.GetString();
-                if (!string.IsNullOrWhiteSpace(number) && !string.IsNullOrWhiteSpace(name))
-                {
-                    yield return (number, name, BuildCategoryLabel(categoryPath));
-                }
-            }
-
-            foreach (var property in element.EnumerateObject())
-            {
-                if (property.NameEquals("Karten-Nr.") || property.NameEquals("Name"))
-                {
-                    continue;
-                }
-
-                var nextCategoryPath = categoryPath;
-                if (ShouldTrackCategory(property.Name))
-                {
-                    nextCategoryPath = [.. categoryPath, ToCategoryDisplayName(property.Name)];
-                }
-
-                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath))
-                {
-                    yield return entry;
-                }
-            }
-        }
-        else if (element.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in element.EnumerateArray())
-            {
-                foreach (var entry in EnumerateCardEntries(item, categoryPath))
-                {
-                    yield return entry;
-                }
-            }
-        }
-    }
-
-    private static bool ShouldTrackCategory(string propertyName)
-    {
-        if (string.IsNullOrWhiteSpace(propertyName))
-        {
-            return false;
-        }
-
-        var normalized = propertyName.Trim();
-        return !normalized.Equals("Jahr", StringComparison.OrdinalIgnoreCase)
-               && !normalized.Equals("Logo", StringComparison.OrdinalIgnoreCase)
-               && !normalized.Equals("Thema", StringComparison.OrdinalIgnoreCase)
-               && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
-               && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
-               && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ToCategoryDisplayName(string rawCategory)
-    {
-        if (string.IsNullOrWhiteSpace(rawCategory))
-        {
-            return "Unkategorisiert";
-        }
-
-        var normalized = rawCategory.Trim().Replace('_', ' ');
-        normalized = Regex.Replace(normalized, "\\s+", " ").Trim();
-        return normalized;
-    }
-
-    private static string BuildCategoryLabel(IReadOnlyList<string> categoryPath)
-    {
-        if (categoryPath.Count == 0)
-        {
-            return "Unkategorisiert";
-        }
-
-        return string.Join(" / ", categoryPath);
-    }
-
-    private static string ToSeriesDisplayName(string rawSeriesName)
-    {
-        if (string.IsNullOrWhiteSpace(rawSeriesName))
-        {
-            return "Unbekannte Serie";
-        }
-
-        var normalized = rawSeriesName.Trim().Replace('_', ' ');
-        normalized = Regex.Replace(normalized, "\\s+", " ");
-
-        if (normalized.Contains(" NL", StringComparison.OrdinalIgnoreCase))
-        {
-            normalized = Regex.Replace(normalized, "\\bNL\\b", "Next Level", RegexOptions.IgnoreCase);
-        }
-
-        if (Regex.IsMatch(normalized, "^Serie\\s*\\d+NL$", RegexOptions.IgnoreCase))
-        {
-            normalized = Regex.Replace(normalized, "NL$", " Next Level", RegexOptions.IgnoreCase);
-        }
-
-        if (!normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase))
-        {
-            normalized = $"Serie {normalized}";
-        }
-
-        normalized = Regex.Replace(normalized, "\\s+", " ").Trim();
-        return normalized;
     }
 
     private static string BuildOwnershipKey(string? series, string? cardNumber)
@@ -830,18 +636,6 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         public string? SidecarFilePath { get; init; }
         public string? AiModel { get; init; }
         public string? RawModelResponse { get; init; }
-    }
-
-    private sealed class SeriesCatalogRoot
-    {
-        [JsonPropertyName("Ninjago_Sammelkarten_Serien")]
-        public SeriesCatalogEntry[]? Series { get; init; }
-    }
-
-    private sealed class SeriesCatalogEntry
-    {
-        [JsonPropertyName("Serie")]
-        public string? Serie { get; init; }
     }
 
     private sealed class SeriesMetadata

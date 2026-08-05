@@ -17,7 +17,7 @@ internal sealed class ScannerConfig
     public required string ApiKey { get; init; }
     public required string Model { get; init; }
     public required string CardPhotosDirectory { get; init; }
-    public required string SeriesCatalogPath { get; init; }
+    public required string CatalogServiceAddress { get; init; }
     public required bool OverwriteExistingSidecars { get; init; }
     public required int DelayBetweenRequestsMs { get; init; }
     public required int RetryDelayMs { get; init; }
@@ -31,7 +31,7 @@ internal sealed class ScannerConfig
             ApiKey = request?.ApiKey ?? configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
             Model = request?.Model ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-3.1-flash-lite",
             CardPhotosDirectory = request?.CardPhotosDirectory ?? configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? ResolveDefaultCardPhotosDirectory(),
-            SeriesCatalogPath = request?.SeriesCatalogPath ?? configuration["CardSeries:Path"] ?? configuration["CARD_SERIES_PATH"] ?? ResolveDefaultSeriesCatalogPath(),
+            CatalogServiceAddress = request?.CatalogServiceAddress ?? configuration["CatalogService:Address"] ?? configuration["CATALOG_SERVICE_ADDRESS"] ?? "http://localhost:5073",
             OverwriteExistingSidecars = request?.OverwriteExistingSidecars ?? (bool.TryParse(configuration["Scanner:OverwriteSidecars"] ?? configuration["OVERWRITE_SIDECARS"], out var overwrite) && overwrite),
             DelayBetweenRequestsMs = request?.DelayBetweenRequestsMs ?? TryParseInt(configuration["Scanner:DelayBetweenRequestsMs"] ?? configuration["DELAY_BETWEEN_REQUESTS_MS"], 1000),
             RetryDelayMs = request?.RetryDelayMs ?? TryParseInt(configuration["Scanner:RetryDelayMs"] ?? configuration["RETRY_DELAY_MS"], 3000),
@@ -58,21 +58,6 @@ internal sealed class ScannerConfig
         }
 
         return candidateDirectories[0];
-    }
-
-    private static string ResolveDefaultSeriesCatalogPath()
-    {
-        var candidatePaths = GetDefaultSeriesCatalogCandidates();
-
-        foreach (var candidate in candidatePaths)
-        {
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return candidatePaths[0];
     }
 
     private static IReadOnlyList<string> GetDefaultCardPhotosCandidates()
@@ -120,14 +105,4 @@ internal sealed class ScannerConfig
         return null;
     }
 
-    private static IReadOnlyList<string> GetDefaultSeriesCatalogCandidates()
-    {
-        return
-        [
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "cardInfos", "series.json")),
-            Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "cardInfos", "series.json")),
-            Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "..", "cardInfos", "series.json")),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "cardInfos", "series.json"))
-        ];
-    }
 }

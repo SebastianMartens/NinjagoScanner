@@ -45,50 +45,49 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         return GetSnapshot().Series.FirstOrDefault(entry => NormalizeLookupKey(entry.SeriesName) == requestedKey);
     }
 
-    private CatalogSnapshot LoadSnapshot()
+    public SeriesMetadataItem? FindSeriesMetadata(string seriesName)
     {
-        if (!File.Exists(mainCatalogPath))
+        if (string.IsNullOrWhiteSpace(seriesName))
         {
-            logger.LogWarning("Catalog file not found at {CatalogPath}", mainCatalogPath);
-            return new CatalogSnapshot
-            {
-                DataDirectory = dataDirectoryPath,
-                LoadedAtUtc = DateTimeOffset.UtcNow,
-                Series = Array.Empty<SeriesCatalogItem>()
-            };
+            return null;
         }
 
+        var key = NormalizeLookupKey(seriesName);
+        return GetSnapshot().MetadataBySeriesKey.TryGetValue(key, out var metadata)
+            ? metadata
+            : null;
+    }
+
+    private CatalogSnapshot LoadSnapshot()
+    {
         try
         {
-            var rootJson = File.ReadAllText(mainCatalogPath, Encoding.UTF8);
-            var root = JsonSerializer.Deserialize<SeriesCatalogRoot>(rootJson, JsonOptions);
-            var cardNamesBySeries = LoadSeriesCardNames(dataDirectoryPath);
+            var detailData = LoadSeriesDetails(dataDirectoryPath);
+            var root = LoadMainSeriesCatalog(mainCatalogPath);
+            var series = BuildSeriesList(root, detailData);
+            var cards = detailData.Values
+                .SelectMany(entry => entry.Cards)
+                .OrderBy(card => card.SeriesName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
 
-            var series = root?.Series?
-                .Where(item => !string.IsNullOrWhiteSpace(item.Serie))
-                .Select(item =>
-                {
-                    var seriesName = item.Serie!.Trim();
-                    cardNamesBySeries.TryGetValue(NormalizeLookupKey(seriesName), out var knownCardNames);
-
-                    return new SeriesCatalogItem
-                    {
-                        SeriesName = seriesName,
-                        Year = item.Jahr,
-                        SpecialFeatures = item.Besonderheiten ?? Array.Empty<string>(),
-                        SpecialEditions = item.Sondereditionen ?? Array.Empty<string>(),
-                        KnownCardNames = knownCardNames ?? Array.Empty<string>()
-                    };
-                })
-                .OrderBy(item => item.Year)
-                .ThenBy(item => item.SeriesName, StringComparer.OrdinalIgnoreCase)
-                .ToArray() ?? Array.Empty<SeriesCatalogItem>();
+            var metadataBySeries = detailData
+                .Values
+                .Where(entry => entry.Metadata is not null)
+                .ToDictionary(
+                    entry => NormalizeLookupKey(entry.SeriesName),
+                    entry => entry.Metadata!,
+                    StringComparer.Ordinal);
 
             return new CatalogSnapshot
             {
                 DataDirectory = dataDirectoryPath,
                 LoadedAtUtc = DateTimeOffset.UtcNow,
-                Series = series
+                Series = series,
+                Cards = cards,
+                MetadataBySeriesKey = metadataBySeries
             };
         }
         catch (Exception ex)
@@ -98,19 +97,69 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             {
                 DataDirectory = dataDirectoryPath,
                 LoadedAtUtc = DateTimeOffset.UtcNow,
-                Series = Array.Empty<SeriesCatalogItem>()
+                Series = Array.Empty<SeriesCatalogItem>(),
+                Cards = Array.Empty<CatalogCardItem>(),
+                MetadataBySeriesKey = new Dictionary<string, SeriesMetadataItem>(StringComparer.Ordinal)
             };
         }
     }
 
-    private static Dictionary<string, string[]> LoadSeriesCardNames(string dataDirectory)
+    private static SeriesCatalogRoot? LoadMainSeriesCatalog(string catalogPath)
     {
-        if (!Directory.Exists(dataDirectory))
+        if (!File.Exists(catalogPath))
         {
-            return new Dictionary<string, string[]>(StringComparer.Ordinal);
+            return null;
         }
 
-        var result = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var rootJson = File.ReadAllText(catalogPath, Encoding.UTF8);
+        return JsonSerializer.Deserialize<SeriesCatalogRoot>(rootJson, JsonOptions);
+    }
+
+    private static SeriesCatalogItem[] BuildSeriesList(SeriesCatalogRoot? root, IReadOnlyDictionary<string, SeriesDetailData> detailData)
+    {
+        var rootSeriesByKey = root?.Series?
+            .Where(item => !string.IsNullOrWhiteSpace(item.Serie))
+            .ToDictionary(item => NormalizeLookupKey(item.Serie!.Trim()), item => item, StringComparer.Ordinal)
+            ?? new Dictionary<string, SeriesCatalogJsonItem>(StringComparer.Ordinal);
+
+        var allSeriesKeys = rootSeriesByKey.Keys
+            .Concat(detailData.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var result = new List<SeriesCatalogItem>(allSeriesKeys.Length);
+
+        foreach (var seriesKey in allSeriesKeys)
+        {
+            rootSeriesByKey.TryGetValue(seriesKey, out var rootSeries);
+            detailData.TryGetValue(seriesKey, out var detail);
+
+            var seriesName = rootSeries?.Serie?.Trim() ?? detail?.SeriesName ?? seriesKey;
+            var knownCardNames = detail?.KnownCardNames ?? Array.Empty<string>();
+
+            result.Add(new SeriesCatalogItem
+            {
+                SeriesName = seriesName,
+                Year = rootSeries?.Jahr ?? detail?.Metadata?.Year ?? 0,
+                SpecialFeatures = rootSeries?.Besonderheiten ?? Array.Empty<string>(),
+                SpecialEditions = rootSeries?.Sondereditionen ?? Array.Empty<string>(),
+                KnownCardNames = knownCardNames
+            });
+        }
+
+        return result
+            .OrderBy(item => item.Year)
+            .ThenBy(item => item.SeriesName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static Dictionary<string, SeriesDetailData> LoadSeriesDetails(string dataDirectory)
+    {
+        var result = new Dictionary<string, SeriesDetailData>(StringComparer.Ordinal);
+        if (!Directory.Exists(dataDirectory))
+        {
+            return result;
+        }
 
         foreach (var detailFilePath in Directory.EnumerateFiles(dataDirectory, "series_*.json"))
         {
@@ -129,60 +178,182 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                         continue;
                     }
 
-                    var names = ExtractCardNames(property.Value);
-                    if (names.Length == 0)
-                    {
-                        continue;
-                    }
-
                     var seriesName = ToSeriesDisplayName(property.Name);
-                    result[NormalizeLookupKey(seriesName)] = names;
+                    var seriesKey = NormalizeLookupKey(seriesName);
+                    var metadata = ExtractSeriesMetadata(seriesName, property.Value);
+                    var cards = ExtractSeriesCards(seriesName, property.Value);
+                    var knownCardNames = cards
+                        .Select(card => card.CardName)
+                        .Where(name => !string.IsNullOrWhiteSpace(name))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    result[seriesKey] = new SeriesDetailData
+                    {
+                        SeriesName = seriesName,
+                        Metadata = metadata,
+                        Cards = cards,
+                        KnownCardNames = knownCardNames
+                    };
                 }
             }
             catch
             {
-                // Ignore invalid detail files and continue with valid files.
+                // Ignore malformed detail files and continue.
             }
         }
 
         return result;
     }
 
-    private static string[] ExtractCardNames(JsonElement root)
+    private static SeriesMetadataItem ExtractSeriesMetadata(string seriesName, JsonElement seriesRoot)
     {
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        CollectCardNames(root, names);
-
-        return names
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        return new SeriesMetadataItem
+        {
+            SeriesName = seriesName,
+            Year = seriesRoot.TryGetProperty("Jahr", out var yearProperty) && yearProperty.ValueKind == JsonValueKind.Number
+                ? yearProperty.GetInt32()
+                : null,
+            Logo = seriesRoot.TryGetProperty("Logo", out var logoProperty) && logoProperty.ValueKind == JsonValueKind.String
+                ? logoProperty.GetString()
+                : null,
+            Theme = seriesRoot.TryGetProperty("Thema", out var themeProperty) && themeProperty.ValueKind == JsonValueKind.String
+                ? themeProperty.GetString()
+                : null,
+            Highlights = seriesRoot.TryGetProperty("Besonderheiten", out var highlightsProperty) && highlightsProperty.ValueKind == JsonValueKind.Array
+                ? highlightsProperty.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString() ?? string.Empty)
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .ToArray()
+                : Array.Empty<string>()
+        };
     }
 
-    private static void CollectCardNames(JsonElement element, HashSet<string> names)
+    private static CatalogCardItem[] ExtractSeriesCards(string seriesName, JsonElement seriesRoot)
     {
-        switch (element.ValueKind)
+        var uniqueKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cards = new List<CatalogCardItem>();
+
+        foreach (var entry in EnumerateCardEntries(seriesRoot, []))
         {
-            case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject())
-                {
-                    if (property.NameEquals("Name")
-                        && property.Value.ValueKind == JsonValueKind.String
-                        && !string.IsNullOrWhiteSpace(property.Value.GetString()))
-                    {
-                        names.Add(property.Value.GetString()!.Trim());
-                    }
+            var normalizedNumber = NormalizeCardNumber(entry.CardNumber);
+            if (string.IsNullOrWhiteSpace(normalizedNumber) || string.IsNullOrWhiteSpace(entry.CardName))
+            {
+                continue;
+            }
 
-                    CollectCardNames(property.Value, names);
-                }
-                break;
+            var category = string.IsNullOrWhiteSpace(entry.Category)
+                ? "Unkategorisiert"
+                : entry.Category.Trim();
+            var cardName = entry.CardName.Trim();
+            var uniqueKey = string.Join('|', seriesName, category, normalizedNumber, cardName);
+            if (!uniqueKeys.Add(uniqueKey))
+            {
+                continue;
+            }
 
-            case JsonValueKind.Array:
-                foreach (var child in element.EnumerateArray())
-                {
-                    CollectCardNames(child, names);
-                }
-                break;
+            cards.Add(new CatalogCardItem
+            {
+                SeriesName = seriesName,
+                Category = category,
+                CardNumber = normalizedNumber,
+                CardName = cardName
+            });
         }
+
+        return cards.ToArray();
+    }
+
+    private static IEnumerable<(string CardNumber, string CardName, string Category)> EnumerateCardEntries(
+        JsonElement element,
+        IReadOnlyList<string> categoryPath)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("Karten-Nr.", out var numberProperty)
+                && element.TryGetProperty("Name", out var nameProperty)
+                && numberProperty.ValueKind != JsonValueKind.Object
+                && nameProperty.ValueKind == JsonValueKind.String)
+            {
+                var number = numberProperty.ValueKind switch
+                {
+                    JsonValueKind.Number => numberProperty.GetRawText(),
+                    JsonValueKind.String => numberProperty.GetString(),
+                    _ => null
+                };
+
+                var name = nameProperty.GetString();
+                if (!string.IsNullOrWhiteSpace(number) && !string.IsNullOrWhiteSpace(name))
+                {
+                    yield return (number, name, BuildCategoryLabel(categoryPath));
+                }
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.NameEquals("Karten-Nr.") || property.NameEquals("Name"))
+                {
+                    continue;
+                }
+
+                var nextCategoryPath = categoryPath;
+                if (ShouldTrackCategory(property.Name))
+                {
+                    nextCategoryPath = [.. categoryPath, ToCategoryDisplayName(property.Name)];
+                }
+
+                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath))
+                {
+                    yield return entry;
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                foreach (var entry in EnumerateCardEntries(item, categoryPath))
+                {
+                    yield return entry;
+                }
+            }
+        }
+    }
+
+    private static bool ShouldTrackCategory(string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return false;
+        }
+
+        var normalized = propertyName.Trim();
+        return !normalized.Equals("Jahr", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Logo", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Thema", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
+               && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ToCategoryDisplayName(string rawCategory)
+    {
+        if (string.IsNullOrWhiteSpace(rawCategory))
+        {
+            return "Unkategorisiert";
+        }
+
+        var normalized = rawCategory.Trim().Replace('_', ' ');
+        return MultiWhitespaceRegex().Replace(normalized, " ").Trim();
+    }
+
+    private static string BuildCategoryLabel(IReadOnlyList<string> categoryPath)
+    {
+        return categoryPath.Count == 0
+            ? "Unkategorisiert"
+            : string.Join(" / ", categoryPath);
     }
 
     private static string ResolveDataDirectory(IWebHostEnvironment environment, IConfiguration configuration)
@@ -242,6 +413,60 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         return MultiWhitespaceRegex().Replace(compact, " ");
     }
 
+    private static string NormalizeCardNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Trim().ToUpperInvariant();
+        normalized = NonAlphaNumericRegex().Replace(normalized, string.Empty);
+
+        if (NumberOnlyRegex().IsMatch(normalized) && int.TryParse(normalized, out var numericValue))
+        {
+            return numericValue.ToString();
+        }
+
+        return normalized;
+    }
+
+    private static string ToSortKey(string cardNumber)
+    {
+        if (int.TryParse(cardNumber, out var numericValue))
+        {
+            return $"0-{numericValue:D6}";
+        }
+
+        if (cardNumber.StartsWith("LE", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(cardNumber.AsSpan(2), out var leValue))
+        {
+            return $"1-{leValue:D6}";
+        }
+
+        if (cardNumber.StartsWith("XXL", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(cardNumber.AsSpan(3), out var xxlValue))
+        {
+            return $"2-{xxlValue:D6}";
+        }
+
+        return $"9-{cardNumber}";
+    }
+
     [GeneratedRegex("\\s+")]
     private static partial Regex MultiWhitespaceRegex();
+
+    [GeneratedRegex("[^A-Z0-9]")]
+    private static partial Regex NonAlphaNumericRegex();
+
+    [GeneratedRegex("^\\d+$")]
+    private static partial Regex NumberOnlyRegex();
+
+    private sealed class SeriesDetailData
+    {
+        public required string SeriesName { get; init; }
+        public required CatalogCardItem[] Cards { get; init; }
+        public required string[] KnownCardNames { get; init; }
+        public SeriesMetadataItem? Metadata { get; init; }
+    }
 }

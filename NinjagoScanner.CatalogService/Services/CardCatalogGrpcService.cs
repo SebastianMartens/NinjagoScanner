@@ -38,6 +38,52 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
         });
     }
 
+    public override Task<ListAllCardsResponse> ListAllCards(Empty request, ServerCallContext context)
+    {
+        var snapshot = repository.GetSnapshot();
+        var response = new ListAllCardsResponse();
+
+        foreach (var card in snapshot.Cards)
+        {
+            response.Cards.Add(new CatalogCardEntry
+            {
+                SeriesName = card.SeriesName,
+                Category = card.Category,
+                CardNumber = card.CardNumber,
+                CardName = card.CardName
+            });
+        }
+
+        return Task.FromResult(response);
+    }
+
+    public override Task<GetSeriesMetadataResponse> GetSeriesMetadata(GetSeriesMetadataRequest request, ServerCallContext context)
+    {
+        var metadata = repository.FindSeriesMetadata(request.SeriesName);
+        if (metadata is null)
+        {
+            return Task.FromResult(new GetSeriesMetadataResponse
+            {
+                Found = false
+            });
+        }
+
+        var response = new GetSeriesMetadataResponse
+        {
+            Found = true,
+            Metadata = new SeriesMetadata
+            {
+                SeriesName = metadata.SeriesName,
+                Year = metadata.Year ?? 0,
+                Logo = metadata.Logo ?? string.Empty,
+                Theme = metadata.Theme ?? string.Empty
+            }
+        };
+
+        response.Metadata.Highlights.AddRange(metadata.Highlights);
+        return Task.FromResult(response);
+    }
+
     public override Task<ServiceInfoResponse> GetServiceInfo(Empty request, ServerCallContext context)
     {
         var snapshot = repository.GetSnapshot();

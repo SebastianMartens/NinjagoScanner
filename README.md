@@ -171,6 +171,20 @@ Konfiguration des Datenordners optional ueber:
 - `Catalog:Directory`
 - `CATALOG_DIRECTORY`
 
+### Nutzung durch Backend und Web
+
+Backend-Scanner und Webanwendung lesen die Katalogdaten nicht mehr lokal aus `cardInfos`,
+sondern ausschliesslich ueber gRPC vom CatalogService.
+
+Konfigurierbare Service-Adresse:
+
+- `CatalogService:Address`
+- `CATALOG_SERVICE_ADDRESS`
+
+Default-Adresse:
+
+- `http://localhost:5073`
+
 ## Typische Probleme
 
 ### 1. Gemini-Fehler `429 TooManyRequests`

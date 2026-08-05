@@ -199,7 +199,7 @@
 			var summary = await GeminiCardScanner.ScanAsync(new GeminiScanRequest
 			{
 				CardPhotosDirectory = CardCatalogService.CardPhotosDirectory,
-				SeriesCatalogPath = CardCatalogService.SeriesCatalogPath
+				CatalogServiceAddress = CardCatalogService.CatalogServiceAddress
 			});
 
 			scanStatusMessage = summary.HasConfigurationError
