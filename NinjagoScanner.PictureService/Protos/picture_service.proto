@@ -4,8 +4,12 @@ option csharp_namespace = "NinjagoScanner.PictureService.Protos";
 
 package pictureservice;
 
-service PictureScanner {
+service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
+  rpc ListCards (ListCardsRequest) returns (ListCardsResponse);
+  rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
+  rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
+  rpc UploadPhoto (stream UploadPhotoChunk) returns (UploadPhotoResponse);
 }
 
 message ScanRequest {
@@ -28,4 +32,72 @@ message ScanSummary {
   int32 failed = 5;
   bool has_configuration_error = 6;
   string message = 7;
+}
+
+// Full sidecar contents for a single card photo, keyed by its image file name.
+message CardEntry {
+  string image_file_name = 1;
+  string status = 2;
+  string card_name = 3;
+  string card_number = 4;
+  string set_name = 5;
+  string rarity = 6;
+  double confidence = 7;
+  string reasoning_summary = 8;
+  repeated string detected_text = 9;
+  string scanned_at_utc = 10;
+  string error_message = 11;
+}
+
+message ListCardsRequest {
+  optional string card_photos_directory = 1;
+}
+
+message ListCardsResponse {
+  repeated CardEntry cards = 1;
+}
+
+message UpdateSidecarRequest {
+  string image_file_name = 1;
+  optional string card_photos_directory = 2;
+  string status = 3;
+  string card_name = 4;
+  string card_number = 5;
+  string set_name = 6;
+  string rarity = 7;
+  double confidence = 8;
+  string reasoning_summary = 9;
+  repeated string detected_text = 10;
+  string error_message = 11;
+}
+
+message UpdateSidecarResponse {
+  bool success = 1;
+}
+
+message UpdateSetNameRequest {
+  string image_file_name = 1;
+  optional string card_photos_directory = 2;
+  string set_name = 3;
+}
+
+message UpdateSetNameResponse {
+  bool success = 1;
+}
+
+message UploadPhotoMetadata {
+  string original_file_name = 1;
+  optional string card_photos_directory = 2;
+}
+
+// Client-streaming upload: first message carries metadata, subsequent messages carry raw byte chunks.
+message UploadPhotoChunk {
+  oneof payload {
+    UploadPhotoMetadata metadata = 1;
+    bytes chunk_data = 2;
+  }
+}
+
+message UploadPhotoResponse {
+  string image_file_name = 1;
 }

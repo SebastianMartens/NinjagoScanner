@@ -1,19 +1,24 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Globalization;
 using System.Text.RegularExpressions;
+using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Components.Forms;
 using NinjagoScanner.CatalogService.Protos;
+using NinjagoScanner.PictureService.Protos;
 using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
 
 /// <summary>
 /// Provides upload, sidecar persistence, and catalog-backed lookup operations for scanned card photos.
+/// All card photo/sidecar access is delegated to PictureService via gRPC; this class never touches the file system.
 /// </summary>
-internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes, string catalogServiceAddress)
+internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUploadBytes, string catalogServiceAddress, string pictureServiceAddress)
 {
+    private const int UploadChunkSizeBytes = 64 * 1024;
+
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg",
@@ -23,19 +28,13 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         ".webp"
     };
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private static readonly Regex NumberOnlyRegex = new("^\\d+$", RegexOptions.Compiled);
-    private static readonly Regex UnsafeFileNameRegex = new("[^A-Za-z0-9_-]+", RegexOptions.Compiled);
 
     public string CardPhotosDirectory => cardPhotosDirectory;
 
     public string CatalogServiceAddress => catalogServiceAddress;
+
+    public string PictureServiceAddress => pictureServiceAddress;
 
     public long MaxUploadBytes => maxUploadBytes;
 
@@ -60,110 +59,55 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             throw new InvalidOperationException("Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP.");
         }
 
-        Directory.CreateDirectory(cardPhotosDirectory);
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        using var call = client.UploadPhoto(cancellationToken: cancellationToken);
 
-        var fileNameStem = BuildUploadFileNameStem(file.Name);
-        for (var attempt = 0; attempt < 100; attempt++)
+        await call.RequestStream.WriteAsync(new UploadPhotoChunk
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var candidateName = attempt == 0
-                ? $"{fileNameStem}{extension}"
-                : $"{fileNameStem}-{attempt}{extension}";
-            var destinationPath = Path.Combine(cardPhotosDirectory, candidateName);
-
-            try
+            Metadata = new UploadPhotoMetadata
             {
-                await using var sourceStream = file.OpenReadStream(maxUploadBytes, cancellationToken);
-                await using var destinationStream = new FileStream(
-                    destinationPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    81920,
-                    useAsync: true);
-                await sourceStream.CopyToAsync(destinationStream, cancellationToken);
-
-                return candidateName;
+                OriginalFileName = file.Name,
+                CardPhotosDirectory = cardPhotosDirectory
             }
-            catch (IOException) when (File.Exists(destinationPath))
+        });
+
+        await using (var sourceStream = file.OpenReadStream(maxUploadBytes, cancellationToken))
+        {
+            var buffer = new byte[UploadChunkSizeBytes];
+            int bytesRead;
+            while ((bytesRead = await sourceStream.ReadAsync(buffer, cancellationToken)) > 0)
             {
-                continue;
+                var chunkData = bytesRead == buffer.Length
+                    ? ByteString.CopyFrom(buffer)
+                    : ByteString.CopyFrom(buffer, 0, bytesRead);
+
+                await call.RequestStream.WriteAsync(new UploadPhotoChunk { ChunkData = chunkData });
             }
         }
 
-        throw new IOException("Es konnte kein eindeutiger Dateiname fuer den Upload erstellt werden.");
+        await call.RequestStream.CompleteAsync();
+
+        try
+        {
+            var response = await call;
+            return response.ImageFileName;
+        }
+        catch (RpcException exception) when (exception.StatusCode == StatusCode.InvalidArgument)
+        {
+            throw new InvalidOperationException(exception.Status.Detail);
+        }
     }
 
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
-        if (!Directory.Exists(cardPhotosDirectory))
-        {
-            return Array.Empty<CardListItem>();
-        }
+        cancellationToken.ThrowIfCancellationRequested();
 
-        var imageFiles = Directory
-            .EnumerateFiles(cardPhotosDirectory)
-            .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var entries = await LoadCardEntriesAsync(cancellationToken);
 
-        var cards = new List<CardListItem>(imageFiles.Count);
-
-        foreach (var imagePath in imageFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var imageFileName = Path.GetFileName(imagePath);
-            var sidecarPath = imagePath + ".json";
-            var imageUrl = $"/cardFotos/{Uri.EscapeDataString(imageFileName)}";
-
-            if (!File.Exists(sidecarPath))
-            {
-                cards.Add(new CardListItem
-                {
-                    ImageFileName = imageFileName,
-                    ImageUrl = imageUrl,
-                    Status = "pending"
-                });
-
-                continue;
-            }
-
-            try
-            {
-                await using var stream = File.OpenRead(sidecarPath);
-                var sidecar = await JsonSerializer.DeserializeAsync<CardSidecar>(stream, JsonOptions, cancellationToken);
-
-                cards.Add(new CardListItem
-                {
-                    ImageFileName = imageFileName,
-                    ImageUrl = imageUrl,
-                    Status = sidecar?.Status ?? "unknown",
-                    CardName = sidecar?.CardName,
-                    CardNumber = sidecar?.CardNumber,
-                    SetName = sidecar?.SetName,
-                    Rarity = sidecar?.Rarity,
-                    Confidence = sidecar?.Confidence ?? 0,
-                    ReasoningSummary = sidecar?.ReasoningSummary,
-                    DetectedText = sidecar?.DetectedText ?? Array.Empty<string>(),
-                    ScannedAtUtc = sidecar?.ScannedAtUtc,
-                    ErrorMessage = sidecar?.ErrorMessage
-                });
-            }
-            catch (Exception exception)
-            {
-                cards.Add(new CardListItem
-                {
-                    ImageFileName = imageFileName,
-                    ImageUrl = imageUrl,
-                    Status = "failed",
-                    ErrorMessage = $"Sidecar konnte nicht gelesen werden: {exception.Message}"
-                });
-            }
-        }
-
-        return cards;
+        return entries
+            .Select(ToCardListItem)
+            .ToArray();
     }
 
     public async Task<CollectionOverviewResult> GetCollectionOverviewAsync(CancellationToken cancellationToken = default)
@@ -171,7 +115,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         cancellationToken.ThrowIfCancellationRequested();
 
         var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
-        var ownershipByKey = LoadOwnedCopiesByCardKey(cancellationToken, out var totalPhotos, out var mappedPhotos);
+        var photoEntries = await LoadCardEntriesAsync(cancellationToken);
+        var ownershipByKey = BuildOwnershipLookup(photoEntries, out var totalPhotos, out var mappedPhotos);
 
         var cards = cardsFromCatalog
             .Select(card =>
@@ -222,7 +167,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         }
 
         var metadata = await LoadSeriesMetadataAsync(series, cancellationToken);
-        var photos = LoadCardPhotos(series, cardNumber, cancellationToken);
+        var photoEntries = await LoadCardEntriesAsync(cancellationToken);
+        var photos = BuildCardPhotos(photoEntries, series, cardNumber);
 
         return new CollectionCardDetails
         {
@@ -245,44 +191,25 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var imagePath = Path.Combine(cardPhotosDirectory, imageFileName);
-        var sidecarPath = imagePath + ".json";
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
 
-        CardSidecar existing;
-        if (File.Exists(sidecarPath))
+        var request = new UpdateSidecarRequest
         {
-            await using var readStream = File.OpenRead(sidecarPath);
-            existing = await JsonSerializer.DeserializeAsync<CardSidecar>(readStream, JsonOptions, cancellationToken)
-                ?? new CardSidecar();
-        }
-        else
-        {
-            existing = new CardSidecar
-            {
-                SourceFileName = imageFileName,
-                SourceFilePath = imagePath,
-                SidecarFilePath = sidecarPath
-            };
-        }
-
-        var updated = existing with
-        {
-            Status = NormalizeNullable(update.Status),
-            CardName = NormalizeNullable(update.CardName),
-            CardNumber = NormalizeNullable(update.CardNumber),
-            SetName = NormalizeNullable(update.SetName),
-            Rarity = NormalizeNullable(update.Rarity),
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory,
+            Status = update.Status ?? string.Empty,
+            CardName = update.CardName ?? string.Empty,
+            CardNumber = update.CardNumber ?? string.Empty,
+            SetName = update.SetName ?? string.Empty,
+            Rarity = update.Rarity ?? string.Empty,
             Confidence = update.Confidence,
-            ReasoningSummary = NormalizeNullable(update.ReasoningSummary),
-            DetectedText = update.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).ToArray(),
-            ErrorMessage = NormalizeNullable(update.ErrorMessage),
-            SourceFileName = existing.SourceFileName ?? imageFileName,
-            SourceFilePath = existing.SourceFilePath ?? imagePath,
-            SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
+            ReasoningSummary = update.ReasoningSummary ?? string.Empty,
+            ErrorMessage = update.ErrorMessage ?? string.Empty
         };
+        request.DetectedText.AddRange(update.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()));
 
-        await using var writeStream = File.Create(sidecarPath);
-        await JsonSerializer.SerializeAsync(writeStream, updated, JsonOptions, cancellationToken);
+        await client.UpdateSidecarAsync(request, cancellationToken: cancellationToken);
     }
 
     public async Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
@@ -301,6 +228,34 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    public async Task UpdateSetNameAsync(string imageFileName, string? setName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+
+        var request = new UpdateSetNameRequest
+        {
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory,
+            SetName = string.IsNullOrWhiteSpace(setName) ? string.Empty : setName.Trim()
+        };
+
+        await client.UpdateSetNameAsync(request, cancellationToken: cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<CardEntry>> LoadCardEntriesAsync(CancellationToken cancellationToken)
+    {
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var response = await client.ListCardsAsync(
+            new ListCardsRequest { CardPhotosDirectory = cardPhotosDirectory },
+            cancellationToken: cancellationToken);
+
+        return response.Cards;
     }
 
     private async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName)>> LoadCardsFromCatalogServiceAsync(CancellationToken cancellationToken)
@@ -352,128 +307,102 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         };
     }
 
-    private IReadOnlyList<CollectionCardPhotoItem> LoadCardPhotos(
-        string series,
-        string cardNumber,
-        CancellationToken cancellationToken)
+    private static CardListItem ToCardListItem(CardEntry entry)
     {
-        if (!Directory.Exists(cardPhotosDirectory))
+        return new CardListItem
         {
-            return Array.Empty<CollectionCardPhotoItem>();
-        }
+            ImageFileName = entry.ImageFileName,
+            ImageUrl = BuildImageUrl(entry.ImageFileName),
+            Status = entry.Status,
+            CardName = NormalizeNullable(entry.CardName),
+            CardNumber = NormalizeNullable(entry.CardNumber),
+            SetName = NormalizeNullable(entry.SetName),
+            Rarity = NormalizeNullable(entry.Rarity),
+            Confidence = entry.Confidence,
+            ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
+            DetectedText = entry.DetectedText.ToArray(),
+            ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
+            ErrorMessage = NormalizeNullable(entry.ErrorMessage)
+        };
+    }
 
+    private static CollectionCardSidecarData ToCollectionSidecar(CardEntry entry)
+    {
+        return new CollectionCardSidecarData
+        {
+            Status = entry.Status,
+            CardName = NormalizeNullable(entry.CardName),
+            CardNumber = NormalizeNullable(entry.CardNumber),
+            SetName = NormalizeNullable(entry.SetName),
+            Rarity = NormalizeNullable(entry.Rarity),
+            Confidence = entry.Confidence,
+            ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
+            DetectedText = entry.DetectedText.ToArray(),
+            ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
+            ErrorMessage = NormalizeNullable(entry.ErrorMessage)
+        };
+    }
+
+    private static IReadOnlyList<CollectionCardPhotoItem> BuildCardPhotos(
+        IReadOnlyList<CardEntry> entries,
+        string series,
+        string cardNumber)
+    {
         var ownershipKey = BuildOwnershipKey(series, cardNumber);
         if (string.IsNullOrWhiteSpace(ownershipKey))
         {
             return Array.Empty<CollectionCardPhotoItem>();
         }
 
-        var photos = new List<CollectionCardPhotoItem>();
-        var imageFiles = Directory
-            .EnumerateFiles(cardPhotosDirectory)
-            .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var imagePath in imageFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var imageFileName = Path.GetFileName(imagePath);
-            var sidecarPath = imagePath + ".json";
-            if (!File.Exists(sidecarPath))
+        return entries
+            .Where(entry => string.Equals(BuildOwnershipKey(entry.SetName, entry.CardNumber), ownershipKey, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(entry => entry.ImageFileName, StringComparer.OrdinalIgnoreCase)
+            .Select(entry => new CollectionCardPhotoItem
             {
-                continue;
-            }
-
-            try
-            {
-                using var stream = File.OpenRead(sidecarPath);
-                var sidecar = JsonSerializer.Deserialize<CardSidecar>(stream, JsonOptions);
-                if (sidecar is null)
-                {
-                    continue;
-                }
-
-                var sidecarKey = BuildOwnershipKey(sidecar.SetName, sidecar.CardNumber);
-                if (!string.Equals(sidecarKey, ownershipKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                photos.Add(new CollectionCardPhotoItem
-                {
-                    ImageFileName = imageFileName,
-                    ImageUrl = $"/cardFotos/{Uri.EscapeDataString(imageFileName)}",
-                    Sidecar = ToCollectionSidecar(sidecar)
-                });
-            }
-            catch
-            {
-                // Ignore invalid sidecars in detail view aggregation.
-            }
-        }
-
-        return photos;
+                ImageFileName = entry.ImageFileName,
+                ImageUrl = BuildImageUrl(entry.ImageFileName),
+                Sidecar = ToCollectionSidecar(entry)
+            })
+            .ToArray();
     }
 
-    private Dictionary<string, int> LoadOwnedCopiesByCardKey(
-        CancellationToken cancellationToken,
+    private static Dictionary<string, int> BuildOwnershipLookup(
+        IReadOnlyList<CardEntry> entries,
         out int totalPhotos,
         out int mappedPhotos)
     {
-        totalPhotos = 0;
+        totalPhotos = entries.Count;
         mappedPhotos = 0;
 
         var ownership = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        if (!Directory.Exists(cardPhotosDirectory))
+
+        foreach (var entry in entries)
         {
-            return ownership;
-        }
-
-        var imageFiles = Directory
-            .EnumerateFiles(cardPhotosDirectory)
-            .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)))
-            .ToArray();
-
-        totalPhotos = imageFiles.Length;
-
-        foreach (var imagePath in imageFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var sidecarPath = imagePath + ".json";
-            if (!File.Exists(sidecarPath))
+            var key = BuildOwnershipKey(entry.SetName, entry.CardNumber);
+            if (string.IsNullOrWhiteSpace(key))
             {
                 continue;
             }
 
-            try
-            {
-                using var stream = File.OpenRead(sidecarPath);
-                var sidecar = JsonSerializer.Deserialize<CardSidecar>(stream, JsonOptions);
-
-                if (string.IsNullOrWhiteSpace(sidecar?.SetName) || string.IsNullOrWhiteSpace(sidecar.CardNumber))
-                {
-                    continue;
-                }
-
-                var key = BuildOwnershipKey(sidecar.SetName, sidecar.CardNumber);
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    continue;
-                }
-
-                mappedPhotos++;
-                ownership.TryGetValue(key, out var current);
-                ownership[key] = current + 1;
-            }
-            catch
-            {
-                // Ignore broken sidecars for overview aggregation.
-            }
+            mappedPhotos++;
+            ownership.TryGetValue(key, out var current);
+            ownership[key] = current + 1;
         }
 
         return ownership;
+    }
+
+    private static string BuildImageUrl(string imageFileName)
+    {
+        return $"/cardFotos/{Uri.EscapeDataString(imageFileName)}";
+    }
+
+    private static DateTimeOffset? ParseScannedAtUtc(string value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+                ? parsed
+                : null;
     }
 
     private static string BuildOwnershipKey(string? series, string? cardNumber)
@@ -556,89 +485,9 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return $"9-{cardNumber}";
     }
 
-    private static CollectionCardSidecarData ToCollectionSidecar(CardSidecar sidecar)
-    {
-        return new CollectionCardSidecarData
-        {
-            Status = sidecar.Status,
-            CardName = sidecar.CardName,
-            CardNumber = sidecar.CardNumber,
-            SetName = sidecar.SetName,
-            Rarity = sidecar.Rarity,
-            Confidence = sidecar.Confidence,
-            ReasoningSummary = sidecar.ReasoningSummary,
-            DetectedText = sidecar.DetectedText ?? Array.Empty<string>(),
-            ScannedAtUtc = sidecar.ScannedAtUtc,
-            ErrorMessage = sidecar.ErrorMessage
-        };
-    }
-
     private static string? NormalizeNullable(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static string BuildUploadFileNameStem(string originalName)
-    {
-        var rawName = Path.GetFileNameWithoutExtension(originalName);
-        var sanitizedName = UnsafeFileNameRegex.Replace(rawName.Trim(), "-").Trim('-');
-        if (string.IsNullOrWhiteSpace(sanitizedName))
-        {
-            sanitizedName = "mobile-photo";
-        }
-
-        return $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{sanitizedName}";
-    }
-
-    public async Task UpdateSetNameAsync(string imageFileName, string? setName, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var imagePath = Path.Combine(cardPhotosDirectory, imageFileName);
-        var sidecarPath = imagePath + ".json";
-
-        CardSidecar sidecar;
-
-        if (File.Exists(sidecarPath))
-        {
-            await using var readStream = File.OpenRead(sidecarPath);
-            sidecar = await JsonSerializer.DeserializeAsync<CardSidecar>(readStream, JsonOptions, cancellationToken)
-                ?? new CardSidecar();
-        }
-        else
-        {
-            sidecar = new CardSidecar
-            {
-                Status = "pending"
-            };
-        }
-
-        sidecar = sidecar with
-        {
-            SetName = string.IsNullOrWhiteSpace(setName) ? null : setName.Trim()
-        };
-
-        await using var writeStream = File.Create(sidecarPath);
-        await JsonSerializer.SerializeAsync(writeStream, sidecar, JsonOptions, cancellationToken);
-    }
-
-    private sealed record CardSidecar
-    {
-        public string? Status { get; init; }
-        public string? CardName { get; init; }
-        public string? CardNumber { get; init; }
-        public string? SetName { get; init; }
-        public string? Rarity { get; init; }
-        public double Confidence { get; init; }
-        public string? ReasoningSummary { get; init; }
-        public string[]? DetectedText { get; init; }
-        public DateTimeOffset? ScannedAtUtc { get; init; }
-        public string? ErrorMessage { get; init; }
-        public string? SourceFileName { get; init; }
-        public string? SourceFilePath { get; init; }
-        public string? SidecarFilePath { get; init; }
-        public string? AiModel { get; init; }
-        public string? RawModelResponse { get; init; }
     }
 
     private sealed class SeriesMetadata

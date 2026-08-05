@@ -30,7 +30,7 @@ internal sealed class ScannerConfig
         {
             ApiKey = (request?.HasApiKey ?? false ? request.ApiKey : null) ?? configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
             Model = (request?.HasModel ?? false ? request.Model : null) ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-3.1-flash-lite",
-            CardPhotosDirectory = (request?.HasCardPhotosDirectory ?? false ? request.CardPhotosDirectory : null) ?? configuration["CardPhotos:Directory"] ?? configuration["CARD_PHOTOS_DIRECTORY"] ?? ResolveDefaultCardPhotosDirectory(),
+            CardPhotosDirectory = ResolveCardPhotosDirectory(request?.HasCardPhotosDirectory ?? false ? request.CardPhotosDirectory : null, configuration),
             CatalogServiceAddress = (request?.HasCatalogServiceAddress ?? false ? request.CatalogServiceAddress : null) ?? configuration["CatalogService:Address"] ?? configuration["CATALOG_SERVICE_ADDRESS"] ?? "http://localhost:5073",
             OverwriteExistingSidecars = request?.HasOverwriteExistingSidecars ?? false ? request.OverwriteExistingSidecars : (bool.TryParse(configuration["Scanner:OverwriteSidecars"] ?? configuration["OVERWRITE_SIDECARS"], out var overwrite) && overwrite),
             DelayBetweenRequestsMs = request?.HasDelayBetweenRequestsMs ?? false ? request.DelayBetweenRequestsMs : TryParseInt(configuration["Scanner:DelayBetweenRequestsMs"] ?? configuration["DELAY_BETWEEN_REQUESTS_MS"], 1000),
@@ -43,6 +43,14 @@ internal sealed class ScannerConfig
     private static int TryParseInt(string? value, int fallback)
     {
         return int.TryParse(value, out var parsedValue) ? parsedValue : fallback;
+    }
+
+    public static string ResolveCardPhotosDirectory(string? overrideValue, IConfiguration configuration)
+    {
+        return overrideValue
+               ?? configuration["CardPhotos:Directory"]
+               ?? configuration["CARD_PHOTOS_DIRECTORY"]
+               ?? ResolveDefaultCardPhotosDirectory();
     }
 
     private static string ResolveDefaultCardPhotosDirectory()

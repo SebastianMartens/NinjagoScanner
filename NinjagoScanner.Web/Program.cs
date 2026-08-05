@@ -11,7 +11,7 @@ var maxUploadBytes = ResolveMaxUploadBytes(builder.Configuration);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory, maxUploadBytes, catalogServiceAddress));
+builder.Services.AddSingleton(new CardCatalogService(cardPhotosDirectory, maxUploadBytes, catalogServiceAddress, pictureServiceAddress));
 builder.Services.AddSingleton(new PictureServiceClient(pictureServiceAddress));
 
 var app = builder.Build();

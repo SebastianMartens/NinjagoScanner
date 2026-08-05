@@ -2,11 +2,17 @@ using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NinjagoScanner.PictureService.Protos;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace NinjagoScanner.PictureService.Services;
 
-public sealed class PictureScannerGrpcService : PictureScanner.PictureScannerBase
+public sealed class PictureScannerGrpcService : CardPictureService.CardPictureServiceBase
 {
+    private const int MaxUploadFileNameAttempts = 100;
+
+    private static readonly Regex UnsafeFileNameRegex = new("[^A-Za-z0-9_-]+", RegexOptions.Compiled);
+
     private readonly IConfiguration configuration;
     private readonly ILogger<PictureScannerGrpcService> logger;
 
@@ -166,5 +172,229 @@ public sealed class PictureScannerGrpcService : PictureScanner.PictureScannerBas
             Failed = failedCount,
             Message = "Batch abgeschlossen."
         };
+    }
+
+    public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+
+        var response = new ListCardsResponse();
+        if (!Directory.Exists(directory))
+        {
+            return response;
+        }
+
+        var imageFiles = Directory
+            .EnumerateFiles(directory)
+            .Where(path => ScannerConfig.SupportedExtensions.Contains(Path.GetExtension(path)))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var imagePath in imageFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var imageFileName = Path.GetFileName(imagePath);
+            var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+
+            if (!File.Exists(sidecarPath))
+            {
+                response.Cards.Add(new CardEntry
+                {
+                    ImageFileName = imageFileName,
+                    Status = "pending"
+                });
+                continue;
+            }
+
+            try
+            {
+                var sidecar = await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken);
+                response.Cards.Add(ToCardEntry(imageFileName, sidecar));
+            }
+            catch (Exception exception)
+            {
+                response.Cards.Add(new CardEntry
+                {
+                    ImageFileName = imageFileName,
+                    Status = "failed",
+                    ErrorMessage = $"Sidecar konnte nicht gelesen werden: {exception.Message}"
+                });
+            }
+        }
+
+        return response;
+    }
+
+    public override async Task<UpdateSidecarResponse> UpdateSidecar(UpdateSidecarRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+        var imagePath = Path.Combine(directory, request.ImageFileName);
+        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+
+        var existing = File.Exists(sidecarPath)
+            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord()
+            : new SidecarRecord
+            {
+                SourceFileName = request.ImageFileName,
+                SourceFilePath = imagePath,
+                SidecarFilePath = sidecarPath
+            };
+
+        var updated = existing with
+        {
+            Status = NormalizeNullable(request.Status),
+            CardName = NormalizeNullable(request.CardName),
+            CardNumber = NormalizeNullable(request.CardNumber),
+            SetName = NormalizeNullable(request.SetName),
+            Rarity = NormalizeNullable(request.Rarity),
+            Confidence = request.Confidence,
+            ReasoningSummary = NormalizeNullable(request.ReasoningSummary),
+            DetectedText = request.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).ToArray(),
+            ErrorMessage = NormalizeNullable(request.ErrorMessage),
+            SourceFileName = existing.SourceFileName ?? request.ImageFileName,
+            SourceFilePath = existing.SourceFilePath ?? imagePath,
+            SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
+        };
+
+        await SidecarStore.WriteRecordAsync(sidecarPath, updated, cancellationToken);
+
+        return new UpdateSidecarResponse { Success = true };
+    }
+
+    public override async Task<UpdateSetNameResponse> UpdateSetName(UpdateSetNameRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+        var imagePath = Path.Combine(directory, request.ImageFileName);
+        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+
+        var sidecar = File.Exists(sidecarPath)
+            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { Status = "pending" }
+            : new SidecarRecord { Status = "pending" };
+
+        sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
+
+        await SidecarStore.WriteRecordAsync(sidecarPath, sidecar, cancellationToken);
+
+        return new UpdateSetNameResponse { Success = true };
+    }
+
+    public override async Task<UploadPhotoResponse> UploadPhoto(IAsyncStreamReader<UploadPhotoChunk> requestStream, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+
+        string? originalFileName = null;
+        string? cardPhotosDirectoryOverride = null;
+        using var buffer = new MemoryStream();
+
+        await foreach (var chunk in requestStream.ReadAllAsync(cancellationToken))
+        {
+            switch (chunk.PayloadCase)
+            {
+                case UploadPhotoChunk.PayloadOneofCase.Metadata:
+                    originalFileName = chunk.Metadata.OriginalFileName;
+                    cardPhotosDirectoryOverride = chunk.Metadata.HasCardPhotosDirectory ? chunk.Metadata.CardPhotosDirectory : null;
+                    break;
+                case UploadPhotoChunk.PayloadOneofCase.ChunkData:
+                    var span = chunk.ChunkData.Span;
+                    buffer.Write(span);
+                    break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(originalFileName))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Kein Dateiname angegeben."));
+        }
+
+        if (buffer.Length == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Die hochgeladene Datei ist leer."));
+        }
+
+        var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
+        if (!ScannerConfig.SupportedExtensions.Contains(extension))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP."));
+        }
+
+        var directory = ResolveDirectory(cardPhotosDirectoryOverride);
+        Directory.CreateDirectory(directory);
+
+        var fileNameStem = BuildUploadFileNameStem(originalFileName);
+        var bytes = buffer.ToArray();
+
+        for (var attempt = 0; attempt < MaxUploadFileNameAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var candidateName = attempt == 0
+                ? $"{fileNameStem}{extension}"
+                : $"{fileNameStem}-{attempt}{extension}";
+            var destinationPath = Path.Combine(directory, candidateName);
+
+            try
+            {
+                await using var destinationStream = new FileStream(
+                    destinationPath,
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.None,
+                    81920,
+                    useAsync: true);
+                await destinationStream.WriteAsync(bytes, cancellationToken);
+
+                return new UploadPhotoResponse { ImageFileName = candidateName };
+            }
+            catch (IOException) when (File.Exists(destinationPath))
+            {
+                continue;
+            }
+        }
+
+        throw new RpcException(new Status(StatusCode.Internal, "Es konnte kein eindeutiger Dateiname fuer den Upload erstellt werden."));
+    }
+
+    private string ResolveDirectory(string? overrideValue)
+    {
+        return ScannerConfig.ResolveCardPhotosDirectory(overrideValue, configuration);
+    }
+
+    private static CardEntry ToCardEntry(string imageFileName, SidecarRecord? sidecar)
+    {
+        var entry = new CardEntry
+        {
+            ImageFileName = imageFileName,
+            Status = sidecar?.Status ?? "unknown",
+            CardName = sidecar?.CardName ?? string.Empty,
+            CardNumber = sidecar?.CardNumber ?? string.Empty,
+            SetName = sidecar?.SetName ?? string.Empty,
+            Rarity = sidecar?.Rarity ?? string.Empty,
+            Confidence = sidecar?.Confidence ?? 0,
+            ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
+            ScannedAtUtc = sidecar?.ScannedAtUtc?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
+            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty
+        };
+        entry.DetectedText.AddRange(sidecar?.DetectedText ?? Array.Empty<string>());
+        return entry;
+    }
+
+    private static string? NormalizeNullable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string BuildUploadFileNameStem(string originalName)
+    {
+        var rawName = Path.GetFileNameWithoutExtension(originalName);
+        var sanitizedName = UnsafeFileNameRegex.Replace(rawName.Trim(), "-").Trim('-');
+        if (string.IsNullOrWhiteSpace(sanitizedName))
+        {
+            sanitizedName = "mobile-photo";
+        }
+
+        return $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{sanitizedName}";
     }
 }
