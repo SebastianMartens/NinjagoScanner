@@ -18,9 +18,41 @@
             "stopAtEntry": false
         },
         {
+            "name": ".NET Core Launch (CatalogService)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/NinjagoScanner.CatalogService/bin/Debug/net10.0/NinjagoScanner.CatalogService.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/NinjagoScanner.CatalogService",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": ".NET Core Launch (PictureService)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/NinjagoScanner.PictureService/bin/Debug/net10.0/NinjagoScanner.PictureService.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/NinjagoScanner.PictureService",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Launch All (CatalogService + PictureService + Web)",
+            "preLaunchTask": "build",
+            "configurations": [
+                ".NET Core Launch (CatalogService)",
+                ".NET Core Launch (PictureService)",
+                ".NET Core Launch (Web)"
+            ],
+            "stopAll": true
         }
     ]
 }
