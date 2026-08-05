@@ -4,6 +4,7 @@ Dieses Repository enthaelt zwei .NET-10-Projekte fuer das Erfassen und Anzeigen 
 
 - `NinjagoScanner.Backend`: Scanner-Backendbibliothek fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
 - `NinjagoScanner.Web`: Blazor-Webanwendung zur Anzeige der Karten als Kacheln und in Tabellenform.
+- `NinjagoScanner.CatalogService`: Eigenstaendiger gRPC-Microservice, der die Katalogdaten (`cardInfos/*.json`) besitzt und als API bereitstellt.
 
 Die Projektmappe im Root ist `NinjagoScanner.slnx`.
 
@@ -142,6 +143,33 @@ Das gesamte Repository kann ueber die Solution im Root gebaut werden:
 Set-Location c:\sma\github\NinjagoScanner
 dotnet build
 ```
+
+## Catalog Microservice (gRPC)
+
+Projektpfad:
+
+- [NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj](NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj)
+
+Der Service verwaltet den Serienkatalog unabhaengig als eigene Komponente.
+Die JSON-Dateien liegen innerhalb des Service-Projekts in `NinjagoScanner.CatalogService/cardInfos` und werden beim Build in die Ausgabe kopiert.
+
+### Starten
+
+```powershell
+Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.CatalogService
+dotnet run
+```
+
+### gRPC-Endpunkte
+
+- `CardCatalog/ListSeries`
+- `CardCatalog/GetSeries`
+- `CardCatalog/GetServiceInfo`
+
+Konfiguration des Datenordners optional ueber:
+
+- `Catalog:Directory`
+- `CATALOG_DIRECTORY`
 
 ## Typische Probleme
 
