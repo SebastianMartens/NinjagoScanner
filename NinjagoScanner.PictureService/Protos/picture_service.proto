@@ -10,6 +10,7 @@ service CardPictureService {
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
   rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
   rpc UploadPhoto (stream UploadPhotoChunk) returns (UploadPhotoResponse);
+  rpc MigrateSidecars (MigrateSidecarsRequest) returns (MigrateSidecarsResponse);
 }
 
 message ScanRequest {
@@ -37,7 +38,7 @@ message ScanSummary {
 // Full sidecar contents for a single card photo, keyed by its image file name.
 message CardEntry {
   string image_file_name = 1;
-  string status = 2;
+  string analysis_status = 2;
   string card_name = 3;
   string card_number = 4;
   string set_name = 5;
@@ -47,6 +48,7 @@ message CardEntry {
   repeated string detected_text = 9;
   string scanned_at_utc = 10;
   string error_message = 11;
+  string review_status = 12;
 }
 
 message ListCardsRequest {
@@ -60,7 +62,7 @@ message ListCardsResponse {
 message UpdateSidecarRequest {
   string image_file_name = 1;
   optional string card_photos_directory = 2;
-  string status = 3;
+  string analysis_status = 3;
   string card_name = 4;
   string card_number = 5;
   string set_name = 6;
@@ -69,6 +71,7 @@ message UpdateSidecarRequest {
   string reasoning_summary = 9;
   repeated string detected_text = 10;
   string error_message = 11;
+  string review_status = 12;
 }
 
 message UpdateSidecarResponse {
@@ -100,4 +103,15 @@ message UploadPhotoChunk {
 
 message UploadPhotoResponse {
   string image_file_name = 1;
+}
+
+message MigrateSidecarsRequest {
+  optional string card_photos_directory = 1;
+}
+
+message MigrateSidecarsResponse {
+  int32 total_files = 1;
+  int32 migrated = 2;
+  int32 already_current = 3;
+  int32 errors = 4;
 }

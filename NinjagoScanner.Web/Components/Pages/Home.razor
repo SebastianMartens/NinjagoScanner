@@ -23,8 +23,8 @@
 		</div>
 		<div class="cards-stats">
 			<span>@cards.Count Karte(n)</span>
-			<span>@cards.Count(card => card.Status == "ok") erkannt</span>
-			<span>@cards.Count(card => card.Status != "ok") offen</span>
+			<span>@cards.Count(card => card.AnalysisStatus == "ok") erkannt</span>
+			<span>@cards.Count(card => card.AnalysisStatus != "ok") offen</span>
 		</div>
 	</header>
 
@@ -53,6 +53,17 @@
 					@foreach (var status in AvailableStatuses)
 					{
 						<option value="@status">@GetStatusLabel(status)</option>
+					}
+				</select>
+			</label>
+
+			<label>
+				<span>Review-Status</span>
+				<select @bind="selectedReviewStatus">
+					<option value="">Alle Review-Status</option>
+					@foreach (var reviewStatus in AvailableReviewStatuses)
+					{
+						<option value="@reviewStatus">@GetReviewStatusLabel(reviewStatus)</option>
 					}
 				</select>
 			</label>
@@ -118,7 +129,8 @@
 						<article class="card-tile">
 							<div class="card-preview">
 								<img src="@card.ImageUrl" alt="@card.ImageFileName" loading="lazy" />
-								<span class="status-badge @GetStatusClass(card.Status)">@GetStatusLabel(card.Status)</span>
+								<span class="status-badge @GetStatusClass(card.AnalysisStatus)">@GetStatusLabel(card.AnalysisStatus)</span>
+								<span class="status-badge @GetReviewStatusClass(card.ReviewStatus)">@GetReviewStatusLabel(card.ReviewStatus)</span>
 							</div>
 
 							<div class="card-body">
@@ -180,6 +192,7 @@
 	private string groupBy = "none";
 	private string searchText = string.Empty;
 	private string selectedStatus = string.Empty;
+	private string selectedReviewStatus = string.Empty;
 	private string selectedSet = string.Empty;
 	private string selectedRarity = string.Empty;
 
@@ -213,10 +226,16 @@
 	}
 
 	private IEnumerable<string> AvailableStatuses => cards
-		.Select(card => card.Status)
+		.Select(card => card.AnalysisStatus)
 		.Where(status => !string.IsNullOrWhiteSpace(status))
 		.Distinct(StringComparer.OrdinalIgnoreCase)
 		.OrderBy(GetStatusLabel, StringComparer.OrdinalIgnoreCase);
+
+	private IEnumerable<string> AvailableReviewStatuses => cards
+		.Select(card => card.ReviewStatus)
+		.Where(reviewStatus => !string.IsNullOrWhiteSpace(reviewStatus))
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(GetReviewStatusLabel, StringComparer.OrdinalIgnoreCase);
 
 	private IEnumerable<string> AvailableSets => cards
 		.Select(card => card.SetName)
@@ -240,7 +259,12 @@
 
 			if (!string.IsNullOrWhiteSpace(selectedStatus))
 			{
-				query = query.Where(card => string.Equals(card.Status, selectedStatus, StringComparison.OrdinalIgnoreCase));
+				query = query.Where(card => string.Equals(card.AnalysisStatus, selectedStatus, StringComparison.OrdinalIgnoreCase));
+			}
+
+			if (!string.IsNullOrWhiteSpace(selectedReviewStatus))
+			{
+				query = query.Where(card => string.Equals(card.ReviewStatus, selectedReviewStatus, StringComparison.OrdinalIgnoreCase));
 			}
 
 			if (!string.IsNullOrWhiteSpace(selectedSet))
@@ -266,7 +290,7 @@
 							card.CardNumber,
 							card.SetName,
 							card.Rarity,
-							card.Status,
+							card.AnalysisStatus,
 							card.ImageFileName
 						}.Where(value => !string.IsNullOrWhiteSpace(value)));
 
@@ -300,7 +324,7 @@
 
 	private string GetGroupKey(CardListItem card) => groupBy switch
 	{
-		"status" => GetStatusLabel(card.Status),
+		"status" => GetStatusLabel(card.AnalysisStatus),
 		"rarity" => card.Rarity ?? "Unbekannt",
 		_ => card.SetName ?? "Ohne Set"
 	};
@@ -319,6 +343,20 @@
 		"uncertain" => "Unsicher",
 		"pending" => "Kein Sidecar",
 		_ => "Fehler"
+	};
+
+	private static string GetReviewStatusClass(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		"verified" => "status-ok",
+		"incorrect" => "status-failed",
+		_ => "status-pending"
+	};
+
+	private static string GetReviewStatusLabel(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		"verified" => "Bestätigt",
+		"incorrect" => "Fehlerhaft",
+		_ => "Nicht geprüft"
 	};
 
 	private sealed record CardGroup(string? Key, List<CardListItem> Items);

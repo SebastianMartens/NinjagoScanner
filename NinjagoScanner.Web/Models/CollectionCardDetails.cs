@@ -22,7 +22,7 @@ internal sealed class CollectionCardPhotoItem
 
 internal sealed class CollectionCardSidecarData
 {
-    public string? Status { get; init; }
+    public string? AnalysisStatus { get; init; }
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
@@ -32,11 +32,12 @@ internal sealed class CollectionCardSidecarData
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
     public DateTimeOffset? ScannedAtUtc { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? ReviewStatus { get; init; }
 }
 
 internal sealed class CollectionCardSidecarUpdate
 {
-    public string? Status { get; init; }
+    public string? AnalysisStatus { get; init; }
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
@@ -45,4 +46,5 @@ internal sealed class CollectionCardSidecarUpdate
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
     public string? ErrorMessage { get; init; }
+    public string? ReviewStatus { get; init; }
 }

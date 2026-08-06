@@ -124,7 +124,7 @@ internal static class GeminiApiService
             var resolvedSetName = SeriesCatalogService.ResolveSetName(payload, seriesCatalog);
             return new CardAnalysisResult
             {
-                Status = normalizedStatus,
+                AnalysisStatus = normalizedStatus,
                 SourceFileName = Path.GetFileName(imagePath),
                 SourceFilePath = imagePath,
                 SidecarFilePath = sidecarPath,
@@ -150,7 +150,7 @@ internal static class GeminiApiService
     {
         return new CardAnalysisResult
         {
-            Status = AnalysisStatuses.Failed,
+            AnalysisStatus = AnalysisStatuses.Failed,
             SourceFileName = Path.GetFileName(imagePath),
             SourceFilePath = imagePath,
             SidecarFilePath = sidecarPath,

@@ -198,14 +198,15 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         {
             ImageFileName = imageFileName,
             CardPhotosDirectory = cardPhotosDirectory,
-            Status = update.Status ?? string.Empty,
+            AnalysisStatus = update.AnalysisStatus ?? string.Empty,
             CardName = update.CardName ?? string.Empty,
             CardNumber = update.CardNumber ?? string.Empty,
             SetName = update.SetName ?? string.Empty,
             Rarity = update.Rarity ?? string.Empty,
             Confidence = update.Confidence,
             ReasoningSummary = update.ReasoningSummary ?? string.Empty,
-            ErrorMessage = update.ErrorMessage ?? string.Empty
+            ErrorMessage = update.ErrorMessage ?? string.Empty,
+            ReviewStatus = update.ReviewStatus ?? string.Empty
         };
         request.DetectedText.AddRange(update.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()));
 
@@ -313,7 +314,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         {
             ImageFileName = entry.ImageFileName,
             ImageUrl = BuildImageUrl(entry.ImageFileName),
-            Status = entry.Status,
+            AnalysisStatus = entry.AnalysisStatus,
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),
             SetName = NormalizeNullable(entry.SetName),
@@ -322,7 +323,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
             DetectedText = entry.DetectedText.ToArray(),
             ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
-            ErrorMessage = NormalizeNullable(entry.ErrorMessage)
+            ErrorMessage = NormalizeNullable(entry.ErrorMessage),
+            ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
         };
     }
 
@@ -330,7 +332,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
     {
         return new CollectionCardSidecarData
         {
-            Status = entry.Status,
+            AnalysisStatus = entry.AnalysisStatus,
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),
             SetName = NormalizeNullable(entry.SetName),
@@ -339,7 +341,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
             DetectedText = entry.DetectedText.ToArray(),
             ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
-            ErrorMessage = NormalizeNullable(entry.ErrorMessage)
+            ErrorMessage = NormalizeNullable(entry.ErrorMessage),
+            ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
         };
     }
 

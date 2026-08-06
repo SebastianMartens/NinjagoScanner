@@ -10,9 +10,16 @@ internal static class AnalysisStatuses
     public const string Failed = "failed";
 }
 
-internal sealed class CardAnalysisResult
+internal static class ReviewStatuses
 {
-    public required string Status { get; init; }
+    public const string Unreviewed = "unreviewed";
+    public const string Verified = "verified";
+    public const string Incorrect = "incorrect";
+}
+
+internal sealed record CardAnalysisResult
+{
+    public required string AnalysisStatus { get; init; }
     public required string SourceFileName { get; init; }
     public required string SourceFilePath { get; init; }
     public required string SidecarFilePath { get; init; }
@@ -27,6 +34,7 @@ internal sealed class CardAnalysisResult
     public required DateTimeOffset ScannedAtUtc { get; init; }
     public string? ErrorMessage { get; init; }
     public string? RawModelResponse { get; init; }
+    public string ReviewStatus { get; init; } = ReviewStatuses.Unreviewed;
 }
 
 internal sealed class GeminiCardPayload

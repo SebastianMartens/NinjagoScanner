@@ -198,8 +198,12 @@
                             <EditForm Model="sidecarDraft" OnValidSubmit="SaveSelectedSidecarAsync">
                                 <div class="detail-form-grid">
                                     <label>
-                                        <span>Status</span>
-                                        <input @bind="sidecarDraft.Status" />
+                                        <span>Review-Status</span>
+                                        <select @bind="sidecarDraft.ReviewStatus">
+                                            <option value="@ReviewStatuses.Unreviewed">Nicht geprüft</option>
+                                            <option value="@ReviewStatuses.Verified">Bestätigt</option>
+                                            <option value="@ReviewStatuses.Incorrect">Fehlerhaft</option>
+                                        </select>
                                     </label>
                                     <label>
                                         <span>Kartenname</span>
@@ -243,6 +247,8 @@
                                     <span>Error Message</span>
                                     <textarea rows="2" @bind="sidecarDraft.ErrorMessage"></textarea>
                                 </label>
+
+                                <p class="table-secondary">Analyse-Status (durch Gemini ermittelt, nicht editierbar): @(SelectedPhoto.Sidecar?.AnalysisStatus ?? "-")</p>
 
                                 @if (SelectedPhoto.Sidecar?.ScannedAtUtc is not null)
                                 {
@@ -477,7 +483,7 @@
 
             var update = new CollectionCardSidecarUpdate
             {
-                Status = sidecarDraft.Status,
+                AnalysisStatus = sidecarDraft.AnalysisStatus,
                 CardName = sidecarDraft.CardName,
                 CardNumber = sidecarDraft.CardNumber,
                 SetName = sidecarDraft.SetName,
@@ -485,7 +491,8 @@
                 Confidence = confidence,
                 ReasoningSummary = sidecarDraft.ReasoningSummary,
                 DetectedText = SplitLines(sidecarDraft.DetectedTextLines),
-                ErrorMessage = sidecarDraft.ErrorMessage
+                ErrorMessage = sidecarDraft.ErrorMessage,
+                ReviewStatus = sidecarDraft.ReviewStatus
             };
 
             await CardCatalogService.UpdateCardSidecarAsync(SelectedPhoto.ImageFileName, update);
@@ -599,7 +606,7 @@
     {
         return new SidecarDraft
         {
-            Status = sidecar?.Status ?? "ok",
+            AnalysisStatus = sidecar?.AnalysisStatus ?? "ok",
             CardName = sidecar?.CardName ?? fallbackCard?.CardName ?? string.Empty,
             CardNumber = sidecar?.CardNumber ?? fallbackCard?.CardNumber ?? string.Empty,
             SetName = sidecar?.SetName ?? fallbackCard?.Series ?? string.Empty,
@@ -607,7 +614,8 @@
             ConfidenceText = sidecar?.Confidence.ToString("0.##") ?? "0",
             ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
             DetectedTextLines = sidecar is null ? string.Empty : string.Join(Environment.NewLine, sidecar.DetectedText),
-            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty
+            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
+            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
         };
     }
 
@@ -639,7 +647,7 @@
 
     private sealed class SidecarDraft
     {
-        public string Status { get; set; } = "ok";
+        public string AnalysisStatus { get; set; } = "ok";
         public string CardName { get; set; } = string.Empty;
         public string CardNumber { get; set; } = string.Empty;
         public string SetName { get; set; } = string.Empty;
@@ -648,6 +656,7 @@
         public string ReasoningSummary { get; set; } = string.Empty;
         public string DetectedTextLines { get; set; } = string.Empty;
         public string ErrorMessage { get; set; } = string.Empty;
+        public string ReviewStatus { get; set; } = ReviewStatuses.Unreviewed;
     }
 
     private sealed record CardGroup(string Key, List<CollectionCardItem> Items);

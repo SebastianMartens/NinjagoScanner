@@ -18,8 +18,35 @@ internal static class SidecarStore
 
     public static async Task<SidecarRecord?> ReadRecordAsync(string sidecarPath, CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(sidecarPath);
-        return await JsonSerializer.DeserializeAsync<SidecarRecord>(stream, ScannerJsonOptions.Default, cancellationToken);
+        var json = await File.ReadAllTextAsync(sidecarPath, Encoding.UTF8, cancellationToken);
+        var record = JsonSerializer.Deserialize<SidecarRecord>(json, ScannerJsonOptions.Default);
+        if (record is null || !string.IsNullOrWhiteSpace(record.AnalysisStatus))
+        {
+            return record;
+        }
+
+        using var document = JsonDocument.Parse(json);
+        var legacyStatus = FindLegacyStatus(document.RootElement);
+        return legacyStatus is null ? record : record with { AnalysisStatus = legacyStatus };
+    }
+
+    /// <summary>
+    /// Sidecar files written before the "status" field was renamed to "AnalysisStatus" still carry
+    /// the old key. This lets those pre-existing files keep surfacing a correct AnalysisStatus without
+    /// requiring a rescan; it does not rewrite the file (see the MigrateSidecars RPC for that).
+    /// </summary>
+    private static string? FindLegacyStatus(JsonElement root)
+    {
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, "status", StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.String)
+            {
+                return property.Value.GetString();
+            }
+        }
+
+        return null;
     }
 
     public static async Task WriteRecordAsync(string sidecarPath, SidecarRecord record, CancellationToken cancellationToken)
@@ -35,7 +62,8 @@ internal static class SidecarStore
 /// </summary>
 internal sealed record SidecarRecord
 {
-    public string? Status { get; init; }
+    public string? AnalysisStatus { get; init; }
+    public string? ReviewStatus { get; init; }
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }

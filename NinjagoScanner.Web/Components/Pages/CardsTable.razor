@@ -26,6 +26,17 @@
 				<span>Filter</span>
 				<input @bind="searchText" @bind:event="oninput" placeholder="Name, Nummer, Set, Status..." />
 			</label>
+
+			<label>
+				<span>Review-Status</span>
+				<select @bind="selectedReviewStatus">
+					<option value="">Alle Review-Status</option>
+					@foreach (var reviewStatus in AvailableReviewStatuses)
+					{
+						<option value="@reviewStatus">@GetReviewStatusLabel(reviewStatus)</option>
+					}
+				</select>
+			</label>
 		</div>
 	</header>
 
@@ -59,6 +70,7 @@
 								<th>Nummer</th>
 								<th>Set</th>
 								<th>Status</th>
+								<th>Review-Status</th>
 								<th>Seltenheit</th>
 								<th>Confidence</th>
 								<th>Details</th>
@@ -95,7 +107,8 @@
 											<div class="table-set-hint">Speichert...</div>
 										}
 									</td>
-									<td><span class="table-status @GetStatusClass(card.Status)">@GetStatusLabel(card.Status)</span></td>
+									<td><span class="table-status @GetStatusClass(card.AnalysisStatus)">@GetStatusLabel(card.AnalysisStatus)</span></td>
+									<td><span class="table-status @GetReviewStatusClass(card.ReviewStatus)">@GetReviewStatusLabel(card.ReviewStatus)</span></td>
 									<td>@(card.Rarity ?? "-")</td>
 									<td>@card.Confidence.ToString("0.00")</td>
 									<td>
@@ -152,6 +165,7 @@
 	private bool isLoading = true;
 	private string groupBy = "set";
 	private string searchText = string.Empty;
+	private string selectedReviewStatus = string.Empty;
 	private string? expandedCardKey;
 	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
 	private string? savingCardKey;
@@ -166,10 +180,17 @@
 		isLoading = false;
 	}
 
+	private IEnumerable<string> AvailableReviewStatuses => cards
+		.Select(card => card.ReviewStatus)
+		.Where(reviewStatus => !string.IsNullOrWhiteSpace(reviewStatus))
+		.Distinct(StringComparer.OrdinalIgnoreCase)
+		.OrderBy(GetReviewStatusLabel, StringComparer.OrdinalIgnoreCase);
+
 	private IEnumerable<CardGroup> GetGroupedCards()
 	{
 		var filteredCards = cards
 			.Where(MatchesSearch)
+			.Where(MatchesReviewStatus)
 			.OrderBy(card => card.SetName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
 			.ThenBy(card => card.CardNumber ?? string.Empty, StringComparer.OrdinalIgnoreCase)
 			.ThenBy(card => card.CardName ?? card.ImageFileName, StringComparer.OrdinalIgnoreCase);
@@ -202,11 +223,17 @@
 				card.CardNumber,
 				card.SetName,
 				card.Rarity,
-				card.Status,
+				card.AnalysisStatus,
 				card.ImageFileName
 			}.Where(value => !string.IsNullOrWhiteSpace(value)));
 
 		return haystack.Contains(query, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private bool MatchesReviewStatus(CardListItem card)
+	{
+		return string.IsNullOrWhiteSpace(selectedReviewStatus)
+			|| string.Equals(card.ReviewStatus, selectedReviewStatus, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static bool HasDetails(CardListItem card)
@@ -267,7 +294,7 @@
 				{
 					ImageFileName = card.ImageFileName,
 					ImageUrl = card.ImageUrl,
-					Status = card.Status,
+					AnalysisStatus = card.AnalysisStatus,
 					CardName = card.CardName,
 					CardNumber = card.CardNumber,
 					SetName = string.IsNullOrWhiteSpace(newSetName) ? null : newSetName,
@@ -276,7 +303,8 @@
 					ReasoningSummary = card.ReasoningSummary,
 					DetectedText = card.DetectedText,
 					ScannedAtUtc = card.ScannedAtUtc,
-					ErrorMessage = card.ErrorMessage
+					ErrorMessage = card.ErrorMessage,
+					ReviewStatus = card.ReviewStatus
 				};
 			}
 		}
@@ -288,7 +316,7 @@
 
 	private string GetGroupKey(CardListItem card) => groupBy switch
 	{
-		"status" => GetStatusLabel(card.Status),
+		"status" => GetStatusLabel(card.AnalysisStatus),
 		"rarity" => card.Rarity ?? "Unbekannt",
 		_ => card.SetName ?? "Ohne Set"
 	};
@@ -307,6 +335,20 @@
 		"uncertain" => "Unsicher",
 		"pending" => "Kein Sidecar",
 		_ => "Fehler"
+	};
+
+	private static string GetReviewStatusClass(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		"verified" => "status-ok",
+		"incorrect" => "status-failed",
+		_ => "status-pending"
+	};
+
+	private static string GetReviewStatusLabel(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		"verified" => "Bestätigt",
+		"incorrect" => "Fehlerhaft",
+		_ => "Nicht geprüft"
 	};
 
 	private sealed record CardGroup(string Key, List<CardListItem> Items)

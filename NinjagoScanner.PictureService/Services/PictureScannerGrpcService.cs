@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NinjagoScanner.PictureService.Protos;
 using System.Globalization;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace NinjagoScanner.PictureService.Services;
@@ -124,7 +125,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {ImagePath}", imagePath);
                 result = new CardAnalysisResult
                 {
-                    Status = AnalysisStatuses.Failed,
+                    AnalysisStatus = AnalysisStatuses.Failed,
                     SourceFileName = Path.GetFileName(imagePath),
                     SourceFilePath = imagePath,
                     SidecarFilePath = sidecarPath,
@@ -135,24 +136,33 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 };
             }
 
+            if (File.Exists(sidecarPath))
+            {
+                var existingReviewStatus = (await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken))?.ReviewStatus;
+                if (!string.IsNullOrWhiteSpace(existingReviewStatus))
+                {
+                    result = result with { ReviewStatus = existingReviewStatus };
+                }
+            }
+
             await SidecarStore.WriteAsync(sidecarPath, result, cancellationToken);
 
             logger.LogDebug(
-                "[{Index}/{Total}] {FileName} → Status: {Status} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
+                "[{Index}/{Total}] {FileName} → Status: {AnalysisStatus} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
                 index + 1,
                 cardImages.Count,
                 Path.GetFileName(imagePath),
-                result.Status,
+                result.AnalysisStatus,
                 string.IsNullOrWhiteSpace(result.CardName) ? "(unbekannt)" : result.CardName,
                 result.SetName ?? "-",
                 result.CardNumber ?? "-");
 
             processedCount++;
-            if (string.Equals(result.Status, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(result.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
             {
                 failedCount++;
             }
-            else if (string.Equals(result.Status, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(result.AnalysisStatus, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase))
             {
                 uncertainCount++;
             }
@@ -202,7 +212,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 response.Cards.Add(new CardEntry
                 {
                     ImageFileName = imageFileName,
-                    Status = "pending"
+                    AnalysisStatus = "pending",
+                    ReviewStatus = ReviewStatuses.Unreviewed
                 });
                 continue;
             }
@@ -217,7 +228,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 response.Cards.Add(new CardEntry
                 {
                     ImageFileName = imageFileName,
-                    Status = "failed",
+                    AnalysisStatus = "failed",
+                    ReviewStatus = ReviewStatuses.Unreviewed,
                     ErrorMessage = $"Sidecar konnte nicht gelesen werden: {exception.Message}"
                 });
             }
@@ -244,7 +256,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
         var updated = existing with
         {
-            Status = NormalizeNullable(request.Status),
+            AnalysisStatus = NormalizeNullable(request.AnalysisStatus),
             CardName = NormalizeNullable(request.CardName),
             CardNumber = NormalizeNullable(request.CardNumber),
             SetName = NormalizeNullable(request.SetName),
@@ -253,6 +265,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             ReasoningSummary = NormalizeNullable(request.ReasoningSummary),
             DetectedText = request.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).ToArray(),
             ErrorMessage = NormalizeNullable(request.ErrorMessage),
+            ReviewStatus = NormalizeNullable(request.ReviewStatus),
             SourceFileName = existing.SourceFileName ?? request.ImageFileName,
             SourceFilePath = existing.SourceFilePath ?? imagePath,
             SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
@@ -271,14 +284,86 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
 
         var sidecar = File.Exists(sidecarPath)
-            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { Status = "pending" }
-            : new SidecarRecord { Status = "pending" };
+            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
+            : new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
 
         await SidecarStore.WriteRecordAsync(sidecarPath, sidecar, cancellationToken);
 
         return new UpdateSetNameResponse { Success = true };
+    }
+
+    public override async Task<MigrateSidecarsResponse> MigrateSidecars(MigrateSidecarsRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+
+        var response = new MigrateSidecarsResponse();
+        if (!Directory.Exists(directory))
+        {
+            return response;
+        }
+
+        var imageFiles = Directory
+            .EnumerateFiles(directory)
+            .Where(path => ScannerConfig.SupportedExtensions.Contains(Path.GetExtension(path)));
+
+        foreach (var imagePath in imageFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+            if (!File.Exists(sidecarPath))
+            {
+                continue;
+            }
+
+            response.TotalFiles++;
+
+            try
+            {
+                var json = await File.ReadAllTextAsync(sidecarPath, cancellationToken);
+                using var document = JsonDocument.Parse(json);
+                if (HasCurrentAnalysisStatusKey(document.RootElement))
+                {
+                    response.AlreadyCurrent++;
+                    continue;
+                }
+
+                var record = await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken);
+                if (record is null)
+                {
+                    response.AlreadyCurrent++;
+                    continue;
+                }
+
+                await SidecarStore.WriteRecordAsync(sidecarPath, record, cancellationToken);
+                response.Migrated++;
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Sidecar-Migration fuer {SidecarPath} fehlgeschlagen", sidecarPath);
+                response.Errors++;
+            }
+        }
+
+        return response;
+    }
+
+    private static bool HasCurrentAnalysisStatusKey(JsonElement root)
+    {
+        foreach (var property in root.EnumerateObject())
+        {
+            if (string.Equals(property.Name, "AnalysisStatus", StringComparison.OrdinalIgnoreCase)
+                && property.Value.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(property.Value.GetString()))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public override async Task<UploadPhotoResponse> UploadPhoto(IAsyncStreamReader<UploadPhotoChunk> requestStream, ServerCallContext context)
@@ -367,7 +452,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var entry = new CardEntry
         {
             ImageFileName = imageFileName,
-            Status = sidecar?.Status ?? "unknown",
+            AnalysisStatus = sidecar?.AnalysisStatus ?? "unknown",
             CardName = sidecar?.CardName ?? string.Empty,
             CardNumber = sidecar?.CardNumber ?? string.Empty,
             SetName = sidecar?.SetName ?? string.Empty,
@@ -375,7 +460,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             Confidence = sidecar?.Confidence ?? 0,
             ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
             ScannedAtUtc = sidecar?.ScannedAtUtc?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
-            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty
+            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
+            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
         };
         entry.DetectedText.AddRange(sidecar?.DetectedText ?? Array.Empty<string>());
         return entry;
