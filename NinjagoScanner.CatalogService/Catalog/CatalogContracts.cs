@@ -14,6 +14,7 @@ public sealed class SeriesCatalogItem
 {
     public required string SeriesName { get; init; }
     public int Year { get; init; }
+    public int SortOrder { get; init; }
     public string[] SpecialFeatures { get; init; } = Array.Empty<string>();
     public string[] SpecialEditions { get; init; } = Array.Empty<string>();
     public string[] KnownCardNames { get; init; } = Array.Empty<string>();
@@ -25,12 +26,14 @@ public sealed class CatalogCardItem
     public required string Category { get; init; }
     public required string CardNumber { get; init; }
     public required string CardName { get; init; }
+    public int SortOrder { get; init; }
 }
 
 public sealed class SeriesMetadataItem
 {
     public required string SeriesName { get; init; }
     public int? Year { get; init; }
+    public int? SortOrder { get; init; }
     public string? Logo { get; init; }
     public string? Theme { get; init; }
     public string[] Highlights { get; init; } = Array.Empty<string>();

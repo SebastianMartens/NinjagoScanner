@@ -125,13 +125,14 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                 return new CollectionCardItem
                 {
                     Series = card.Series,
+                    SortOrder = card.SortOrder,
                     Category = card.Category,
                     CardNumber = card.CardNumber,
                     CardName = card.CardName,
                     OwnedCopies = ownedCopies
                 };
             })
-            .OrderBy(card => card.Series, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(card => card.SortOrder)
             .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
             .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
@@ -173,6 +174,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return new CollectionCardDetails
         {
             Series = card.Series,
+            SortOrder = card.SortOrder,
             Category = card.Category,
             CardNumber = card.CardNumber,
             CardName = card.CardName,
@@ -227,7 +229,6 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             .Select(entry => entry.SeriesName.Trim())
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
 
@@ -259,7 +260,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return response.Cards;
     }
 
-    private async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName)>> LoadCardsFromCatalogServiceAsync(CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)>> LoadCardsFromCatalogServiceAsync(CancellationToken cancellationToken)
     {
         using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
         var client = new CardCatalog.CardCatalogClient(channel);
@@ -273,7 +274,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                     Series: card.SeriesName?.Trim() ?? string.Empty,
                     Category: string.IsNullOrWhiteSpace(card.Category) ? "Unkategorisiert" : card.Category.Trim(),
                     CardNumber: normalizedNumber,
-                    CardName: card.CardName?.Trim() ?? string.Empty
+                    CardName: card.CardName?.Trim() ?? string.Empty,
+                    SortOrder: card.SortOrder
                 );
             })
             .Where(card =>

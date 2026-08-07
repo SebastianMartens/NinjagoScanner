@@ -57,6 +57,7 @@ message SeriesEntry {
   repeated string special_features = 3;
   repeated string special_editions = 4;
   repeated string known_card_names = 5;
+  int32 sort_order = 6;
 }
 
 message CatalogCardEntry {
@@ -64,6 +65,7 @@ message CatalogCardEntry {
   string category = 2;
   string card_number = 3;
   string card_name = 4;
+  int32 sort_order = 5;
 }
 
 message SeriesMetadata {
@@ -72,4 +74,5 @@ message SeriesMetadata {
   string logo = 3;
   string theme = 4;
   repeated string highlights = 5;
+  int32 sort_order = 6;
 }

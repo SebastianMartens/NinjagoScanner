@@ -60,14 +60,16 @@ public sealed class NormalizationAndSortingTests : IDisposable
     }
 
     [Fact]
-    public void GetSnapshot_OrdersCards_BySeriesThenCategoryThenNumberThenName()
+    public void GetSnapshot_OrdersCards_BySortOrderThenCategoryThenNumberThenName()
     {
         directory.WriteFile("series_1.json", """
         {
           "Serie_2": {
+            "SortOrder": 20,
             "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "B"} ] }
           },
           "Serie_1": {
+            "SortOrder": 10,
             "Kategorien": {
               "Villains": [ {"Karten-Nr.": "1", "Name": "A"} ],
               "Good_Guys": [
@@ -91,6 +93,75 @@ public sealed class NormalizationAndSortingTests : IDisposable
             ("Serie 1", "Villains", "A"),
             ("Serie 2", "Good Guys", "B"),
         ], ordered);
+    }
+
+    [Fact]
+    public void GetSnapshot_OrdersCardsBySortOrder_NotAlphabeticalSeriesName()
+    {
+        // "Serie 10" sorts before "Serie 2" alphabetically, but its SortOrder (100) places it after
+        // "Serie 2" (SortOrder 20) - the catalog's curated order must win over the name string.
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_10": {
+            "SortOrder": 100,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+          },
+          "Serie_2": {
+            "SortOrder": 20,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var orderedSeriesNames = repository.GetSnapshot().Cards
+            .Select(card => card.SeriesName)
+            .ToArray();
+
+        Assert.Equal(["Serie 2", "Serie 10"], orderedSeriesNames);
+    }
+
+    [Fact]
+    public void GetSnapshot_OrdersSeriesList_BySortOrder_NotAlphabeticalSeriesName()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_10": {
+            "SortOrder": 100,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+          },
+          "Serie_2": {
+            "SortOrder": 20,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var orderedSeriesNames = repository.GetSnapshot().Series
+            .Select(series => series.SeriesName)
+            .ToArray();
+
+        Assert.Equal(["Serie 2", "Serie 10"], orderedSeriesNames);
+    }
+
+    [Fact]
+    public void GetSnapshot_SeriesSortOrderDefaultsToZero_WhenFieldOmitted()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var series = Assert.Single(repository.GetSnapshot().Series);
+        var card = Assert.Single(repository.GetSnapshot().Cards);
+
+        Assert.Equal(0, series.SortOrder);
+        Assert.Equal(0, card.SortOrder);
     }
 
     [Theory]

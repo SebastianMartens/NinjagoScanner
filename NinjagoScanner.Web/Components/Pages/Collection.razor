@@ -103,7 +103,7 @@
                         <div class="collection-table-wrapper">
                             <QuickGrid Items="group.Items.AsQueryable()" Class="collection-grid"
                                        RowClass="@(card => IsCardSelected(card) ? "is-selected" : null)">
-                                <TemplateColumn Title="Serie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.Series)">
+                                <TemplateColumn Title="Serie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.SortOrder)">
                                     <div class="row-click-area" data-card-key="@CardRowKey(context)" @onclick="() => SelectAndFocusAsync(context)">@context.Series</div>
                                 </TemplateColumn>
                                 <TemplateColumn Title="Kategorie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.Category)">
@@ -309,9 +309,10 @@
         overview = await CardCatalogService.GetCollectionOverviewAsync();
         allCards = overview.Cards.ToList();
         availableSeries = allCards
-            .Select(card => card.Series)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(series => series, StringComparer.OrdinalIgnoreCase)
+            .Select(card => (card.Series, card.SortOrder))
+            .DistinctBy(pair => pair.Series, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(pair => pair.SortOrder)
+            .Select(pair => pair.Series)
             .ToList();
 
         isLoading = false;
@@ -387,7 +388,7 @@
         "none" => [new CardGroup("Alle Karten", FilteredCards.ToList())],
         "category" => BuildGroups(FilteredCards, card => card.Category),
         "ownership" => BuildGroups(FilteredCards, GetOwnershipGroup),
-        _ => BuildGroups(FilteredCards, card => card.Series)
+        _ => BuildSeriesGroups(FilteredCards)
     };
 
     private CollectionCardPhotoItem? SelectedPhoto => selectedDetails?.Photos
@@ -515,9 +516,10 @@
         overview = await CardCatalogService.GetCollectionOverviewAsync();
         allCards = overview.Cards.ToList();
         availableSeries = allCards
-            .Select(card => card.Series)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(series => series, StringComparer.OrdinalIgnoreCase)
+            .Select(card => (card.Series, card.SortOrder))
+            .DistinctBy(pair => pair.Series, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(pair => pair.SortOrder)
+            .Select(pair => pair.Series)
             .ToList();
 
         if (!string.IsNullOrWhiteSpace(selectedCategory)
@@ -534,6 +536,14 @@
         return source
             .GroupBy(keySelector)
             .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new CardGroup(group.Key, group.ToList()));
+    }
+
+    private static IEnumerable<CardGroup> BuildSeriesGroups(IEnumerable<CollectionCardItem> source)
+    {
+        return source
+            .GroupBy(card => card.Series)
+            .OrderBy(group => group.Min(card => card.SortOrder))
             .Select(group => new CardGroup(group.Key, group.ToList()));
     }
 

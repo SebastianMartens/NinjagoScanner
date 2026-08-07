@@ -50,7 +50,8 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
                 SeriesName = card.SeriesName,
                 Category = card.Category,
                 CardNumber = card.CardNumber,
-                CardName = card.CardName
+                CardName = card.CardName,
+                SortOrder = card.SortOrder
             });
         }
 
@@ -75,6 +76,7 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
             {
                 SeriesName = metadata.SeriesName,
                 Year = metadata.Year ?? 0,
+                SortOrder = metadata.SortOrder ?? 0,
                 Logo = metadata.Logo ?? string.Empty,
                 Theme = metadata.Theme ?? string.Empty
             }
@@ -101,7 +103,8 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
         var dto = new SeriesEntry
         {
             SeriesName = entry.SeriesName,
-            Year = entry.Year
+            Year = entry.Year,
+            SortOrder = entry.SortOrder
         };
 
         dto.SpecialFeatures.AddRange(entry.SpecialFeatures);

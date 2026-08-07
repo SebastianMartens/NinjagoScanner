@@ -201,10 +201,32 @@
 			return items.Count == 0 ? [] : [new CardGroup("Alle Karten", items)];
 		}
 
-		return filteredCards
-			.GroupBy(GetGroupKey)
+		var groups = filteredCards.GroupBy(GetGroupKey);
+
+		if (groupBy == "set")
+		{
+			return groups
+				.OrderBy(group => GetSeriesGroupRank(group.Key))
+				.ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+				.Select(group => new CardGroup(group.Key, group.ToList()));
+		}
+
+		return groups
 			.OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
 			.Select(group => new CardGroup(group.Key, group.ToList()));
+	}
+
+	private int GetSeriesGroupRank(string seriesName)
+	{
+		for (var index = 0; index < knownSeries.Count; index++)
+		{
+			if (string.Equals(knownSeries[index], seriesName, StringComparison.OrdinalIgnoreCase))
+			{
+				return index;
+			}
+		}
+
+		return int.MaxValue;
 	}
 
 	private bool MatchesSearch(CardListItem card)

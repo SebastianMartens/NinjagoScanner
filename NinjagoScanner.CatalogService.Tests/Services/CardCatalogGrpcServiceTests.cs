@@ -21,6 +21,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         {
           "Serie_1": {
             "Jahr": 2016,
+            "SortOrder": 42,
             "Logo": "Some Logo",
             "Thema": "Some Theme",
             "Besonderheiten": ["Highlight A"],
@@ -44,9 +45,32 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         var entry = Assert.Single(response.Series);
         Assert.Equal("Serie 1", entry.SeriesName);
         Assert.Equal(2016, entry.Year);
+        Assert.Equal(42, entry.SortOrder);
         Assert.Equal(["Highlight A"], entry.SpecialFeatures);
         Assert.Equal(["Edition A"], entry.SpecialEditions);
         Assert.Empty(entry.KnownCardNames);
+    }
+
+    [Fact]
+    public async Task ListSeries_OrdersBySortOrder_NotAlphabeticalSeriesName()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_10": {
+            "SortOrder": 100,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+          },
+          "Serie_2": {
+            "SortOrder": 20,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+          }
+        }
+        """);
+        var service = CreateService();
+
+        var response = await service.ListSeries(new ListSeriesRequest { IncludeKnownCardNames = false }, null!);
+
+        Assert.Equal(["Serie 2", "Serie 10"], response.Series.Select(entry => entry.SeriesName));
     }
 
     [Fact]
@@ -101,6 +125,29 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         Assert.Equal("Good Guys", card.Category);
         Assert.Equal("1", card.CardNumber);
         Assert.Equal("Kai", card.CardName);
+        Assert.Equal(42, card.SortOrder);
+    }
+
+    [Fact]
+    public async Task ListAllCards_OrdersBySortOrder_NotAlphabeticalSeriesName()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_10": {
+            "SortOrder": 100,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+          },
+          "Serie_2": {
+            "SortOrder": 20,
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+          }
+        }
+        """);
+        var service = CreateService();
+
+        var response = await service.ListAllCards(new Empty(), null!);
+
+        Assert.Equal(["Serie 2", "Serie 10"], response.Cards.Select(card => card.SeriesName));
     }
 
     [Fact]
@@ -116,6 +163,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         Assert.True(response.Found);
         Assert.Equal("Serie 1", response.Metadata.SeriesName);
         Assert.Equal(2016, response.Metadata.Year);
+        Assert.Equal(42, response.Metadata.SortOrder);
         Assert.Equal("Some Logo", response.Metadata.Logo);
         Assert.Equal("Some Theme", response.Metadata.Theme);
         Assert.Equal(["Highlight A"], response.Metadata.Highlights);
@@ -139,6 +187,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
 
         Assert.True(response.Found);
         Assert.Equal(0, response.Metadata.Year);
+        Assert.Equal(0, response.Metadata.SortOrder);
         Assert.Equal(string.Empty, response.Metadata.Logo);
         Assert.Equal(string.Empty, response.Metadata.Theme);
         Assert.Empty(response.Metadata.Highlights);

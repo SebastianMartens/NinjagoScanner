@@ -1,10 +1,4 @@
-# catalog-service-series-metadata Specification
-
-## Purpose
-
-Exposes descriptive metadata (year, logo, theme, highlights) for a series, distinct from the structural series entry, to support richer catalog presentation.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Look up series metadata by name
 `GetSeriesMetadata` SHALL return the metadata associated with a series when it exists, using the same normalized name lookup as series lookup (case-insensitive, ignoring underscores, hyphens, and repeated whitespace), and SHALL indicate when no metadata is found.

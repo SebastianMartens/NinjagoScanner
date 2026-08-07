@@ -60,7 +60,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             var series = BuildSeriesList(detailData);
             var cards = detailData.Values
                 .SelectMany(entry => entry.Cards)
-                .OrderBy(card => card.SeriesName, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(card => card.SortOrder)
                 .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
                 .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
@@ -104,11 +104,12 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             {
                 SeriesName = detail.SeriesName,
                 Year = detail.Metadata?.Year ?? 0,
+                SortOrder = detail.Metadata?.SortOrder ?? 0,
                 SpecialFeatures = detail.Metadata?.Highlights ?? Array.Empty<string>(),
                 SpecialEditions = detail.Metadata?.SpecialEditions ?? Array.Empty<string>(),
                 KnownCardNames = detail.KnownCardNames
             })
-            .OrderBy(item => item.Year)
+            .OrderBy(item => item.SortOrder)
             .ThenBy(item => item.SeriesName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -141,7 +142,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                     var seriesName = ToSeriesDisplayName(property.Name);
                     var seriesKey = NormalizeLookupKey(seriesName);
                     var metadata = ExtractSeriesMetadata(seriesName, property.Value);
-                    var cards = ExtractSeriesCards(seriesName, property.Value);
+                    var cards = ExtractSeriesCards(seriesName, metadata.SortOrder ?? 0, property.Value);
                     var knownCardNames = cards
                         .Select(card => card.CardName)
                         .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -175,6 +176,9 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             Year = seriesRoot.TryGetProperty("Jahr", out var yearProperty) && yearProperty.ValueKind == JsonValueKind.Number
                 ? yearProperty.GetInt32()
                 : null,
+            SortOrder = seriesRoot.TryGetProperty("SortOrder", out var sortOrderProperty) && sortOrderProperty.ValueKind == JsonValueKind.Number
+                ? sortOrderProperty.GetInt32()
+                : null,
             Logo = seriesRoot.TryGetProperty("Logo", out var logoProperty) && logoProperty.ValueKind == JsonValueKind.String
                 ? logoProperty.GetString()
                 : null,
@@ -198,7 +202,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         };
     }
 
-    private static CatalogCardItem[] ExtractSeriesCards(string seriesName, JsonElement seriesRoot)
+    private static CatalogCardItem[] ExtractSeriesCards(string seriesName, int sortOrder, JsonElement seriesRoot)
     {
         var uniqueKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var cards = new List<CatalogCardItem>();
@@ -226,7 +230,8 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 SeriesName = seriesName,
                 Category = category,
                 CardNumber = normalizedNumber,
-                CardName = cardName
+                CardName = cardName,
+                SortOrder = sortOrder
             });
         }
 
@@ -298,6 +303,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
 
         var normalized = propertyName.Trim();
         return !normalized.Equals("Jahr", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("SortOrder", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Logo", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Thema", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
