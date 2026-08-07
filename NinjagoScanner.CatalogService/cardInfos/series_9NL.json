@@ -3,6 +3,14 @@
     "Jahr": 2024,
     "Logo": "Rot (Dragons Rising - Next Level)",
     "Thema": "Dragons Rising (Next Level)",
+    "Besonderheiten": [
+      "Logo: Quelldrache der Bewegung",
+      "4 Platin-Karten",
+      "LE19 exklusiv beim Hersteller Blue-Ocean bestellbar"
+    ],
+    "Sondereditionen": [
+      "Platin-Karten"
+    ],
     "Kategorien": {
       "Heroes": [
         {"Karten-Nr.": 1, "Name": "Dragon Team Matriarch"},
@@ -223,26 +231,25 @@
         {"Karten-Nr.": 206, "Name": "Climber Zane Platinum Edition"}
       ],
       "Limited_Edition_Cards": [
-        {"Karten-Nr.": "LE1", "Name": "Strong Kai Limited Edition"},
-        {"Karten-Nr.": "LE2", "Name": "Strong Arin Limited Edition"},
-        {"Karten-Nr.": "LE3", "Name": "Strong Cole Limited Edition"},
-        {"Karten-Nr.": "LE4", "Name": "Evil Ras Limited Edition"},
-        {"Karten-Nr.": "LE5", "Name": "Strong Jay Limited Edition"},
-        {"Karten-Nr.": "LE6", "Name": "Cinder Limited Edition"},
-        {"Karten-Nr.": "LE6", "Name": "Action Arin Limited Edition"},
-        {"Karten-Nr.": "LE7", "Name": "Action Kai Limited Edition"},
-        {"Karten-Nr.": "LE8", "Name": "Strong Zane Limited Edition"},
-        {"Karten-Nr.": "LE9", "Name": "Strong Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE10", "Name": "Action Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE11", "Name": "Action Cole Limited Edition"},
-        {"Karten-Nr.": "LE12", "Name": "Action Jay Limited Edition"},
-        {"Karten-Nr.": "LE13", "Name": "Cinder Golden Edition"},
-        {"Karten-Nr.": "LE14", "Name": "Climber Lloyd Golden Edition"},
-        {"Karten-Nr.": "LE15", "Name": "Lloyd vs Ras Limited Edition"},
-        {"Karten-Nr.": "LE16", "Name": "Arin vs Cinder Limited Edition"},
-        {"Karten-Nr.": "LE17", "Name": "Team Cole & Zane Limited Edition"},
-        {"Karten-Nr.": "LE18", "Name": "Team Cinder and Ras Limited Edition"},
-        {"Karten-Nr.": "LE19", "Name": "Thunderrob Limited Edition"}
+        {"Karten-Nr.": "LE1", "Name": "Strong Kai Limited Edition", "Fundort": "Starterpack", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE2", "Name": "Strong Arin Limited Edition", "Fundort": "LEGO Ninjago Magazin #118", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE3", "Name": "Strong Cole Limited Edition", "Fundort": "LEGO Ninjago Magazin #119", "Erscheinungsdatum": "06.09.2024"},
+        {"Karten-Nr.": "LE4", "Name": "Evil Ras Limited Edition", "Fundort": "LEGO Ninjago Legacy Magazin #33", "Erscheinungsdatum": "20.09.2024"},
+        {"Karten-Nr.": "LE5", "Name": "Strong Jay Limited Edition", "Fundort": "LEGO Ninjago Magazin #120", "Erscheinungsdatum": "04.10.2024"},
+        {"Karten-Nr.": "LE6", "Name": "Action Arin Limited Edition", "Fundort": "LEGO Ninjago Magazin #121", "Erscheinungsdatum": "01.11.2024"},
+        {"Karten-Nr.": "LE7", "Name": "Action Kai Limited Edition", "Fundort": "5! Magazin #7", "Erscheinungsdatum": "08.11.2024"},
+        {"Karten-Nr.": "LE8", "Name": "Strong Zane Limited Edition", "Fundort": "LEGO Ninjago Legacy Magazin #34", "Erscheinungsdatum": "15.11.2024"},
+        {"Karten-Nr.": "LE9", "Name": "Strong Lloyd Limited Edition", "Fundort": "LEGO Ninjago Magazin #122", "Erscheinungsdatum": "29.11.2024"},
+        {"Karten-Nr.": "LE10", "Name": "Action Lloyd Limited Edition", "Fundort": "Multipack A", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE11", "Name": "Action Cole Limited Edition", "Fundort": "Multipack B", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE12", "Name": "Action Jay Limited Edition", "Fundort": "Multipack C", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE13", "Name": "Cinder Golden Edition", "Fundort": "Penny-Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE14", "Name": "Climber Lloyd Golden Edition", "Fundort": "Penny-Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE15", "Name": "Lloyd vs Ras Limited Edition", "Fundort": "Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE16", "Name": "Arin vs Cinder Limited Edition", "Fundort": "Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE17", "Name": "Team Cole & Zane Limited Edition", "Fundort": "Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE18", "Name": "Team Cinder and Ras Limited Edition", "Fundort": "Blister", "Erscheinungsdatum": "09.08.2024"},
+        {"Karten-Nr.": "LE19", "Name": "Thunderrob Limited Edition", "Fundort": "Thunderrob Eco-Blister (Exklusiv im Blue-Ocean Shop)", "Erscheinungsdatum": "29.10.2024"}
       ],
       "XXL_Cards": [
         {"Karten-Nr.": "XXL1", "Name": "Mighty Duo"}

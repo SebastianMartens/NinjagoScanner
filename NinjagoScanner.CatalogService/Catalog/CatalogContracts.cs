@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace NinjagoScanner.CatalogService.Catalog;
 
 public sealed class CatalogSnapshot
@@ -36,25 +34,5 @@ public sealed class SeriesMetadataItem
     public string? Logo { get; init; }
     public string? Theme { get; init; }
     public string[] Highlights { get; init; } = Array.Empty<string>();
-}
-
-internal sealed class SeriesCatalogRoot
-{
-    [JsonPropertyName("Ninjago_Sammelkarten_Serien")]
-    public SeriesCatalogJsonItem[]? Series { get; init; }
-}
-
-internal sealed class SeriesCatalogJsonItem
-{
-    [JsonPropertyName("Serie")]
-    public string? Serie { get; init; }
-
-    [JsonPropertyName("Jahr")]
-    public int Jahr { get; init; }
-
-    [JsonPropertyName("Besonderheiten")]
-    public string[]? Besonderheiten { get; init; }
-
-    [JsonPropertyName("Sondereditionen")]
-    public string[]? Sondereditionen { get; init; }
+    public string[] SpecialEditions { get; init; } = Array.Empty<string>();
 }

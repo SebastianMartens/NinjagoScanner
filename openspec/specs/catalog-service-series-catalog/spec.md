@@ -28,15 +28,13 @@ Lets clients discover and look up the catalog's card series — name, year, spec
 - **WHEN** a client calls `GetSeries` with a `series_name` that matches no known series after normalization
 - **THEN** the response has `found = false` and `series` left unset
 
-<!-- TODO (not yet resolved, to be addressed later): There is a dedicated json file "series.json" that contains information about all series. This data is redundant with the other more detailed files. We should decide if the series metadata like year etc. should appear only in the series.json or if we remove the series.json and put everything into the other files. -->
+### Requirement: Series entries are built entirely from per-series detail data
+The system SHALL build each series entry (name, year, special features, special editions, known card names) from that series' own detail file (`series_*.json`). There is no separate main series catalog file — `series.json` has been retired, and its former content (year, special features/`Besonderheiten`, special editions/`Sondereditionen`, and per-limited-edition-card find location/release date) now lives in the corresponding detail file.
 
-### Requirement: Series entries merge main catalog and detail data
-The system SHALL build each series entry by merging the main series catalog (name, year, special features, special editions) with the corresponding per-series detail data (known card names), including a series when it appears in only one of the two sources.
+#### Scenario: Series year, features, and editions come from the detail file
+- **WHEN** a series' detail file provides `Jahr`, `Besonderheiten`, and `Sondereditionen`
+- **THEN** `ListSeries` and `GetSeries` return that series with `year`, `special_features`, and `special_editions` populated from those fields
 
-#### Scenario: Series present only in the main catalog
-- **WHEN** a series appears in the main series catalog but has no matching per-series detail data
-- **THEN** `ListSeries` and `GetSeries` still return that series, with `known_card_names` empty
-
-#### Scenario: Series present only in detail data
-- **WHEN** a series appears only in per-series detail data and not in the main series catalog
-- **THEN** `ListSeries` and `GetSeries` still return that series, using year `0` and empty `special_features`/`special_editions` unless the detail data's metadata supplies a year
+#### Scenario: Series detail file omits optional metadata
+- **WHEN** a series' detail file has no `Jahr`, `Besonderheiten`, or `Sondereditionen`
+- **THEN** `ListSeries` and `GetSeries` still return that series, using year `0` and empty `special_features`/`special_editions`

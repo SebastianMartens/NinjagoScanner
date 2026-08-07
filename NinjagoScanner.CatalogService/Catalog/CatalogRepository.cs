@@ -6,17 +6,11 @@ namespace NinjagoScanner.CatalogService.Catalog;
 
 public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger, IWebHostEnvironment environment, IConfiguration configuration)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     private readonly object gate = new();
     private CatalogSnapshot? cachedSnapshot;
     private long cachedStamp;
 
     private readonly string dataDirectoryPath = ResolveDataDirectory(environment, configuration);
-    private readonly string mainCatalogPath = Path.Combine(ResolveDataDirectory(environment, configuration), "series.json");
 
     public CatalogSnapshot GetSnapshot()
     {
@@ -63,8 +57,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         try
         {
             var detailData = LoadSeriesDetails(dataDirectoryPath);
-            var root = LoadMainSeriesCatalog(mainCatalogPath);
-            var series = BuildSeriesList(root, detailData);
+            var series = BuildSeriesList(detailData);
             var cards = detailData.Values
                 .SelectMany(entry => entry.Cards)
                 .OrderBy(card => card.SeriesName, StringComparer.OrdinalIgnoreCase)
@@ -92,7 +85,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to load catalog from {CatalogPath}", mainCatalogPath);
+            logger.LogError(ex, "Failed to load catalog from {CatalogPath}", dataDirectoryPath);
             return new CatalogSnapshot
             {
                 DataDirectory = dataDirectoryPath,
@@ -104,50 +97,17 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         }
     }
 
-    private static SeriesCatalogRoot? LoadMainSeriesCatalog(string catalogPath)
+    private static SeriesCatalogItem[] BuildSeriesList(IReadOnlyDictionary<string, SeriesDetailData> detailData)
     {
-        if (!File.Exists(catalogPath))
-        {
-            return null;
-        }
-
-        var rootJson = File.ReadAllText(catalogPath, Encoding.UTF8);
-        return JsonSerializer.Deserialize<SeriesCatalogRoot>(rootJson, JsonOptions);
-    }
-
-    private static SeriesCatalogItem[] BuildSeriesList(SeriesCatalogRoot? root, IReadOnlyDictionary<string, SeriesDetailData> detailData)
-    {
-        var rootSeriesByKey = root?.Series?
-            .Where(item => !string.IsNullOrWhiteSpace(item.Serie))
-            .ToDictionary(item => NormalizeLookupKey(item.Serie!.Trim()), item => item, StringComparer.Ordinal)
-            ?? new Dictionary<string, SeriesCatalogJsonItem>(StringComparer.Ordinal);
-
-        var allSeriesKeys = rootSeriesByKey.Keys
-            .Concat(detailData.Keys)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        var result = new List<SeriesCatalogItem>(allSeriesKeys.Length);
-
-        foreach (var seriesKey in allSeriesKeys)
-        {
-            rootSeriesByKey.TryGetValue(seriesKey, out var rootSeries);
-            detailData.TryGetValue(seriesKey, out var detail);
-
-            var seriesName = rootSeries?.Serie?.Trim() ?? detail?.SeriesName ?? seriesKey;
-            var knownCardNames = detail?.KnownCardNames ?? Array.Empty<string>();
-
-            result.Add(new SeriesCatalogItem
+        return detailData.Values
+            .Select(detail => new SeriesCatalogItem
             {
-                SeriesName = seriesName,
-                Year = rootSeries?.Jahr ?? detail?.Metadata?.Year ?? 0,
-                SpecialFeatures = rootSeries?.Besonderheiten ?? Array.Empty<string>(),
-                SpecialEditions = rootSeries?.Sondereditionen ?? Array.Empty<string>(),
-                KnownCardNames = knownCardNames
-            });
-        }
-
-        return result
+                SeriesName = detail.SeriesName,
+                Year = detail.Metadata?.Year ?? 0,
+                SpecialFeatures = detail.Metadata?.Highlights ?? Array.Empty<string>(),
+                SpecialEditions = detail.Metadata?.SpecialEditions ?? Array.Empty<string>(),
+                KnownCardNames = detail.KnownCardNames
+            })
             .OrderBy(item => item.Year)
             .ThenBy(item => item.SeriesName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -223,6 +183,13 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 : null,
             Highlights = seriesRoot.TryGetProperty("Besonderheiten", out var highlightsProperty) && highlightsProperty.ValueKind == JsonValueKind.Array
                 ? highlightsProperty.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString() ?? string.Empty)
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .ToArray()
+                : Array.Empty<string>(),
+            SpecialEditions = seriesRoot.TryGetProperty("Sondereditionen", out var specialEditionsProperty) && specialEditionsProperty.ValueKind == JsonValueKind.Array
+                ? specialEditionsProperty.EnumerateArray()
                     .Where(item => item.ValueKind == JsonValueKind.String)
                     .Select(item => item.GetString() ?? string.Empty)
                     .Where(text => !string.IsNullOrWhiteSpace(text))
@@ -334,6 +301,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                && !normalized.Equals("Logo", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Thema", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Sondereditionen", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
                && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
     }

@@ -28,25 +28,7 @@ public sealed class DedupMergeCachingTests : IDisposable
     }
 
     [Fact]
-    public void GetSnapshot_MergesSeries_PresentOnlyInMainCatalog()
-    {
-        directory.WriteFile("series.json", """
-        {
-          "Ninjago_Sammelkarten_Serien": [
-            {"Serie": "Serie 1", "Jahr": 2016}
-          ]
-        }
-        """);
-
-        var repository = directory.CreateRepository();
-        var series = Assert.Single(repository.GetSnapshot().Series);
-
-        Assert.Equal("Serie 1", series.SeriesName);
-        Assert.Equal(2016, series.Year);
-    }
-
-    [Fact]
-    public void GetSnapshot_MergesSeries_PresentOnlyInDetailFile()
+    public void GetSnapshot_BuildsSeriesEntry_FromDetailFile()
     {
         directory.WriteFile("series_1.json", """
         {
@@ -66,19 +48,14 @@ public sealed class DedupMergeCachingTests : IDisposable
     }
 
     [Fact]
-    public void GetSnapshot_MergesSeries_PresentInBoth_MainCatalogTakesPrecedenceForYearAndFeatures()
+    public void GetSnapshot_PopulatesYearFeaturesAndEditions_FromDetailFileMetadata()
     {
-        directory.WriteFile("series.json", """
-        {
-          "Ninjago_Sammelkarten_Serien": [
-            {"Serie": "Serie 1", "Jahr": 2099, "Besonderheiten": ["From main catalog"]}
-          ]
-        }
-        """);
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
             "Jahr": 2016,
+            "Besonderheiten": ["Feature A"],
+            "Sondereditionen": ["Edition A"],
             "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
           }
         }
@@ -88,8 +65,9 @@ public sealed class DedupMergeCachingTests : IDisposable
         var series = Assert.Single(repository.GetSnapshot().Series);
 
         Assert.Equal("Serie 1", series.SeriesName);
-        Assert.Equal(2099, series.Year);
-        Assert.Equal(["From main catalog"], series.SpecialFeatures);
+        Assert.Equal(2016, series.Year);
+        Assert.Equal(["Feature A"], series.SpecialFeatures);
+        Assert.Equal(["Edition A"], series.SpecialEditions);
         Assert.Equal(["Kai"], series.KnownCardNames);
     }
 
@@ -133,10 +111,8 @@ public sealed class DedupMergeCachingTests : IDisposable
     }
 
     [Fact]
-    public void GetSnapshot_FallsBackToEmptySnapshot_WhenMainCatalogIsMalformed()
+    public void GetSnapshot_ReturnsEmptySnapshot_WhenDataDirectoryHasNoDetailFiles()
     {
-        directory.WriteFile("series.json", "{ not valid json !!!");
-
         var repository = directory.CreateRepository();
         var snapshot = repository.GetSnapshot();
 

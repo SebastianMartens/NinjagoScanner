@@ -3,6 +3,14 @@
     "Jahr": 2023,
     "Logo": "Lila (Crystalized - Next Level)",
     "Thema": "Crystalized (Kristallisierung - Next Level)",
+    "Besonderheiten": [
+      "Logo: An Serie 8 angelehnt",
+      "Erste Next-Level-Serie mit Platin-Karten (Golddrachen-Jay, Golddrachen-Cole)",
+      "204 Basis-Karten"
+    ],
+    "Sondereditionen": [
+      "Platin-Karten"
+    ],
     "Kategorien": {
       "Ultra_Duel_Cards": [
         {"Karten-Nr.": 1, "Name": "Ultra Duell Oni Lloyd"},
@@ -223,28 +231,28 @@
         {"Karten-Nr.": 204, "Name": "Lloyds Ninja-Motorrad"}
       ],
       "Limited_Edition_Cards": [
-        {"Karten-Nr.": "LE1", "Name": "Power Oni Lloyd"},
-        {"Karten-Nr.": "LE2", "Name": "Power Golddrachen-Cole"},
-        {"Karten-Nr.": "LE3", "Name": "Power Golddrachen-Kai"},
-        {"Karten-Nr.": "LE4", "Name": "Power Golddrachen-Jay"},
-        {"Karten-Nr.": "LE5", "Name": "Power Golddrachen-Zane"},
-        {"Karten-Nr.": "LE6", "Name": "Mutiger Goldener Kai"},
-        {"Karten-Nr.": "LE7", "Name": "Mutiger Crystalized Lloyd"},
-        {"Karten-Nr.": "LE8", "Name": "Mutiger Goldener Jay"},
-        {"Karten-Nr.": "LE9", "Name": "Crystalized Oni Garmadon"},
-        {"Karten-Nr.": "LE10", "Name": "Mutiger Crystalized Cole"},
-        {"Karten-Nr.": "LE11", "Name": "Mutiger Crystalized Zane"},
-        {"Karten-Nr.": "LE12", "Name": "Mutiger Crystalized Meister Wu"},
-        {"Karten-Nr.": "LE13", "Name": "Kristallkönig Overlord"},
-        {"Karten-Nr.": "LE14", "Name": "Wilder Crystalized Totenkopfmagier"},
-        {"Karten-Nr.": "LE15", "Name": "Duo Oni Lloyd & Golddrachen-Kai"},
-        {"Karten-Nr.": "LE16", "Name": "Duo Golddrachen-Zane & -Cole"},
-        {"Karten-Nr.": "LE17", "Name": "Duo Samurai X & Golddrachen-Jay"},
-        {"Karten-Nr.": "LE18", "Name": "Duo Meister Wu & Oni Garmadon"},
-        {"Karten-Nr.": "LE19", "Name": "Golddrachen-Zane vs. Automechaniker"},
-        {"Karten-Nr.": "LE20", "Name": "Golddrachen-Jay vs. Totenkopfmagier"},
-        {"Karten-Nr.": "LE21", "Name": "Golddrachen-Jay"},
-        {"Karten-Nr.": "LE22", "Name": "Golddrachen-Zane"}
+        {"Karten-Nr.": "LE1", "Name": "Power Oni Lloyd", "Fundort": "Starterpack", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE2", "Name": "Power Golddrachen-Cole", "Fundort": "LEGO Ninjago Magazin #105", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE3", "Name": "Power Golddrachen-Kai", "Fundort": "LEGO Ninjago Magazin #106", "Erscheinungsdatum": "05.09.2023"},
+        {"Karten-Nr.": "LE4", "Name": "Power Golddrachen-Jay", "Fundort": "LEGO Ninjago Magazin #107", "Erscheinungsdatum": "02.10.2023"},
+        {"Karten-Nr.": "LE5", "Name": "Power Golddrachen-Zane", "Fundort": "LEGO Ninjago Magazin #108", "Erscheinungsdatum": "31.10.2023"},
+        {"Karten-Nr.": "LE6", "Name": "Mutiger Goldener Kai", "Fundort": "LEGO Ninjago Legacy Magazin #26", "Erscheinungsdatum": "22.08.2023"},
+        {"Karten-Nr.": "LE7", "Name": "Mutiger Crystalized Lloyd", "Fundort": "LEGO Ninjago Legacy Magazin #27", "Erscheinungsdatum": "17.10.2023"},
+        {"Karten-Nr.": "LE8", "Name": "Mutiger Goldener Jay", "Fundort": "LEGO Ninjago Legacy Magazin #28", "Erscheinungsdatum": "12.12.2023"},
+        {"Karten-Nr.": "LE9", "Name": "Crystalized Oni Garmadon", "Fundort": "LEGO Ninjago Magazin #109", "Erscheinungsdatum": "28.11.2023"},
+        {"Karten-Nr.": "LE10", "Name": "Mutiger Crystalized Cole", "Fundort": "Midi-Metalldose", "Erscheinungsdatum": "Herbst 2023"},
+        {"Karten-Nr.": "LE11", "Name": "Mutiger Crystalized Zane", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE12", "Name": "Mutiger Crystalized Meister Wu", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE13", "Name": "Kristallkönig Overlord", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE14", "Name": "Wilder Crystalized Totenkopfmagier", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE15", "Name": "Duo Oni Lloyd & Golddrachen-Kai", "Fundort": "5! Magazin 23/08", "Erscheinungsdatum": "27.12.2023"},
+        {"Karten-Nr.": "LE16", "Name": "Duo Golddrachen-Zane & -Cole", "Fundort": "5! Magazin 23/06", "Erscheinungsdatum": "28.09.2023"},
+        {"Karten-Nr.": "LE17", "Name": "Duo Samurai X & Golddrachen-Jay", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE18", "Name": "Duo Meister Wu & Oni Garmadon", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE19", "Name": "Golddrachen-Zane vs. Automechaniker", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE20", "Name": "Golddrachen-Jay vs. Totenkopfmagier", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE21", "Name": "Golddrachen-Jay", "Fundort": "Penny-Blister", "Erscheinungsdatum": "08.08.2023"},
+        {"Karten-Nr.": "LE22", "Name": "Golddrachen-Zane", "Fundort": "Penny-Blister", "Erscheinungsdatum": "08.08.2023"}
       ],
       "XXL_Cards": [
         {"Karten-Nr.": "XXL1", "Name": "Level Up Golddrachen Kai"}

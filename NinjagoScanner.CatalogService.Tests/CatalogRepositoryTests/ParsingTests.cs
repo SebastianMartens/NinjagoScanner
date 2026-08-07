@@ -124,6 +124,7 @@ public sealed class ParsingTests : IDisposable
     [InlineData("Logo")]
     [InlineData("Thema")]
     [InlineData("Besonderheiten")]
+    [InlineData("Sondereditionen")]
     [InlineData("Kategorien")]
     [InlineData("Serie")]
     public void GetSnapshot_DoesNotTreatReservedKeys_AsCategoryNames(string reservedKey)
@@ -185,6 +186,7 @@ public sealed class ParsingTests : IDisposable
             "Logo": "Some Logo",
             "Thema": "Some Theme",
             "Besonderheiten": ["Highlight A", "Highlight B"],
+            "Sondereditionen": ["Edition A"],
             "Kategorien": {
               "Good_Guys": [ {"Karten-Nr.": 1, "Name": "Kai"} ]
             }
@@ -200,6 +202,7 @@ public sealed class ParsingTests : IDisposable
         Assert.Equal("Some Logo", metadata.Logo);
         Assert.Equal("Some Theme", metadata.Theme);
         Assert.Equal(["Highlight A", "Highlight B"], metadata.Highlights);
+        Assert.Equal(["Edition A"], metadata.SpecialEditions);
     }
 
     [Fact]
@@ -224,6 +227,7 @@ public sealed class ParsingTests : IDisposable
         Assert.Null(metadata.Logo);
         Assert.Null(metadata.Theme);
         Assert.Empty(metadata.Highlights);
+        Assert.Empty(metadata.SpecialEditions);
     }
 
     public void Dispose() => directory.Dispose();

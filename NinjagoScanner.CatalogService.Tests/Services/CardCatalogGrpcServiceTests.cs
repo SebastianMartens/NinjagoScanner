@@ -17,13 +17,6 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
 
     private void WriteSingleSeriesWithOneCard()
     {
-        directory.WriteFile("series.json", """
-        {
-          "Ninjago_Sammelkarten_Serien": [
-            {"Serie": "Serie 1", "Jahr": 2016, "Besonderheiten": ["Feature A"], "Sondereditionen": ["Edition A"]}
-          ]
-        }
-        """);
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
@@ -31,6 +24,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
             "Logo": "Some Logo",
             "Thema": "Some Theme",
             "Besonderheiten": ["Highlight A"],
+            "Sondereditionen": ["Edition A"],
             "Kategorien": {
               "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ]
             }
@@ -50,7 +44,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         var entry = Assert.Single(response.Series);
         Assert.Equal("Serie 1", entry.SeriesName);
         Assert.Equal(2016, entry.Year);
-        Assert.Equal(["Feature A"], entry.SpecialFeatures);
+        Assert.Equal(["Highlight A"], entry.SpecialFeatures);
         Assert.Equal(["Edition A"], entry.SpecialEditions);
         Assert.Empty(entry.KnownCardNames);
     }

@@ -4,11 +4,14 @@
     "Logo": "Schwarz (Prime Empire - Next Level)",
     "Thema": "Prime Empire (Digitale Welt - Next Level)",
     "Besonderheiten": [
-        "Logo: Pixel-Totenkopf (gelb auf rotem Grund, bei Fallenkarten rot auf sandigem Grund)",
-        "Erste Next-Level-Serie mit 126 Hauptkarten",
-        "Einführung von Level-Up-Karten",
-        "Erster LEGO Ninjago Adventskalender mit 4 exklusiven LE-Karten"
-      ],
+      "Logo: Pixel-Totenkopf (gelb auf rotem Grund, bei Fallenkarten rot auf sandigem Grund)",
+      "Erste Next-Level-Serie mit 126 Hauptkarten",
+      "Einführung von Level-Up-Karten",
+      "Erster LEGO Ninjago Adventskalender mit 4 exklusiven LE-Karten"
+    ],
+    "Sondereditionen": [
+      "Adventskalender-LE-Karten"
+    ],
     "Kategorien": {
       "Heroes": [
         {"Karten-Nr.": 1, "Name": "Proud Never-Realm Lloyd"},
@@ -147,24 +150,24 @@
         {"Karten-Nr.": 126, "Name": "Kai Fighter"}
       ],
       "Limited_Edition_Cards": [
-        {"Karten-Nr.": "LE1", "Name": "Arcade Kai Limited Edition"},
-        {"Karten-Nr.": "LE2", "Name": "Arcade Jay Limited Edition"},
-        {"Karten-Nr.": "LE3", "Name": "Arcade Cole Limited Edition"},
-        {"Karten-Nr.": "LE4", "Name": "Arcade Zane Limited Edition"},
-        {"Karten-Nr.": "LE5", "Name": "Arcade Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE6", "Name": "Next Level Digi Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE7", "Name": "Next Level Digi Kai Limited Edition"},
-        {"Karten-Nr.": "LE8", "Name": "Next Level Digi Cole Limited Edition"},
-        {"Karten-Nr.": "LE9", "Name": "Next Level Digi Jay Limited Edition"},
-        {"Karten-Nr.": "LE10", "Name": "Next Level Unagami Limited Edition"},
-        {"Karten-Nr.": "LE11", "Name": "Next Level Digi Zane Limited Edition"},
-        {"Karten-Nr.": "LE12", "Name": "Digi Ninja Duo Zane & Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE13", "Name": "Digi Ninja Duo Jay & Cole Limited Edition"},
-        {"Karten-Nr.": "LE14", "Name": "Digi Ninja Duo Kai & Nya Limited Edition"},
-        {"Karten-Nr.": "LE15", "Name": "Kai vs Ice Emperor Limited Edition"},
-        {"Karten-Nr.": "LE16", "Name": "Cole vs General Vex Limited Edition"},
-        {"Karten-Nr.": "LE17", "Name": "Jay vs Blizzard Warrior Limited Edition"},
-        {"Karten-Nr.": "LE18", "Name": "Lloyd vs Blizzard Archer Limited Edition"}
+        {"Karten-Nr.": "LE1", "Name": "Arcade Kai Limited Edition", "Fundort": "Starter-Pack", "Erscheinungsdatum": "04.08.2020"},
+        {"Karten-Nr.": "LE2", "Name": "Arcade Jay Limited Edition", "Fundort": "Ninjago Magazin #66", "Erscheinungsdatum": "04.08.2020"},
+        {"Karten-Nr.": "LE3", "Name": "Arcade Cole Limited Edition", "Fundort": "Ninjago Magazin #69", "Erscheinungsdatum": "27.10.2020"},
+        {"Karten-Nr.": "LE4", "Name": "Arcade Zane Limited Edition", "Fundort": "Ninjago Magazin #68", "Erscheinungsdatum": "29.09.2020"},
+        {"Karten-Nr.": "LE5", "Name": "Arcade Lloyd Limited Edition", "Fundort": "Ninjago Magazin #67", "Erscheinungsdatum": "01.09.2020"},
+        {"Karten-Nr.": "LE6", "Name": "Next Level Digi Lloyd Limited Edition", "Fundort": "Ninjago Legacy Magazin #08", "Erscheinungsdatum": "08.10.2020"},
+        {"Karten-Nr.": "LE7", "Name": "Next Level Digi Kai Limited Edition", "Fundort": "Ninjago Magazin #70", "Erscheinungsdatum": "24.11.2020"},
+        {"Karten-Nr.": "LE8", "Name": "Next Level Digi Cole Limited Edition", "Fundort": "5! Magazin 8/20", "Erscheinungsdatum": "12.11.2020"},
+        {"Karten-Nr.": "LE9", "Name": "Next Level Digi Jay Limited Edition", "Fundort": "Duell Box", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE10", "Name": "Next Level Unagami Limited Edition", "Fundort": "Duell Box", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE11", "Name": "Next Level Digi Zane Limited Edition", "Fundort": "Adventskalender", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE12", "Name": "Digi Ninja Duo Zane & Lloyd Limited Edition", "Fundort": "Adventskalender", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE13", "Name": "Digi Ninja Duo Jay & Cole Limited Edition", "Fundort": "Adventskalender", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE14", "Name": "Digi Ninja Duo Kai & Nya Limited Edition", "Fundort": "Adventskalender", "Erscheinungsdatum": "unbekannt"},
+        {"Karten-Nr.": "LE15", "Name": "Kai vs Ice Emperor Limited Edition", "Fundort": "1 von 2 in jedem Blister", "Erscheinungsdatum": "31.08.2020"},
+        {"Karten-Nr.": "LE16", "Name": "Cole vs General Vex Limited Edition", "Fundort": "1 von 2 in jedem Blister", "Erscheinungsdatum": "31.08.2020"},
+        {"Karten-Nr.": "LE17", "Name": "Jay vs Blizzard Warrior Limited Edition", "Fundort": "1 von 2 in jedem Multi-Pack", "Erscheinungsdatum": "04.08.2020"},
+        {"Karten-Nr.": "LE18", "Name": "Lloyd vs Blizzard Archer Limited Edition", "Fundort": "1 von 2 in jedem Multi-Pack", "Erscheinungsdatum": "04.08.2020"}
       ],
       "XXL_Cards": [
         {"Karten-Nr.": "XXL1", "Name": "Level Up Jay"},

@@ -3,6 +3,10 @@
     "Jahr": 2021,
     "Logo": "Orange (The Island - Next Level)",
     "Thema": "The Island (Insel der Wächter - Next Level)",
+    "Besonderheiten": [
+      "Logo: Aufgemalte Totenköpfe auf den Masken der Wächter",
+      "Level-Up-Karten"
+    ],
     "Kategorien": {
       "Heroes": [
         {"Karten-Nr.": 1, "Name": "Cool Legacy Lloyd"},
@@ -143,24 +147,24 @@
         {"Karten-Nr.": 126, "Name": "Action Electro Mech"}
       ],
       "Limited_Edition_Cards": [
-        {"Karten-Nr.": "LE1", "Name": "Island Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE2", "Name": "Brave Legacy Lloyd Limited Edition"},
-        {"Karten-Nr.": "LE3", "Name": "Island Cole Limited Edition"},
-        {"Karten-Nr.": "LE4", "Name": "Golden Cole Limited Edition"},
-        {"Karten-Nr.": "LE5", "Name": "Island Kai Limited Edition"},
-        {"Karten-Nr.": "LE6", "Name": "Brave Legacy Kai Limited Edition"},
-        {"Karten-Nr.": "LE7", "Name": "Island Zane Limited Edition"},
-        {"Karten-Nr.": "LE8", "Name": "Golden Zane Limited Edition"},
-        {"Karten-Nr.": "LE9", "Name": "Golden Nya Limited Edition"},
-        {"Karten-Nr.": "LE10", "Name": "Golden Master Wu Limited Edition"},
-        {"Karten-Nr.": "LE11", "Name": "Island Jay Limited Edition"},
-        {"Karten-Nr.": "LE12", "Name": "Brave Legacy Jay Limited Edition"},
-        {"Karten-Nr.": "LE13", "Name": "PoulErik Limited Edition"},
-        {"Karten-Nr.": "LE14", "Name": "Chief Mammatus Limited Edition"},
-        {"Karten-Nr.": "LE15", "Name": "Skull Sorcerer Limited Edition"},
-        {"Karten-Nr.": "LE16", "Name": "Golden Team Zane & Cole Limited Edition"},
-        {"Karten-Nr.": "LE17", "Name": "Golden Team Nya & Jay Limited Edition"},
-        {"Karten-Nr.": "LE18", "Name": "Golden Team Lloyd & Kai Limited Edition"}
+        {"Karten-Nr.": "LE1", "Name": "Island Lloyd Limited Edition", "Fundort": "Starterpack", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE2", "Name": "Brave Legacy Lloyd Limited Edition", "Fundort": "Ninjago Magazin #80", "Erscheinungsdatum": "07.09.2021"},
+        {"Karten-Nr.": "LE3", "Name": "Island Cole Limited Edition", "Fundort": "5! Magazin 6/21", "Erscheinungsdatum": "07.10.2021"},
+        {"Karten-Nr.": "LE4", "Name": "Golden Cole Limited Edition", "Fundort": "Ninjago Magazin #81", "Erscheinungsdatum": "05.10.2021"},
+        {"Karten-Nr.": "LE5", "Name": "Island Kai Limited Edition", "Fundort": "Ninjago Magazin #79", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE6", "Name": "Brave Legacy Kai Limited Edition", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE7", "Name": "Island Zane Limited Edition", "Fundort": "Ninjago Magazin #82", "Erscheinungsdatum": "02.11.2021"},
+        {"Karten-Nr.": "LE8", "Name": "Golden Zane Limited Edition", "Fundort": "Ninjago Legacy Magazin #13", "Erscheinungsdatum": "24.08.2021"},
+        {"Karten-Nr.": "LE9", "Name": "Golden Nya Limited Edition", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE10", "Name": "Golden Master Wu Limited Edition", "Fundort": "Ninjago Legacy Magazin #14", "Erscheinungsdatum": "18.10.2021"},
+        {"Karten-Nr.": "LE11", "Name": "Island Jay Limited Edition", "Fundort": "Ninjago Legacy Magazin #15", "Erscheinungsdatum": "14.12.2021"},
+        {"Karten-Nr.": "LE12", "Name": "Brave Legacy Jay Limited Edition", "Fundort": "Ninjago Magazin #83", "Erscheinungsdatum": "30.11.2021"},
+        {"Karten-Nr.": "LE13", "Name": "PoulErik Limited Edition", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE14", "Name": "Chief Mammatus Limited Edition", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE15", "Name": "Skull Sorcerer Limited Edition", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE16", "Name": "Golden Team Zane & Cole Limited Edition", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE17", "Name": "Golden Team Nya & Jay Limited Edition", "Fundort": "1 von 4 in jedem Blister", "Erscheinungsdatum": "10.08.2021"},
+        {"Karten-Nr.": "LE18", "Name": "Golden Team Lloyd & Kai Limited Edition", "Fundort": "1 von 4 in jedem Multi-Pack", "Erscheinungsdatum": "10.08.2021"}
       ],
       "XXL_Cards": [
         {"Karten-Nr.": "XXL1", "Name": "Level Up Shock Cole"},

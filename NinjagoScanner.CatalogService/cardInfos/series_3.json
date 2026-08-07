@@ -3,6 +3,10 @@
     "Jahr": 2018,
     "Logo": "Silhouette einer Oni-Maske (Maske der Täuschung)",
     "Thema": "Garmadons Motorrad-Gang und Oni-Masken",
+    "Besonderheiten": [
+      "Logo: Silhouette einer Oni-Maske (Maske der Täuschung)",
+      "Garmadons Motorrad-Gang als Thema"
+    ],
     "Kategorien": {
       "Heroes": [
         {"Karten-Nr.": 1, "Name": "Schüler Lloyd"},
@@ -133,7 +137,7 @@
       ],
       "Action_Cards": [
         {"Karten-Nr.": 124, "Name": "Handschellen"},
-        {"Karten-Nr.": 126, "Name": "Über dem Abgrund"},
+        {"Karten-Nr.": 125, "Name": "Über dem Abgrund"},
         {"Karten-Nr.": 126, "Name": "Achtung Steinschlag"},
         {"Karten-Nr.": 127, "Name": "Luft-Duell"},
         {"Karten-Nr.": 128, "Name": "Sonnenfinsternis"},
