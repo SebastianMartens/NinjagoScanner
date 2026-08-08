@@ -1,0 +1,48 @@
+@page "/"
+@inject CardCatalogService CardCatalogService
+@inject PictureServiceClient PictureServiceClient
+
+<PageTitle>Ninjago Scanner</PageTitle>
+
+<div class="overview-page">
+	<header class="overview-header">
+		<p class="eyebrow">Ninjago Scanner</p>
+		<h1>Übersicht</h1>
+		<p class="lede">Starte hier den Gemini-Scan neuer Kartenfotos aus dem Ordner <strong>cardFotos</strong>.</p>
+		<div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
+			<button class="btn btn-primary" type="button" disabled="@isScanning" @onclick="StartGeminiScanAsync">
+				@(isScanning ? "Gemini-Scan laeuft..." : "Gemini-Suche starten")
+			</button>
+			@if (!string.IsNullOrWhiteSpace(scanStatusMessage))
+			{
+				<span>@scanStatusMessage</span>
+			}
+		</div>
+	</header>
+</div>
+
+@code {
+	private bool isScanning;
+	private string? scanStatusMessage;
+
+	private async Task StartGeminiScanAsync()
+	{
+		isScanning = true;
+		scanStatusMessage = null;
+
+		try
+		{
+			var summary = await PictureServiceClient.ScanAsync(
+				CardCatalogService.CardPhotosDirectory,
+				CardCatalogService.CatalogServiceAddress);
+
+			scanStatusMessage = summary.HasConfigurationError
+				? summary.Message ?? "Scan konnte nicht gestartet werden."
+				: $"Scan fertig: {summary.Processed} verarbeitet, {summary.Skipped} uebersprungen, {summary.Uncertain} unsicher, {summary.Failed} fehlgeschlagen.";
+		}
+		finally
+		{
+			isScanning = false;
+		}
+	}
+}

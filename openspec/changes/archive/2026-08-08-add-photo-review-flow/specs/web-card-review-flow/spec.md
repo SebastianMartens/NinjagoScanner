@@ -1,0 +1,81 @@
+## Purpose
+
+Lets a person work through scanned card photos one catalog card at a time, comparing every photo grouped under that series/card-number against each other, confirming correct groups in one click, and fixing the dominant error (Gemini picking the wrong series) without leaving the page.
+
+## ADDED Requirements
+
+### Requirement: Photos are grouped by series and card number
+The review page SHALL group every scanned photo by the pair of its own sidecar `SetName` and `CardNumber`, independent of the catalog, so a group exists if and only if at least one photo currently carries that `SetName`/`CardNumber` pair.
+
+#### Scenario: Photos sharing a series and card number are grouped together
+- **WHEN** two or more photos have the same `SetName` and `CardNumber` in their sidecar
+- **THEN** they appear together in the same group on the review page
+
+#### Scenario: A catalog card with no photos never appears
+- **WHEN** a catalog card has no photo whose sidecar `SetName`/`CardNumber` matches it
+- **THEN** no group for that card is shown on the review page
+
+### Requirement: Groups are ordered by known series order, then card number
+Groups whose `SetName` matches a known catalog series SHALL be ordered by that series' catalog `SortOrder`, then by `CardNumber` within the series. Every photo whose `SetName` does not match a known catalog series - including a blank `SetName` - SHALL be merged into exactly one catch-all group, sorted after every known-series group, regardless of `CardNumber`.
+
+#### Scenario: Groups follow catalog series order
+- **WHEN** the review page lists groups for known series
+- **THEN** they appear ordered by the series' catalog `SortOrder`, and by `CardNumber` within the same series
+
+#### Scenario: Unrecognized and blank series are combined into one trailing group
+- **WHEN** photos have a `SetName` that does not match any known catalog series, or have no `SetName` at all
+- **THEN** all such photos appear together in a single group that is ordered after every known-series group
+
+### Requirement: All photos in a group are shown at once
+The review page SHALL display every photo currently in the selected group simultaneously, with each photo tile always showing that photo's own current series name, card name, and card number.
+
+#### Scenario: Viewing a group with multiple photos
+- **WHEN** a user opens a group containing more than one photo
+- **THEN** all of that group's photos are shown at the same time, each labeled with its own series name, card name, and card number
+
+### Requirement: Additional photo details are collapsed by default
+Each photo tile SHALL hide its remaining sidecar fields (rarity, confidence, reasoning summary, detected text, error message, scanned-at timestamp) behind an on-demand control, collapsed by default.
+
+#### Scenario: Expanding a photo's details
+- **WHEN** a user activates the details control on a photo tile
+- **THEN** that photo's remaining sidecar fields become visible, without affecting other photo tiles
+
+### Requirement: A single photo can be confirmed or flagged as an error
+Each photo tile SHALL provide a "Confirm" control that sets that photo's `ReviewStatus` to `verified`, and a "Has Error" control that sets that photo's `ReviewStatus` to `incorrect`, each acting only on that one photo.
+
+#### Scenario: Confirming one photo in a group
+- **WHEN** a user activates the Confirm control on one photo tile
+- **THEN** that photo's `ReviewStatus` becomes `verified`, and no other photo in the group is changed
+
+#### Scenario: Flagging one photo as an error
+- **WHEN** a user activates the Has Error control on one photo tile
+- **THEN** that photo's `ReviewStatus` becomes `incorrect`, and no other photo in the group is changed
+
+### Requirement: A single photo can be reassigned to a different series with one click
+Each photo tile SHALL provide one control per known catalog series; activating it SHALL update only that photo's `SetName` to the selected series, leaving its `ReviewStatus` and every other sidecar field unchanged.
+
+#### Scenario: Reassigning a misclassified photo
+- **WHEN** a user activates a series control for a photo whose true series differs from the group it is currently shown in
+- **THEN** that photo's `SetName` is updated to the selected series, its `ReviewStatus` is unchanged, and it no longer appears in the current group on the next load
+
+### Requirement: A group can be confirmed all at once
+The review page SHALL provide a group-level "Confirm all" control that sets `ReviewStatus` to `verified` for every photo currently shown in the group, then advances the page to the next group in the order defined above.
+
+#### Scenario: Confirming a group where every photo is correct
+- **WHEN** a user activates "Confirm all" on a group
+- **THEN** every photo currently shown in that group has its `ReviewStatus` set to `verified`, and the page advances to the next group in sort order
+
+#### Scenario: Confirm all advances even into an already-reviewed group
+- **WHEN** the next group in sort order after a "Confirm all" action has every photo already reviewed
+- **THEN** the page still advances to that group rather than skipping it
+
+### Requirement: Groups can be navigated manually
+The review page SHALL provide controls to move to the previous or next group in the order defined above, independent of the "Confirm all" action.
+
+#### Scenario: Moving to the next group manually
+- **WHEN** a user activates the next-group control
+- **THEN** the page displays the next group in sort order without changing any photo's `ReviewStatus` or `SetName`
+
+#### Scenario: Moving to the previous group manually
+- **WHEN** a user activates the previous-group control
+- **THEN** the page displays the previous group in sort order without changing any photo's `ReviewStatus` or `SetName`

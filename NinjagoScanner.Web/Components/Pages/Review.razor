@@ -1,0 +1,282 @@
+@page "/review"
+@using NinjagoScanner.Web.Models
+@inject CardCatalogService CardCatalogService
+
+<PageTitle>Karten-Review</PageTitle>
+
+<div class="review-page">
+	<header class="review-header">
+		<div>
+			<p class="eyebrow">Ninjago Scanner</p>
+			<h1>Karten-Review</h1>
+			<p class="lede">Vergleiche alle Fotos einer Karte, bestaetige sie in einem Klick oder korrigiere die Serie.</p>
+		</div>
+
+		@if (!isLoading && groups.Count > 0)
+		{
+			<div class="review-nav">
+				<span class="review-nav-position">@(currentIndex + 1) / @groups.Count</span>
+				<button class="review-btn" type="button" disabled="@(currentIndex <= 0)" @onclick="GoToPrevious">← Zurueck</button>
+				<button class="review-btn" type="button" disabled="@(currentIndex >= groups.Count - 1)" @onclick="GoToNext">Weiter →</button>
+			</div>
+		}
+	</header>
+
+	@if (isLoading)
+	{
+		<p>Lade Karten...</p>
+	}
+	else if (groups.Count == 0)
+	{
+		<div class="empty-state">
+			<h2>Keine Fotos vorhanden</h2>
+			<p>Im Ordner <strong>cardFotos</strong> sind derzeit keine gescannten Karten zum Pruefen vorhanden.</p>
+		</div>
+	}
+	else if (CurrentGroup is null)
+	{
+		<div class="empty-state">
+			<h2>Alle Karten geprueft</h2>
+			<p>Du hast das Ende der Liste erreicht.</p>
+			<button class="review-btn" type="button" @onclick="RestartFromBeginning">Von vorne beginnen</button>
+		</div>
+	}
+	else
+	{
+		var group = CurrentGroup;
+
+		<div class="review-group-summary">
+			<h2 class="review-group-title">@GroupTitle(group)</h2>
+			<span class="review-group-count">@group.Photos.Count Foto(s)</span>
+		</div>
+
+		<div class="review-photo-grid">
+			@foreach (var photo in group.Photos)
+			{
+				var isBusy = IsBusy(photo);
+
+				<article class="review-photo-tile">
+					<div class="review-photo-image">
+						<img src="@photo.ImageUrl" alt="@photo.ImageFileName" loading="lazy" />
+					</div>
+
+					<div class="review-photo-body">
+						<p class="review-photo-meta">
+							<span class="review-photo-series">@(photo.SetName ?? "Ohne Serie")</span>
+							· @(photo.CardName ?? Path.GetFileNameWithoutExtension(photo.ImageFileName))
+							· <span class="review-photo-number">Nr. @(photo.CardNumber ?? "-")</span>
+						</p>
+
+						<div class="review-photo-actions">
+							<button class="review-btn review-btn-confirm" type="button" disabled="@isBusy" @onclick="() => ConfirmPhotoAsync(photo)">Confirm</button>
+							<button class="review-btn review-btn-error" type="button" disabled="@isBusy" @onclick="() => FlagPhotoErrorAsync(photo)">Has Error</button>
+						</div>
+
+						<div class="review-series-buttons">
+							@foreach (var series in knownSeries)
+							{
+								<button class="review-btn" type="button" disabled="@isBusy" @onclick="() => ReassignSeriesAsync(photo, series)">@series</button>
+							}
+						</div>
+
+						<button class="review-details-toggle" type="button" @onclick="() => ToggleDetails(photo)">
+							@(IsExpanded(photo) ? "Details ausblenden" : "Details anzeigen")
+						</button>
+
+						@if (IsExpanded(photo))
+						{
+							<div class="review-details">
+								<span>Seltenheit: @(photo.Rarity ?? "-")</span>
+								<span>Confidence: @photo.Confidence.ToString("0.00")</span>
+								@if (!string.IsNullOrWhiteSpace(photo.ReasoningSummary))
+								{
+									<span>Begruendung: @photo.ReasoningSummary</span>
+								}
+								@if (photo.DetectedText.Count > 0)
+								{
+									<span>Erkannter Text: @string.Join(", ", photo.DetectedText)</span>
+								}
+								@if (!string.IsNullOrWhiteSpace(photo.ErrorMessage))
+								{
+									<span>Fehler: @photo.ErrorMessage</span>
+								}
+								@if (photo.ScannedAtUtc is not null)
+								{
+									<span>Gescannt: @photo.ScannedAtUtc.Value.LocalDateTime</span>
+								}
+							</div>
+						}
+					</div>
+				</article>
+			}
+		</div>
+
+		<div class="review-confirm-all">
+			<button class="btn btn-primary" type="button" disabled="@isConfirmingAll" @onclick="ConfirmAllAsync">
+				@(isConfirmingAll ? "Bestaetigt..." : "Alle bestaetigen")
+			</button>
+		</div>
+	}
+</div>
+
+@code {
+	private IReadOnlyList<CardReviewGroup> groups = Array.Empty<CardReviewGroup>();
+	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
+	private int currentIndex;
+	private bool isLoading = true;
+	private bool isConfirmingAll;
+	private string? busyPhotoFileName;
+	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
+
+	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < groups.Count ? groups[currentIndex] : null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		knownSeries = await CardCatalogService.GetKnownSeriesAsync();
+		groups = await CardCatalogService.GetReviewGroupsAsync();
+		currentIndex = 0;
+		isLoading = false;
+	}
+
+	private static string GroupTitle(CardReviewGroup group)
+	{
+		return group.IsCatchAll
+			? "Ohne bekannte Serie"
+			: $"{group.SeriesName} · Nr. {group.CardNumber}";
+	}
+
+	private bool IsBusy(CardListItem photo)
+	{
+		return isConfirmingAll || string.Equals(busyPhotoFileName, photo.ImageFileName, StringComparison.Ordinal);
+	}
+
+	private bool IsExpanded(CardListItem photo)
+	{
+		return expandedPhotos.Contains(photo.ImageFileName);
+	}
+
+	private void ToggleDetails(CardListItem photo)
+	{
+		if (!expandedPhotos.Add(photo.ImageFileName))
+		{
+			expandedPhotos.Remove(photo.ImageFileName);
+		}
+	}
+
+	private void GoToPrevious()
+	{
+		if (currentIndex > 0)
+		{
+			currentIndex--;
+		}
+	}
+
+	private void GoToNext()
+	{
+		if (currentIndex < groups.Count - 1)
+		{
+			currentIndex++;
+		}
+	}
+
+	private void RestartFromBeginning()
+	{
+		currentIndex = 0;
+	}
+
+	private async Task ConfirmPhotoAsync(CardListItem photo)
+	{
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, ReviewStatuses.Verified));
+	}
+
+	private async Task FlagPhotoErrorAsync(CardListItem photo)
+	{
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, ReviewStatuses.Incorrect));
+	}
+
+	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
+	{
+		busyPhotoFileName = photo.ImageFileName;
+
+		try
+		{
+			await action();
+
+			var key = CurrentGroup?.Key;
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+
+			if (key is not null && TryFindGroupIndex(key, out var index))
+			{
+				currentIndex = index;
+			}
+		}
+		finally
+		{
+			busyPhotoFileName = null;
+		}
+	}
+
+	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)
+	{
+		busyPhotoFileName = photo.ImageFileName;
+		var previousIndex = currentIndex;
+
+		try
+		{
+			await CardCatalogService.UpdateSetNameAsync(photo.ImageFileName, seriesName);
+
+			var key = CurrentGroup?.Key;
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+
+			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
+				? index
+				: Math.Min(previousIndex, Math.Max(groups.Count - 1, 0));
+		}
+		finally
+		{
+			busyPhotoFileName = null;
+		}
+	}
+
+	private async Task ConfirmAllAsync()
+	{
+		var group = CurrentGroup;
+		if (group is null)
+		{
+			return;
+		}
+
+		isConfirmingAll = true;
+		var nextIndex = currentIndex + 1;
+
+		try
+		{
+			foreach (var photo in group.Photos)
+			{
+				await CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, ReviewStatuses.Verified);
+			}
+
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+			currentIndex = nextIndex;
+		}
+		finally
+		{
+			isConfirmingAll = false;
+		}
+	}
+
+	private bool TryFindGroupIndex(string key, out int index)
+	{
+		for (var i = 0; i < groups.Count; i++)
+		{
+			if (string.Equals(groups[i].Key, key, StringComparison.Ordinal))
+			{
+				index = i;
+				return true;
+			}
+		}
+
+		index = -1;
+		return false;
+	}
+}

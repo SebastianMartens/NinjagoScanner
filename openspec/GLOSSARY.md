@@ -135,6 +135,13 @@ A scanned **Card Photo** whose **Series Name** and **Card Number** don't
 match any catalog **Card** after normalization — e.g. from a typo, an
 unrecognized series, or a card not yet in the catalog.
 
+### Overview
+The application's home page ("/"), currently hosting only the **AI
+Analysis** trigger button. Not to be confused with the **Collection
+Overview** ("/collection"), which merges the catalog with owned photos —
+Overview is a lightweight entry point, with room for later at-a-glance
+collection status.
+
 ## System / Software Components
 
 ### Catalog Service

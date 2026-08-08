@@ -215,6 +215,85 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         await client.UpdateSidecarAsync(request, cancellationToken: cancellationToken);
     }
 
+    public async Task UpdateReviewStatusAsync(string imageFileName, string reviewStatus, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+
+        var request = new UpdateReviewStatusRequest
+        {
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory,
+            ReviewStatus = reviewStatus
+        };
+
+        await client.UpdateReviewStatusAsync(request, cancellationToken: cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CardReviewGroup>> GetReviewGroupsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var knownSeries = await GetKnownSeriesAsync(cancellationToken);
+        var seriesRank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < knownSeries.Count; index++)
+        {
+            seriesRank.TryAdd(knownSeries[index], index);
+        }
+
+        var entries = await LoadCardEntriesAsync(cancellationToken);
+        var photos = entries.Select(ToCardListItem).ToArray();
+
+        var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, List<CardListItem> Photos)>(StringComparer.OrdinalIgnoreCase);
+        var catchAll = new List<CardListItem>();
+
+        foreach (var photo in photos)
+        {
+            if (!string.IsNullOrWhiteSpace(photo.SetName)
+                && !string.IsNullOrWhiteSpace(photo.CardNumber)
+                && seriesRank.ContainsKey(photo.SetName))
+            {
+                var groupKey = $"{photo.SetName}␟{photo.CardNumber}".ToUpperInvariant();
+                if (!catalogGroups.TryGetValue(groupKey, out var group))
+                {
+                    group = (photo.SetName, photo.CardNumber, new List<CardListItem>());
+                    catalogGroups[groupKey] = group;
+                }
+
+                group.Photos.Add(photo);
+            }
+            else
+            {
+                catchAll.Add(photo);
+            }
+        }
+
+        var groups = catalogGroups.Values
+            .Select(group => new CardReviewGroup
+            {
+                IsCatchAll = false,
+                SeriesName = group.SeriesName,
+                CardNumber = group.CardNumber,
+                Photos = group.Photos.OrderBy(photo => photo.ImageFileName, StringComparer.OrdinalIgnoreCase).ToArray()
+            })
+            .OrderBy(group => seriesRank[group.SeriesName!])
+            .ThenBy(group => group.CardNumber, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (catchAll.Count > 0)
+        {
+            groups.Add(new CardReviewGroup
+            {
+                IsCatchAll = true,
+                Photos = catchAll.OrderBy(photo => photo.ImageFileName, StringComparer.OrdinalIgnoreCase).ToArray()
+            });
+        }
+
+        return groups;
+    }
+
     public async Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

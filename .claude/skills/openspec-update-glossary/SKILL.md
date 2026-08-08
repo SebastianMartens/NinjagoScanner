@@ -79,9 +79,9 @@ often only settle once a change is finished. Always announce: "Using change:
 
 6. **Show the proposed diff and confirm before writing**
 
-   Present new terms and modified terms as two short lists (term name +
+   Present new terms and modified terms one-by-one (term name +
    proposed body). Apply only after the user confirms. If they reject one
-   entry, drop just that one and keep the rest.
+   entry, drop that one and keep the rest.
 
 7. **Write** the confirmed entries into `openspec/GLOSSARY.md`.
 

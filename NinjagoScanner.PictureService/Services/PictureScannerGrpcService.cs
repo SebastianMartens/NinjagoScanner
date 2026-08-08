@@ -294,6 +294,24 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return new UpdateSetNameResponse { Success = true };
     }
 
+    public override async Task<UpdateReviewStatusResponse> UpdateReviewStatus(UpdateReviewStatusRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+        var imagePath = Path.Combine(directory, request.ImageFileName);
+        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+
+        var sidecar = File.Exists(sidecarPath)
+            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
+            : new SidecarRecord { AnalysisStatus = "pending" };
+
+        sidecar = sidecar with { ReviewStatus = NormalizeNullable(request.ReviewStatus) };
+
+        await SidecarStore.WriteRecordAsync(sidecarPath, sidecar, cancellationToken);
+
+        return new UpdateReviewStatusResponse { Success = true };
+    }
+
     public override async Task<MigrateSidecarsResponse> MigrateSidecars(MigrateSidecarsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
