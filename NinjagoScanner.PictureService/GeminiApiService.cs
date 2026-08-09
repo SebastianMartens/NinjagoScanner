@@ -126,15 +126,32 @@ internal static class GeminiApiService
 
             var normalizedStatus = NormalizeStatus(payload.Status, payload.Confidence);
             var resolvedSetName = SeriesCatalogService.ResolveSetName(payload, seriesCatalog);
+
+            string? finalSetName;
+            var finalStatus = normalizedStatus;
+            if (normalizedStatus == AnalysisStatuses.Failed)
+            {
+                finalSetName = null;
+            }
+            else if (resolvedSetName is not null)
+            {
+                finalSetName = resolvedSetName;
+            }
+            else
+            {
+                finalSetName = payload.SetName?.Trim();
+                finalStatus = AnalysisStatuses.Failed;
+            }
+
             return new CardAnalysisResult
             {
-                AnalysisStatus = normalizedStatus,
+                AnalysisStatus = finalStatus,
                 SourceFileName = Path.GetFileName(imagePath),
                 SourceFilePath = imagePath,
                 SidecarFilePath = sidecarPath,
                 CardName = payload.CardName,
                 CardNumber = payload.CardNumber,
-                SetName = normalizedStatus == AnalysisStatuses.Failed ? null : resolvedSetName,
+                SetName = finalSetName,
                 Rarity = payload.Rarity,
                 Language = NormalizeLanguage(payload.Language),
                 Confidence = ClampConfidence(payload.Confidence),

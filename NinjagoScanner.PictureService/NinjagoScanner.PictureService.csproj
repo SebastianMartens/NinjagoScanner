@@ -22,4 +22,8 @@
     <Protobuf Include="Protos\picture_service.proto" GrpcServices="Server" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="NinjagoScanner.PictureService.Tests" />
+  </ItemGroup>
+
 </Project>

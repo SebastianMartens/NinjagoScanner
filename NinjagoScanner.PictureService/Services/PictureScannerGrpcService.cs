@@ -16,11 +16,13 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
     private readonly IConfiguration configuration;
     private readonly ILogger<PictureScannerGrpcService> logger;
+    private readonly SidecarCache sidecarCache;
 
-    public PictureScannerGrpcService(IConfiguration configuration, ILogger<PictureScannerGrpcService> logger)
+    internal PictureScannerGrpcService(IConfiguration configuration, ILogger<PictureScannerGrpcService> logger, SidecarCache sidecarCache)
     {
         this.configuration = configuration;
         this.logger = logger;
+        this.sidecarCache = sidecarCache;
     }
 
     public override async Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
@@ -138,14 +140,14 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
             if (File.Exists(sidecarPath))
             {
-                var existingReviewStatus = (await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken))?.ReviewStatus;
+                var existingReviewStatus = (await sidecarCache.GetAsync(sidecarPath, cancellationToken))?.ReviewStatus;
                 if (!string.IsNullOrWhiteSpace(existingReviewStatus))
                 {
                     result = result with { ReviewStatus = existingReviewStatus };
                 }
             }
 
-            await SidecarStore.WriteAsync(sidecarPath, result, cancellationToken);
+            await sidecarCache.SetAsync(sidecarPath, result, cancellationToken);
 
             logger.LogDebug(
                 "[{Index}/{Total}] {FileName} → Status: {AnalysisStatus} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
@@ -220,7 +222,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
             try
             {
-                var sidecar = await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken);
+                var sidecar = await sidecarCache.GetAsync(sidecarPath, cancellationToken);
                 response.Cards.Add(ToCardEntry(imageFileName, sidecar));
             }
             catch (Exception exception)
@@ -246,7 +248,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
 
         var existing = File.Exists(sidecarPath)
-            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord()
+            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord()
             : new SidecarRecord
             {
                 SourceFileName = request.ImageFileName,
@@ -272,7 +274,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
         };
 
-        await SidecarStore.WriteRecordAsync(sidecarPath, updated, cancellationToken);
+        await sidecarCache.SetAsync(sidecarPath, updated, cancellationToken);
 
         return new UpdateSidecarResponse { Success = true };
     }
@@ -285,12 +287,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
 
         var sidecar = File.Exists(sidecarPath)
-            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
+            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
             : new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
 
-        await SidecarStore.WriteRecordAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
 
         return new UpdateSetNameResponse { Success = true };
     }
@@ -303,12 +305,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
 
         var sidecar = File.Exists(sidecarPath)
-            ? await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
+            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
             : new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { ReviewStatus = NormalizeNullable(request.ReviewStatus) };
 
-        await SidecarStore.WriteRecordAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
 
         return new UpdateReviewStatusResponse { Success = true };
     }
@@ -350,14 +352,14 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                     continue;
                 }
 
-                var record = await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken);
+                var record = await sidecarCache.GetAsync(sidecarPath, cancellationToken);
                 if (record is null)
                 {
                     response.AlreadyCurrent++;
                     continue;
                 }
 
-                await SidecarStore.WriteRecordAsync(sidecarPath, record, cancellationToken);
+                await sidecarCache.SetAsync(sidecarPath, record, cancellationToken);
                 response.Migrated++;
             }
             catch (Exception exception)

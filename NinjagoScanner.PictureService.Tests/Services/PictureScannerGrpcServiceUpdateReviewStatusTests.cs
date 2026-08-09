@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using NinjagoScanner.PictureService;
 using NinjagoScanner.PictureService.Protos;
 using NinjagoScanner.PictureService.Services;
 using NinjagoScanner.PictureService.Tests.Fixtures;
@@ -26,10 +27,10 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests : IDisposab
         }
     }
 
-    private static PictureScannerGrpcService CreateService()
+    private static PictureScannerGrpcService CreateService(SidecarCache? sidecarCache = null)
     {
         var configuration = new ConfigurationBuilder().Build();
-        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance);
+        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, sidecarCache ?? new SidecarCache());
     }
 
     private JsonDocument ReadSidecarJson(string imageFileName)

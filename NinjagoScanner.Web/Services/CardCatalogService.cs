@@ -146,6 +146,59 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         };
     }
 
+    public async Task<SeriesSummaryResult> GetSeriesSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
+        var photoEntries = await LoadCardEntriesAsync(cancellationToken);
+
+        var seriesGroups = cardsFromCatalog
+            .GroupBy(card => card.Series, StringComparer.Ordinal)
+            .Select(group => new
+            {
+                SeriesName = group.Key,
+                SortOrder = group.Min(card => card.SortOrder),
+                CardNumbers = group.Select(card => card.CardNumber).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            })
+            .ToArray();
+
+        var photosBySeriesKey = photoEntries.ToLookup(entry => NormalizeSeriesNameForSummary(entry.SetName));
+
+        var seriesItems = seriesGroups
+            .Select(series =>
+            {
+                var photosForSeries = photosBySeriesKey[NormalizeSeriesNameForSummary(series.SeriesName)];
+                var ownedCards = photosForSeries
+                    .Select(entry => NormalizeCardNumber(entry.CardNumber))
+                    .Where(number => series.CardNumbers.Contains(number))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+
+                return new SeriesSummaryItem
+                {
+                    SeriesName = series.SeriesName,
+                    SortOrder = series.SortOrder,
+                    TotalCards = series.CardNumbers.Count,
+                    OwnedCards = ownedCards,
+                    TotalPhotos = photosForSeries.Count()
+                };
+            })
+            .OrderBy(item => item.SortOrder)
+            .ToArray();
+
+        var knownSeriesKeys = seriesGroups
+            .Select(series => NormalizeSeriesNameForSummary(series.SeriesName))
+            .ToHashSet(StringComparer.Ordinal);
+        var unknownSeriesPhotoCount = photoEntries.Count(entry => !knownSeriesKeys.Contains(NormalizeSeriesNameForSummary(entry.SetName)));
+
+        return new SeriesSummaryResult
+        {
+            Series = seriesItems,
+            UnknownSeriesPhotoCount = unknownSeriesPhotoCount
+        };
+    }
+
     public async Task<CollectionCardDetails?> GetCollectionCardDetailsAsync(
         string series,
         string category,
@@ -502,6 +555,11 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         }
 
         return $"{seriesKey}|{numberKey}";
+    }
+
+    private static string NormalizeSeriesNameForSummary(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToUpperInvariant();
     }
 
     private static string NormalizeSeriesKey(string? value)

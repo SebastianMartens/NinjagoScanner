@@ -1,6 +1,8 @@
 @page "/"
+@using NinjagoScanner.Web.Models
 @inject CardCatalogService CardCatalogService
 @inject PictureServiceClient PictureServiceClient
+@inject NavigationManager NavigationManager
 
 <PageTitle>Ninjago Scanner</PageTitle>
 
@@ -19,11 +21,95 @@
 			}
 		</div>
 	</header>
+
+	<section class="series-summary">
+		<div class="series-summary-header">
+			<h2>Serienübersicht</h2>
+			<label class="series-layout-toggle">
+				<span>Ansicht</span>
+				<select @bind="layoutMode">
+					<option value="tiles">Kacheln</option>
+					<option value="table">Tabelle</option>
+				</select>
+			</label>
+		</div>
+
+		@if (isSummaryLoading)
+		{
+			<p>Lade Serienübersicht...</p>
+		}
+		else if (seriesSummary.Series.Count == 0)
+		{
+			<p class="table-secondary">Keine Serien im Katalog gefunden.</p>
+		}
+		else
+		{
+			@if (layoutMode == "table")
+			{
+				<div class="series-table-wrapper">
+					<table class="series-table">
+						<thead>
+							<tr>
+								<th>Serie</th>
+								<th>Karten</th>
+								<th>Besitzt</th>
+								<th>Fotos</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var series in seriesSummary.Series)
+							{
+								<tr class="series-row" @onclick="() => GoToSeries(series.SeriesName)">
+									<td>@series.SeriesName</td>
+									<td>@series.TotalCards</td>
+									<td>@series.OwnedCards / @series.TotalCards</td>
+									<td>@series.TotalPhotos</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+			else
+			{
+				<div class="series-tile-grid">
+					@foreach (var series in seriesSummary.Series)
+					{
+						<div class="series-tile" @onclick="() => GoToSeries(series.SeriesName)">
+							<h3>@series.SeriesName</h3>
+							<div class="series-tile-progress">
+								<div class="series-tile-progress-bar" style="width: @(OwnedPercent(series))%"></div>
+							</div>
+							<div class="series-tile-stats">
+								<span>@series.OwnedCards / @series.TotalCards Karten</span>
+								<span>@series.TotalPhotos Foto(s)</span>
+							</div>
+						</div>
+					}
+				</div>
+			}
+
+			@if (seriesSummary.UnknownSeriesPhotoCount > 0)
+			{
+				<p class="series-unknown-note">@seriesSummary.UnknownSeriesPhotoCount Foto(s) ohne erkannte Serie ("unbekannte Serie").</p>
+			}
+		}
+	</section>
 </div>
 
 @code {
 	private bool isScanning;
 	private string? scanStatusMessage;
+
+	private SeriesSummaryResult seriesSummary = new() { Series = Array.Empty<SeriesSummaryItem>() };
+	private bool isSummaryLoading = true;
+	private string layoutMode = "tiles";
+
+	protected override async Task OnInitializedAsync()
+	{
+		seriesSummary = await CardCatalogService.GetSeriesSummaryAsync();
+		isSummaryLoading = false;
+	}
 
 	private async Task StartGeminiScanAsync()
 	{
@@ -44,5 +130,15 @@
 		{
 			isScanning = false;
 		}
+	}
+
+	private static int OwnedPercent(SeriesSummaryItem series)
+	{
+		return series.TotalCards > 0 ? (int)Math.Round(100.0 * series.OwnedCards / series.TotalCards) : 0;
+	}
+
+	private void GoToSeries(string seriesName)
+	{
+		NavigationManager.NavigateTo($"/collection?series={Uri.EscapeDataString(seriesName)}");
 	}
 }

@@ -1,4 +1,5 @@
 @page "/collection"
+@using Microsoft.AspNetCore.Components
 @inject CardCatalogService CardCatalogService
 @inject IJSRuntime JS
 
@@ -288,6 +289,9 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "series")]
+    public string? SeriesQueryParameter { get; set; }
+
     private CollectionOverviewResult overview = new CollectionOverviewResult
     {
         Cards = Array.Empty<CollectionCardItem>()
@@ -322,6 +326,15 @@
             .OrderBy(pair => pair.SortOrder)
             .Select(pair => pair.Series)
             .ToList();
+
+        if (!string.IsNullOrWhiteSpace(SeriesQueryParameter))
+        {
+            var matchedSeries = availableSeries.FirstOrDefault(series => string.Equals(series, SeriesQueryParameter, StringComparison.OrdinalIgnoreCase));
+            if (matchedSeries is not null)
+            {
+                SelectedSeries = matchedSeries;
+            }
+        }
 
         isLoading = false;
     }
