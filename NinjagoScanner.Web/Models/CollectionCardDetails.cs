@@ -28,6 +28,7 @@ internal sealed class CollectionCardSidecarData
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
+    public string? Language { get; init; }
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
@@ -43,6 +44,7 @@ internal sealed class CollectionCardSidecarUpdate
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
+    public string? Language { get; init; }
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();

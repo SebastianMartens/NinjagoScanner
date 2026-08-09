@@ -64,9 +64,9 @@ person's collection photos.
 ### Sidecar
 A record stored alongside a **Card Photo** holding everything known about
 it: its **Analysis Status**, detected card data (name, number, set name,
-rarity), **Confidence**, **Reasoning Summary**, **Detected Text**, and its
-independent **Review Status**. Created automatically on first scan, or
-manually when a person edits a card before it's scanned.
+rarity), **Language**, **Confidence**, **Reasoning Summary**, **Detected
+Text**, and its independent **Review Status**. Created automatically on
+first scan, or manually when a person edits a card before it's scanned.
 
 ### AI Analysis
 The batch operation that sends unanalyzed (or explicitly re-requested) card
@@ -95,6 +95,17 @@ card the way it did — useful for a human reviewing an `uncertain` or
 The raw pieces of text the **AI Analysis** read off a card photo (e.g.
 printed name, number, rarity markings), stored on the **Sidecar** as
 supporting evidence alongside the interpreted fields.
+
+### Language
+The printed language of a scanned card, recorded on its **Sidecar** as `de`
+(German), `en` (English), or `unknown`. Detected by **AI Analysis** from the
+card's printed text and character names, or set manually by a person.
+Purely descriptive: it does not affect a catalog **Card**'s identity or its
+**Owned Copies** count. A card photo with no explicit `Language` value —
+whether it has never been analyzed or its **Sidecar** predates this field —
+defaults to `de` without requiring a re-analysis or a rewrite of the
+sidecar file; an explicit `unknown` from a completed analysis is never
+overwritten by that default.
 
 ### Series Name
 The series name as resolved onto a **Sidecar** — either detected by **AI

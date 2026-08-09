@@ -17,6 +17,14 @@ internal static class ReviewStatuses
     public const string Incorrect = "incorrect";
 }
 
+internal static class Languages
+{
+    public const string German = "de";
+    public const string English = "en";
+    public const string Unknown = "unknown";
+    public const string Default = German;
+}
+
 internal sealed record CardAnalysisResult
 {
     public required string AnalysisStatus { get; init; }
@@ -27,6 +35,7 @@ internal sealed record CardAnalysisResult
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
+    public string? Language { get; init; }
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
@@ -44,6 +53,7 @@ internal sealed class GeminiCardPayload
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
+    public string? Language { get; init; }
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public string[]? DetectedText { get; init; }

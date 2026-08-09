@@ -52,6 +52,9 @@ internal static class GeminiApiService
     Wenn das Bild keine klar lesbare einzelne Karte zeigt, setze status auf \"failed\".
     Bestimme setName primaer ueber das Symbol in der unteren rechten Ecke der Karte.
     Wenn kein Symbol vorhanden ist, gehoert die Karte zu Serie 1.
+    Bestimme language anhand des gedruckten Textes und Charakternamens auf der Karte:
+    "de" fuer deutschen Text, "en" fuer englischen Text, "unknown" wenn die Sprache
+    nicht sicher bestimmt werden kann.
 
     Verwende exakt dieses JSON-Schema:
     {
@@ -60,6 +63,7 @@ internal static class GeminiApiService
       "cardNumber": "string|null",
       "setName": "string|null",
       "rarity": "string|null",
+      "language": "de|en|unknown",
       "confidence": 0.0,
       "reasoningSummary": "string",
       "detectedText": ["string"]
@@ -132,6 +136,7 @@ internal static class GeminiApiService
                 CardNumber = payload.CardNumber,
                 SetName = normalizedStatus == AnalysisStatuses.Failed ? null : resolvedSetName,
                 Rarity = payload.Rarity,
+                Language = NormalizeLanguage(payload.Language),
                 Confidence = ClampConfidence(payload.Confidence),
                 ReasoningSummary = payload.ReasoningSummary,
                 DetectedText = payload.DetectedText ?? Array.Empty<string>(),
@@ -198,6 +203,21 @@ internal static class GeminiApiService
         }
 
         return AnalysisStatuses.Ok;
+    }
+
+    private static string NormalizeLanguage(string? language)
+    {
+        if (string.Equals(language, Languages.German, StringComparison.OrdinalIgnoreCase))
+        {
+            return Languages.German;
+        }
+
+        if (string.Equals(language, Languages.English, StringComparison.OrdinalIgnoreCase))
+        {
+            return Languages.English;
+        }
+
+        return Languages.Unknown;
     }
 
     private static double ClampConfidence(double value)

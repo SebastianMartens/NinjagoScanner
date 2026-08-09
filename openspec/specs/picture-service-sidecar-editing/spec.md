@@ -14,7 +14,7 @@ If no sidecar file exists yet for the given image, `UpdateSidecar` SHALL create 
 - **THEN** a new sidecar file is created with the requested field values and the image's source file name and path recorded
 
 ### Requirement: UpdateSidecar overwrites all editable fields on the existing record
-If a sidecar file already exists, `UpdateSidecar` SHALL merge the requested values onto it, overwriting `AnalysisStatus`, card name, card number, set name, rarity, confidence, reasoning summary, detected text, error message, and `ReviewStatus`, while preserving the record's existing source file identity fields.
+If a sidecar file already exists, `UpdateSidecar` SHALL merge the requested values onto it, overwriting `AnalysisStatus`, card name, card number, set name, rarity, language, confidence, reasoning summary, detected text, error message, and `ReviewStatus`, while preserving the record's existing source file identity fields.
 
 #### Scenario: Editing an existing sidecar
 - **WHEN** `UpdateSidecar` is called for an image with an existing sidecar

@@ -228,6 +228,14 @@
                                         <input @bind="sidecarDraft.Rarity" />
                                     </label>
                                     <label>
+                                        <span>Sprache</span>
+                                        <select @bind="sidecarDraft.Language">
+                                            <option value="@Languages.German">Deutsch</option>
+                                            <option value="@Languages.English">Englisch</option>
+                                            <option value="@Languages.Unknown">Unbekannt</option>
+                                        </select>
+                                    </label>
+                                    <label>
                                         <span>Confidence</span>
                                         <input @bind="sidecarDraft.ConfidenceText" />
                                     </label>
@@ -489,6 +497,7 @@
                 CardNumber = sidecarDraft.CardNumber,
                 SetName = sidecarDraft.SetName,
                 Rarity = sidecarDraft.Rarity,
+                Language = sidecarDraft.Language,
                 Confidence = confidence,
                 ReasoningSummary = sidecarDraft.ReasoningSummary,
                 DetectedText = SplitLines(sidecarDraft.DetectedTextLines),
@@ -621,6 +630,7 @@
             CardNumber = sidecar?.CardNumber ?? fallbackCard?.CardNumber ?? string.Empty,
             SetName = sidecar?.SetName ?? fallbackCard?.Series ?? string.Empty,
             Rarity = sidecar?.Rarity ?? string.Empty,
+            Language = sidecar?.Language ?? Languages.Default,
             ConfidenceText = sidecar?.Confidence.ToString("0.##") ?? "0",
             ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
             DetectedTextLines = sidecar is null ? string.Empty : string.Join(Environment.NewLine, sidecar.DetectedText),
@@ -662,6 +672,7 @@
         public string CardNumber { get; set; } = string.Empty;
         public string SetName { get; set; } = string.Empty;
         public string Rarity { get; set; } = string.Empty;
+        public string Language { get; set; } = Languages.Default;
         public string ConfidenceText { get; set; } = "0";
         public string ReasoningSummary { get; set; } = string.Empty;
         public string DetectedTextLines { get; set; } = string.Empty;

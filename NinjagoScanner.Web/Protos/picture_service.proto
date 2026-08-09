@@ -50,6 +50,7 @@ message CardEntry {
   string scanned_at_utc = 10;
   string error_message = 11;
   string review_status = 12;
+  string language = 13;
 }
 
 message ListCardsRequest {
@@ -73,6 +74,7 @@ message UpdateSidecarRequest {
   repeated string detected_text = 10;
   string error_message = 11;
   string review_status = 12;
+  string language = 13;
 }
 
 message UpdateSidecarResponse {

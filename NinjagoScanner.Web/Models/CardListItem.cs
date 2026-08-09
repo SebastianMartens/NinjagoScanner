@@ -7,6 +7,14 @@ internal static class ReviewStatuses
     public const string Incorrect = "incorrect";
 }
 
+internal static class Languages
+{
+    public const string German = "de";
+    public const string English = "en";
+    public const string Unknown = "unknown";
+    public const string Default = German;
+}
+
 internal sealed class CardListItem
 {
     public required string ImageFileName { get; init; }
