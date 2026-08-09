@@ -890,6 +890,23 @@ body {
     font-weight: 700;
 }
 
+.review-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    color: #5b5649;
+    font-size: 0.82rem;
+}
+
+.review-filter select {
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(96, 78, 42, 0.2);
+    background: rgba(255, 255, 255, 0.86);
+    font: inherit;
+}
+
 .review-group-summary {
     display: flex;
     justify-content: space-between;

@@ -15,9 +15,18 @@
 		@if (!isLoading && groups.Count > 0)
 		{
 			<div class="review-nav">
-				<span class="review-nav-position">@(currentIndex + 1) / @groups.Count</span>
+				<label class="review-filter">
+					<span>Status-Filter</span>
+					<select value="@reviewStatusFilter" @onchange="OnReviewStatusFilterChanged">
+						<option value="@AllFilterValue">Alle</option>
+						<option value="@ReviewStatuses.Unreviewed">@GetReviewStatusLabel(ReviewStatuses.Unreviewed)</option>
+						<option value="@ReviewStatuses.Verified">@GetReviewStatusLabel(ReviewStatuses.Verified)</option>
+						<option value="@ReviewStatuses.Incorrect">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</option>
+					</select>
+				</label>
+				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : currentIndex + 1) / @FilteredGroups.Count</span>
 				<button class="review-btn" type="button" disabled="@(currentIndex <= 0)" @onclick="GoToPrevious">← Zurueck</button>
-				<button class="review-btn" type="button" disabled="@(currentIndex >= groups.Count - 1)" @onclick="GoToNext">Weiter →</button>
+				<button class="review-btn" type="button" disabled="@(currentIndex >= FilteredGroups.Count - 1)" @onclick="GoToNext">Weiter →</button>
 			</div>
 		}
 	</header>
@@ -120,15 +129,26 @@
 </div>
 
 @code {
+	private const string AllFilterValue = "all";
+
 	private IReadOnlyList<CardReviewGroup> groups = Array.Empty<CardReviewGroup>();
 	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
+	private string reviewStatusFilter = AllFilterValue;
 	private int currentIndex;
 	private bool isLoading = true;
 	private bool isConfirmingAll;
 	private string? busyPhotoFileName;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
 
-	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < groups.Count ? groups[currentIndex] : null;
+	private IReadOnlyList<CardReviewGroup> FilteredGroups => groups.Where(MatchesReviewStatusFilter).ToArray();
+
+	private bool MatchesReviewStatusFilter(CardReviewGroup group)
+	{
+		return string.Equals(reviewStatusFilter, AllFilterValue, StringComparison.Ordinal)
+			|| group.Photos.Any(photo => string.Equals(photo.ReviewStatus, reviewStatusFilter, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < FilteredGroups.Count ? FilteredGroups[currentIndex] : null;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -173,7 +193,7 @@
 
 	private void GoToNext()
 	{
-		if (currentIndex < groups.Count - 1)
+		if (currentIndex < FilteredGroups.Count - 1)
 		{
 			currentIndex++;
 		}
@@ -181,6 +201,12 @@
 
 	private void RestartFromBeginning()
 	{
+		currentIndex = 0;
+	}
+
+	private void OnReviewStatusFilterChanged(ChangeEventArgs e)
+	{
+		reviewStatusFilter = e.Value?.ToString() ?? AllFilterValue;
 		currentIndex = 0;
 	}
 
@@ -216,6 +242,7 @@
 	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
 	{
 		busyPhotoFileName = photo.ImageFileName;
+		var previousIndex = currentIndex;
 
 		try
 		{
@@ -224,10 +251,9 @@
 			var key = CurrentGroup?.Key;
 			groups = await CardCatalogService.GetReviewGroupsAsync();
 
-			if (key is not null && TryFindGroupIndex(key, out var index))
-			{
-				currentIndex = index;
-			}
+			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
+				? index
+				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
 		}
 		finally
 		{
@@ -249,7 +275,7 @@
 
 			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
 				? index
-				: Math.Min(previousIndex, Math.Max(groups.Count - 1, 0));
+				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
 		}
 		finally
 		{
@@ -266,7 +292,7 @@
 		}
 
 		isConfirmingAll = true;
-		var nextIndex = currentIndex + 1;
+		var confirmedKey = group.Key;
 
 		try
 		{
@@ -276,7 +302,7 @@
 			}
 
 			groups = await CardCatalogService.GetReviewGroupsAsync();
-			currentIndex = nextIndex;
+			currentIndex = FindNextFilteredIndexAfter(confirmedKey);
 		}
 		finally
 		{
@@ -284,11 +310,40 @@
 		}
 	}
 
+	private int FindNextFilteredIndexAfter(string confirmedKey)
+	{
+		var confirmedSeen = false;
+		var matchCountBeforeTarget = 0;
+
+		foreach (var candidate in groups)
+		{
+			var matches = MatchesReviewStatusFilter(candidate);
+
+			if (confirmedSeen && matches)
+			{
+				return matchCountBeforeTarget;
+			}
+
+			if (matches)
+			{
+				matchCountBeforeTarget++;
+			}
+
+			if (string.Equals(candidate.Key, confirmedKey, StringComparison.Ordinal))
+			{
+				confirmedSeen = true;
+			}
+		}
+
+		return matchCountBeforeTarget;
+	}
+
 	private bool TryFindGroupIndex(string key, out int index)
 	{
-		for (var i = 0; i < groups.Count; i++)
+		var filtered = FilteredGroups;
+		for (var i = 0; i < filtered.Count; i++)
 		{
-			if (string.Equals(groups[i].Key, key, StringComparison.Ordinal))
+			if (string.Equals(filtered[i].Key, key, StringComparison.Ordinal))
 			{
 				index = i;
 				return true;
