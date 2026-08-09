@@ -9,7 +9,7 @@
 		<div>
 			<p class="eyebrow">Ninjago Scanner</p>
 			<h1>Karten-Review</h1>
-			<p class="lede">Vergleiche alle Fotos einer Karte, bestaetige sie in einem Klick oder korrigiere die Serie.</p>
+			<p class="lede">Vergleiche alle Fotos einer Karte, bestätige sie in einem Klick oder korrigiere die Serie.</p>
 		</div>
 
 		@if (!isLoading && groups.Count > 0)
@@ -45,7 +45,7 @@
 	else if (CurrentGroup is null)
 	{
 		<div class="empty-state">
-			<h2>Alle Karten geprueft</h2>
+			<h2>Alle Karten geprüft</h2>
 			<p>Du hast das Ende der Liste erreicht.</p>
 			<button class="review-btn" type="button" @onclick="RestartFromBeginning">Von vorne beginnen</button>
 		</div>
