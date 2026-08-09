@@ -8,7 +8,7 @@ Gives a person a complete view of every card known to the catalog — owned or n
 ### Requirement: The overview covers every catalog card, not just owned ones
 The `/collection` page SHALL list every card returned by CatalogService's card catalog, each annotated with the number of owned photo copies (`OwnedCopies`) determined by matching the card's series and card number, normalized, against scanned photo sidecars' set name and card number.
 
-Known limitation: series + card number does not uniquely identify a catalog card (see GLOSSARY.md's Card / Category entries — e.g. a regular card and its XXL parallel print can share both). Since a photo's sidecar does not record category, a single photo's `OwnedCopies` match is attributed to every catalog card sharing that series + card number, regardless of category. Fixing this requires capturing category on the sidecar, not just a sharper matching key.
+Series name and card number uniquely identify a catalog card (see GLOSSARY.md's Card entry), so this match is always unambiguous: a photo's `OwnedCopies` contribution is attributed to exactly one catalog card.
 
 #### Scenario: A catalog card with no matching photo
 - **WHEN** a catalog card has no scanned photo whose set name and card number match it after normalization

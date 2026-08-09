@@ -308,16 +308,16 @@
         {"Karten-Nr.": "LE24", "Name": "Gemeiner Schlangenjaguar"}
       ],
       "XXL_Cards": [
-        {"Karten-Nr.": 6, "Name": "XXL – Ultra Power Lloyd"},
-        {"Karten-Nr.": 12, "Name": "XXL – Ultra Power Kai"},
-        {"Karten-Nr.": 18, "Name": "XXL – Ultra Power Nya"},
-        {"Karten-Nr.": 24, "Name": "XXL – Ultra Power Cole"},
-        {"Karten-Nr.": 30, "Name": "XXL – Ultra Power Zane"},
-        {"Karten-Nr.": 36, "Name": "XXL – Ultra Power Jay"},
-        {"Karten-Nr.": 38, "Name": "XXL – Ultra Power Ninja-Go!"},
-        {"Karten-Nr.": 235, "Name": "XXL – Unheimlicher Garmadon"},
-        {"Karten-Nr.": 236, "Name": "XXL – Fieser Garmadon"},
-        {"Karten-Nr.": 238, "Name": "XXL – Fieser Oni Killow"}
+        {"Karten-Nr.": "XXL6", "Name": "XXL – Ultra Power Lloyd"},
+        {"Karten-Nr.": "XXL12", "Name": "XXL – Ultra Power Kai"},
+        {"Karten-Nr.": "XXL18", "Name": "XXL – Ultra Power Nya"},
+        {"Karten-Nr.": "XXL24", "Name": "XXL – Ultra Power Cole"},
+        {"Karten-Nr.": "XXL30", "Name": "XXL – Ultra Power Zane"},
+        {"Karten-Nr.": "XXL36", "Name": "XXL – Ultra Power Jay"},
+        {"Karten-Nr.": "XXL38", "Name": "XXL – Ultra Power Ninja-Go!"},
+        {"Karten-Nr.": "XXL235", "Name": "XXL – Unheimlicher Garmadon"},
+        {"Karten-Nr.": "XXL236", "Name": "XXL – Fieser Garmadon"},
+        {"Karten-Nr.": "XXL238", "Name": "XXL – Fieser Oni Killow"}
       ]
     }
   }

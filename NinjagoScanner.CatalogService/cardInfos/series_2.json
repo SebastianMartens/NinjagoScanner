@@ -268,8 +268,8 @@
         {"Karten-Nr.": "LE18", "Name": "Echo Zane"}
       ],
       "XXL_Cards": [
-        {"Karten-Nr.": 4, "Name": "Ultra Kai Airjitzu"},
-        {"Karten-Nr.": 8, "Name": "Ultra Jay Airjitzu"}
+        {"Karten-Nr.": "XXL4", "Name": "Ultra Kai Airjitzu"},
+        {"Karten-Nr.": "XXL8", "Name": "Ultra Jay Airjitzu"}
       ]
     }
   }

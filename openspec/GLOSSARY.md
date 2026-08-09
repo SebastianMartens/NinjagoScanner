@@ -24,28 +24,24 @@ the scanning pipeline can match against when resolving a card's series.
 ### Category
 A grouping of cards within a **Series** by role or theme (e.g. "Good Guys",
 "XXL_Cards"). A card belongs to exactly one category within its series.
-Unlike card name, category **is** part of a card's identity: the catalog
-data contains cards that share a **Series** and **Card Number** but differ
-only by category — e.g. a normal card and its XXL parallel print can both
-be numbered `4` within the same series. Series + Card Number alone is
-therefore *not* a reliable identifier; see **Card**.
+Category is descriptive/grouping metadata, not part of a card's identity —
+every card number is unique within its series regardless of category; see
+**Card**.
 
 ### Card
-A single catalog entry identified uniquely by its **Series**, **Category**,
-and **Card Number**. Card name is a descriptive attribute, not part of
-identity, and may have multiple language-variant values for the same card.
-Series + Card Number *without* category is not sufficient to identify a
-card — see **Category** for a concrete example of two distinct cards
-sharing both. (Areas of the app that key only on series + card number — see
-**Owned Copies** — inherit this ambiguity as a known limitation rather than
-a design choice.)
+A single catalog entry identified uniquely by its **Series** and **Card
+Number**. Card name is a descriptive attribute, not part of identity, and
+may have multiple language-variant values for the same card. **Category**
+is also descriptive rather than identifying — it groups cards for
+display/filtering but two cards never share both a series and a card
+number.
 
 ### Card Number
 The identifying number printed on a card within its series (e.g. `42`, or
-prefixed forms like `LE1`, `XXL3`). It is unique only *within a category* —
-combined with series and category, it identifies a **Card**. Sorting treats
-plain numeric values, `LE`-prefixed, `XXL`-prefixed, and other formats as
-separate ordered groups.
+prefixed forms like `LE1`, `XXL3`). Combined with series, it identifies a
+**Card** uniquely — no two cards in the same series share a card number,
+regardless of category. Sorting treats plain numeric values, `LE`-prefixed,
+`XXL`-prefixed, and other formats as separate ordered groups.
 
 ### Known Card Name
 The catalog's recorded name for a **Card** at a given number within a
@@ -150,12 +146,9 @@ with the **Overview** page.
 ### Owned Copies
 The number of scanned **Card Photo**s whose **Series Name** and **Card
 Number** match a given catalog **Card**, after normalization. Zero means the
-card is missing; more than one means it's a duplicate. Note: a **Sidecar**
-does not record **Category**, so this match is series + card number only —
-if two catalog **Card**s share a series and card number but differ by
-category (see **Category**), a single photo is counted as owned by both. A
-correct fix requires capturing category on the **Sidecar**, not just a
-sharper matching key.
+card is missing; more than one means it's a duplicate. Since series + card
+number uniquely identifies a **Card**, this match is always unambiguous — a
+photo is never counted as owned by more than one catalog card.
 
 ### Unmapped Photo
 A scanned **Card Photo** whose **Series Name** and **Card Number** don't

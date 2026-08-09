@@ -312,16 +312,18 @@
         {"Karten-Nr.": "LE25", "Name": "Mega Evil Daddy No Legs"}
       ],
       "XXL_Cards": [
-        {"Karten-Nr.": 138, "Name": "Dragon Master Kai"},
-        {"Karten-Nr.": 141, "Name": "Dragon Master Jay"},
-        {"Karten-Nr.": 144, "Name": "Dragon Master Wu"},
-        {"Karten-Nr.": 147, "Name": "Dragon Master Cole"},
-        {"Karten-Nr.": 150, "Name": "Dragon Master Zane"},
-        {"Karten-Nr.": 153, "Name": "Dragon Masters"}
+        {"Karten-Nr.": "XXL138", "Name": "Dragon Master Kai"},
+        {"Karten-Nr.": "XXL141", "Name": "Dragon Master Jay"},
+        {"Karten-Nr.": "XXL144", "Name": "Dragon Master Wu"},
+        {"Karten-Nr.": "XXL147", "Name": "Dragon Master Cole"},
+        {"Karten-Nr.": "XXL150", "Name": "Dragon Master Zane"},
+        {"Karten-Nr.": "XXL153", "Name": "Dragon Masters"}
       ],
       "XXXL_Cards": [
-        {"Karten-Nr.": "136, 137", "Name": "Fire Dragon"},
-        {"Karten-Nr.": "148, 149", "Name": "Ice Dragon"}
+        {"Karten-Nr.": "XXXL136", "Name": "Fire Dragon"},
+        {"Karten-Nr.": "XXXL137", "Name": "Fire Dragon"},
+        {"Karten-Nr.": "XXXL148", "Name": "Ice Dragon"},
+        {"Karten-Nr.": "XXXL149", "Name": "Ice Dragon"}
       ]
     }
   }

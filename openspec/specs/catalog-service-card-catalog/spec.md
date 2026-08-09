@@ -4,15 +4,13 @@
 
 Provides a flattened, deduplicated, consistently ordered view of every individual card across all series, for downstream cataloging and scanning workflows.
 
-<!-- RESOLVED (was a TODO to key identity on series_name + card_number only):
-confirmed against the catalog data that series + card number is NOT unique.
-E.g. Serie_2 card #4 "Ultra Kai Airjitzu" exists once under category
-Good_Guys and again under category XXL_Cards — same series, same number,
-same name, different card. Category therefore stays part of a card's
-identity; see GLOSSARY.md's Card / Card Number / Category entries. Card
-name is still excluded from identity (translations give it multiple values
-per card), so the identity key remains (series_name, category,
-card_number). -->
+<!-- RESOLVED: series_name + card_number is confirmed unique across the
+catalog data (verified during the catalog-card-identity-series-number
+change), so a card's identity key is (series_name, card_number). Category
+remains a real, displayed/filterable attribute but is no longer needed to
+disambiguate two cards; see GLOSSARY.md's Card / Card Number / Category
+entries. Card name stays excluded from identity (translations give it
+multiple values per card). -->
 
 ## Requirements
 
@@ -24,11 +22,15 @@ card_number). -->
 - **THEN** the response contains one `CatalogCardEntry` for each unique combination of series name, category, card number, and card name found in the catalog data, with `sort_order` populated from that card's series
 
 ### Requirement: Duplicate card entries are collapsed
-A card entry that is identical in series name, category, normalized card number, and card name to another entry SHALL appear only once in the response.
+A card entry that is identical in series name and normalized card number to another entry SHALL appear only once in the response; a catalog card is uniquely identified by its series name and card number.
 
 #### Scenario: Same card listed twice in source data
-- **WHEN** the same card (same series, category, card number, and name) is present more than once in the underlying detail data
+- **WHEN** the same card (same series and card number, allowing for card-number formatting differences such as `"1"` vs `"01"`) is present more than once in the underlying detail data
 - **THEN** `ListAllCards` includes it exactly once
+
+#### Scenario: Series and card number alone identify a card
+- **WHEN** two `CatalogCardEntry` results are compared
+- **THEN** they represent the same catalog card if and only if their series name and normalized card number match, regardless of category or card name
 
 ### Requirement: Cards are sorted deterministically
 Returned cards SHALL be ordered by series `sort_order` ascending, then category, then card number, then card name, all case-insensitively (except `sort_order`, which is compared numerically). Card numbers SHALL sort purely numeric values first, then `LE`-prefixed numbers, then `XXL`-prefixed numbers, then any other format, each group ordered numerically or alphabetically within itself.

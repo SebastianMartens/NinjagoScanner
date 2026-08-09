@@ -227,9 +227,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
 
     public async Task<CollectionCardDetails?> GetCollectionCardDetailsAsync(
         string series,
-        string category,
         string cardNumber,
-        string cardName,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -237,9 +235,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
         var card = cardsFromCatalog.FirstOrDefault(entry =>
             string.Equals(NormalizeSeriesKey(entry.Series), NormalizeSeriesKey(series), StringComparison.Ordinal)
-            && string.Equals(entry.CardNumber, NormalizeCardNumber(cardNumber), StringComparison.OrdinalIgnoreCase)
-            && string.Equals(entry.CardName, cardName, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase));
+            && string.Equals(entry.CardNumber, NormalizeCardNumber(cardNumber), StringComparison.OrdinalIgnoreCase));
 
         if (string.IsNullOrWhiteSpace(card.Series))
         {

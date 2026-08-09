@@ -466,7 +466,7 @@
 
         try
         {
-            selectedDetails = await CardCatalogService.GetCollectionCardDetailsAsync(card.Series, card.Category, card.CardNumber, card.CardName);
+            selectedDetails = await CardCatalogService.GetCollectionCardDetailsAsync(card.Series, card.CardNumber);
             selectedPhotoFileName = selectedDetails?.Photos.FirstOrDefault()?.ImageFileName;
             sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, card);
         }
