@@ -904,14 +904,47 @@ body {
     background: rgba(231, 221, 196, 0.95);
 }
 
-.review-btn-confirm {
-    border-color: rgba(43, 122, 68, 0.4);
-    color: #205c33;
+.review-status-control {
+    display: inline-flex;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid rgba(96, 78, 42, 0.2);
+    margin-bottom: 0.7rem;
 }
 
-.review-btn-error {
-    border-color: rgba(150, 59, 48, 0.4);
-    color: #7a2e25;
+.review-status-segment {
+    padding: 0.4rem 0.75rem;
+    border: 0;
+    background: transparent;
+    color: #6f6556;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.review-status-segment:hover {
+    background: rgba(231, 221, 196, 0.6);
+}
+
+.review-status-segment-active {
+    color: #fff;
+}
+
+.review-status-segment-active.status-ok {
+    background: #2b7a44;
+}
+
+.review-status-segment-active.status-pending {
+    background: #4b6287;
+}
+
+.review-status-segment-active.status-failed {
+    background: #963b30;
+}
+
+.review-status-segment-active:hover {
+    filter: brightness(1.05);
 }
 
 .review-details-toggle {

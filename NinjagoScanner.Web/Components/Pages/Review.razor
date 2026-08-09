@@ -67,9 +67,10 @@
 							· <span class="review-photo-number">Nr. @(photo.CardNumber ?? "-")</span>
 						</p>
 
-						<div class="review-photo-actions">
-							<button class="review-btn review-btn-confirm" type="button" disabled="@isBusy" @onclick="() => ConfirmPhotoAsync(photo)">Confirm</button>
-							<button class="review-btn review-btn-error" type="button" disabled="@isBusy" @onclick="() => FlagPhotoErrorAsync(photo)">Has Error</button>
+						<div class="review-status-control" role="group" aria-label="Review-Status">
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Unreviewed)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Unreviewed)">@GetReviewStatusLabel(ReviewStatuses.Unreviewed)</button>
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Verified)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Verified)">@GetReviewStatusLabel(ReviewStatuses.Verified)</button>
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Incorrect)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Incorrect)">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</button>
 						</div>
 
 						<div class="review-series-buttons">
@@ -184,15 +185,34 @@
 		currentIndex = 0;
 	}
 
-	private async Task ConfirmPhotoAsync(CardListItem photo)
+	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
 	{
-		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, ReviewStatuses.Verified));
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, reviewStatus));
 	}
 
-	private async Task FlagPhotoErrorAsync(CardListItem photo)
+	private static string GetSegmentClass(CardListItem photo, string reviewStatus)
 	{
-		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, ReviewStatuses.Incorrect));
+		if (!string.Equals(photo.ReviewStatus, reviewStatus, StringComparison.OrdinalIgnoreCase))
+		{
+			return "review-status-segment";
+		}
+
+		return $"review-status-segment review-status-segment-active {GetReviewStatusClass(reviewStatus)}";
 	}
+
+	private static string GetReviewStatusClass(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		ReviewStatuses.Verified => "status-ok",
+		ReviewStatuses.Incorrect => "status-failed",
+		_ => "status-pending"
+	};
+
+	private static string GetReviewStatusLabel(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		ReviewStatuses.Verified => "Bestätigt",
+		ReviewStatuses.Incorrect => "Fehlerhaft",
+		_ => "Nicht geprüft"
+	};
 
 	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
 	{
