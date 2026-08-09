@@ -22,16 +22,12 @@ Photos whose Series Name doesn't exactly match (after trim/case-fold) any catalo
 - **WHEN** every photo's Series Name exactly matches (after trim/case-fold) some catalog series
 - **THEN** the unknown-series bucket is omitted
 
-### Requirement: The series summary layout can be switched between tile and table views
-The Overview page SHALL provide a control that switches the per-series summary between a tile/card grid and a table, defaulting to the tile/card grid on first load. The chosen layout SHALL NOT persist across page reloads or revisits.
+### Requirement: The per-series summary is shown as a tile/card grid
+The Overview page SHALL show the per-series summary as a tile/card grid, one tile per series, with no alternate layout or layout-switching control.
 
-#### Scenario: Switching layout
-- **WHEN** a user toggles the layout control
-- **THEN** the per-series summary re-renders in the selected layout immediately, without a page reload
-
-#### Scenario: Reloading resets the layout
-- **WHEN** a user reloads or revisits the Overview page after switching layouts
-- **THEN** the summary is shown in the default tile/card grid layout again
+#### Scenario: Series summary renders as tiles
+- **WHEN** the Overview page loads the per-series summary
+- **THEN** each series is shown as a card/tile in a grid, not as a table row
 
 ### Requirement: Selecting a series navigates to the pre-filtered collection list
 Selecting a series entry in the per-series summary SHALL navigate to the collection list page (`/collection`) with that series pre-selected via a query-string parameter.

@@ -15,10 +15,9 @@
 
 - [x] 3.1 Add the per-series summary section to `Overview.razor`, loaded in `OnInitializedAsync` via `GetSeriesSummaryAsync`.
 - [x] 3.2 Implement the tile/card grid layout (series name, total cards, owned cards, total photos — progress-style presentation).
-- [x] 3.3 Implement the table layout (one row per series, same four values as columns).
-- [x] 3.4 Add the layout toggle control as local component state (no persistence), defaulting to the tile/card grid.
-- [x] 3.5 Show the unknown-series bucket count separately, only when greater than zero.
-- [x] 3.6 Make each series entry (tile or row) navigate to `/collection?series=<series name>` on click/activation, in both layouts.
+- [x] 3.3 Remove the table layout and the layout toggle control built in the first iteration (`layoutMode` field, the `<select>` toggle, the `<table class="series-table">` markup, and the now-unused `.series-layout-toggle`/`.series-table*`/`.series-row*` CSS rules) — tried in the running app, dropped after testing showed the tile grid alone looked better; see design.md.
+- [x] 3.4 Show the unknown-series bucket count separately, only when greater than zero.
+- [x] 3.5 Make each series entry (tile) navigate to `/collection?series=<series name>` on click/activation.
 
 ## 4. Collection page deep-link support
 
@@ -33,5 +32,5 @@
 ## 6. Verification
 
 - [ ] 6.1 Manually verify in the running app: a photo whose series is confidently resolved gets the canonical `SetName`; a photo whose series can't be resolved keeps its raw guess and is marked `failed`; that photo then shows up in the Overview's unknown-series bucket. **Not yet verified end-to-end** — requires a real Gemini API key to trigger an actual scan, which wasn't available in this session; the finalization logic was verified by code review and the unit-tested-adjacent build/behavior of the surrounding code instead.
-- [x] 6.2 Manually verify in the running Web app: series summary counts match expectations, the unknown-series bucket appears only when applicable, both layouts render correctly, and clicking a series entry lands on `/collection` with that series pre-filtered. Verified against the real `cardFotos` data (3821 photos): all 16 series render in `SortOrder`, tile counts sum to 3670 matched + 151 unknown = 3821 total (exact reconciliation), and `/collection?series=Serie%205` pre-selects "Serie 5" in the filter while an unrecognized series value leaves the filter unset with no error. The table-layout toggle was verified by markup/code review, not a live client-side click (curl can't drive the Blazor Server interactive circuit).
+- [x] 6.2 Manually verify in the running Web app: series summary counts match expectations, the unknown-series bucket appears only when applicable, the tile grid renders correctly, and clicking a series entry lands on `/collection` with that series pre-filtered. Verified against the real `cardFotos` data (3821 photos): all 16 series render as tiles in `SortOrder`, tile counts sum to 3670 matched + 151 unknown = 3821 total (exact reconciliation), and `/collection?series=Serie%205` pre-selects "Serie 5" in the filter while an unrecognized series value leaves the filter unset with no error. (This verification predates the table-layout removal below; re-verify the tile grid still renders correctly after that edit.)
 - [x] 6.3 Confirm `/collection`'s existing `Owned Copies`/unmapped-photo behavior is unaffected by this change. Verified: `/collection` still renders its existing stats bar (e.g. "3913 Karte(n) gesamt") correctly against the same data.

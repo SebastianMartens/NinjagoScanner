@@ -23,7 +23,6 @@ See proposal.md - Why. Relevant current state:
 
 **Non-Goals:**
 - Category breakdown within a series (deferred).
-- Persisting the tile/table layout choice.
 - Reconciling or unifying the new strict matching rule with `/collection`'s existing lenient matching — they are allowed to diverge (see Decisions).
 - Series Metadata (year/theme/logo) on the summary.
 - Making the unknown-series bucket clickable/navigable (there's no catalog series to link it to).
@@ -50,8 +49,8 @@ This keeps `SeriesCatalogService.ResolveSetName` itself untouched — only how `
 ### New aggregation method, computed in `CardCatalogService`
 A new method (analogous in shape to `GetCollectionOverviewAsync`) loads the catalog's card list and the scanned photo entries, groups catalog cards by series (`SortOrder` ascending, per existing convention), and for each series counts total cards, distinct owned card numbers, and total matching photos using the strict-match rule above. Photos whose Series Name doesn't exactly match (trim/case-fold) any catalog series name are aggregated into a single "unknown series" total, not attributed to any entry.
 
-### Layout switch is local component state
-A simple in-memory toggle in `Overview.razor`, mirroring how `Collection.razor` already keeps `groupBy`/filter state as plain fields with no persistence. No localStorage or other new persistence mechanism is introduced, since this app has none today.
+### Tile/card grid only — no layout switch
+The first iteration of this change built a tile-vs-table layout toggle (a simple in-memory field in `Overview.razor`, mirroring `Collection.razor`'s unpersisted `groupBy`/filter state). After trying both in the running app, the table view looked worse than the tile grid — the toggle added a control and a whole second rendering path for a layout nobody preferred. Removed; the summary is tiles only, unconditionally. Noted here so a future contributor doesn't re-propose the same toggle without knowing it was already tried and dropped.
 
 ### `/collection` reads `series` via `[SupplyParameterFromQuery]`
 `Collection.razor` is `@page "/collection"`; adding a `[SupplyParameterFromQuery] public string? Series { get; set; }` property and applying it to `SelectedSeries` during `OnInitializedAsync` (after `availableSeries` is loaded, so an unrecognized value can be safely ignored) is the standard Blazor pattern and requires no routing changes.
