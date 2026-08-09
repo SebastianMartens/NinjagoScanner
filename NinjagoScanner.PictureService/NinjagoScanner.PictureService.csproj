@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NinjagoScanner.PictureService.Tests" />
+    <InternalsVisibleTo Include="NinjagoScanner.Web.Tests" />
   </ItemGroup>
 
 </Project>

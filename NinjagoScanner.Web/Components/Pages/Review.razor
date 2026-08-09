@@ -158,11 +158,16 @@
 		isLoading = false;
 	}
 
-	private static string GroupTitle(CardReviewGroup group)
+	internal static string GroupTitle(CardReviewGroup group)
 	{
-		return group.IsCatchAll
-			? "Ohne bekannte Serie"
-			: $"{group.SeriesName} · Nr. {group.CardNumber}";
+		if (group.IsCatchAll)
+		{
+			return "Ohne bekannte Serie";
+		}
+
+		return string.IsNullOrWhiteSpace(group.CardName)
+			? $"{group.SeriesName} · Nr. {group.CardNumber}"
+			: $"{group.SeriesName} · Nr. {group.CardNumber} · {group.CardName}";
 	}
 
 	private bool IsBusy(CardListItem photo)

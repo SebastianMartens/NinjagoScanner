@@ -4,4 +4,5 @@
   <Project Path="NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj" />
   <Project Path="NinjagoScanner.CatalogService.Tests/NinjagoScanner.CatalogService.Tests.csproj" />
   <Project Path="NinjagoScanner.PictureService.Tests/NinjagoScanner.PictureService.Tests.csproj" />
+  <Project Path="NinjagoScanner.Web.Tests/NinjagoScanner.Web.Tests.csproj" />
 </Solution>

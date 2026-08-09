@@ -312,30 +312,34 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var knownSeries = await GetKnownSeriesAsync(cancellationToken);
-        var seriesRank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < knownSeries.Count; index++)
+        var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
+        var catalogByKey = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder)>(StringComparer.Ordinal);
+        foreach (var card in cardsFromCatalog)
         {
-            seriesRank.TryAdd(knownSeries[index], index);
+            var key = BuildOwnershipKey(card.Series, card.CardNumber);
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            catalogByKey.TryAdd(key, (card.Series, card.CardNumber, card.CardName, card.SortOrder));
         }
 
         var entries = await LoadCardEntriesAsync(cancellationToken);
         var photos = entries.Select(ToCardListItem).ToArray();
 
-        var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, List<CardListItem> Photos)>(StringComparer.OrdinalIgnoreCase);
+        var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder, List<CardListItem> Photos)>(StringComparer.Ordinal);
         var catchAll = new List<CardListItem>();
 
         foreach (var photo in photos)
         {
-            if (!string.IsNullOrWhiteSpace(photo.SetName)
-                && !string.IsNullOrWhiteSpace(photo.CardNumber)
-                && seriesRank.ContainsKey(photo.SetName))
+            var key = BuildOwnershipKey(photo.SetName, photo.CardNumber);
+            if (!string.IsNullOrWhiteSpace(key) && catalogByKey.TryGetValue(key, out var catalogCard))
             {
-                var groupKey = $"{photo.SetName}␟{photo.CardNumber}".ToUpperInvariant();
-                if (!catalogGroups.TryGetValue(groupKey, out var group))
+                if (!catalogGroups.TryGetValue(key, out var group))
                 {
-                    group = (photo.SetName, photo.CardNumber, new List<CardListItem>());
-                    catalogGroups[groupKey] = group;
+                    group = (catalogCard.SeriesName, catalogCard.CardNumber, catalogCard.CardName, catalogCard.SortOrder, new List<CardListItem>());
+                    catalogGroups[key] = group;
                 }
 
                 group.Photos.Add(photo);
@@ -347,15 +351,16 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         }
 
         var groups = catalogGroups.Values
+            .OrderBy(group => group.SortOrder)
+            .ThenBy(group => group.CardNumber, StringComparer.OrdinalIgnoreCase)
             .Select(group => new CardReviewGroup
             {
                 IsCatchAll = false,
                 SeriesName = group.SeriesName,
                 CardNumber = group.CardNumber,
+                CardName = group.CardName,
                 Photos = group.Photos.OrderBy(photo => photo.ImageFileName, StringComparer.OrdinalIgnoreCase).ToArray()
             })
-            .OrderBy(group => seriesRank[group.SeriesName!])
-            .ThenBy(group => group.CardNumber, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         if (catchAll.Count > 0)

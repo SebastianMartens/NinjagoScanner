@@ -1,15 +1,17 @@
 namespace NinjagoScanner.Web.Models;
 
 /// <summary>
-/// A set of photos sharing the same (SetName, CardNumber) pair from their own sidecar data,
-/// as shown one at a time on the /review page. <see cref="IsCatchAll"/> groups are the single
-/// trailing bucket for photos whose SetName does not match a known catalog series (including blank).
+/// A set of photos whose sidecar SetName/CardNumber resolve, after normalization, to the same
+/// catalog card, as shown one at a time on the /review page. <see cref="IsCatchAll"/> groups are
+/// the single trailing bucket for photos whose SetName/CardNumber do not resolve to any catalog
+/// card (including a blank SetName or CardNumber).
 /// </summary>
 internal sealed class CardReviewGroup
 {
     public required bool IsCatchAll { get; init; }
     public string? SeriesName { get; init; }
     public string? CardNumber { get; init; }
+    public string? CardName { get; init; }
     public required IReadOnlyList<CardListItem> Photos { get; init; }
 
     public string Key => IsCatchAll
