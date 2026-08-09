@@ -47,6 +47,11 @@
 
 		<div class="review-group-summary">
 			<h2 class="review-group-title">@GroupTitle(group)</h2>
+			<div class="review-confirm-all">
+			<button class="btn btn-primary" type="button" disabled="@isConfirmingAll" @onclick="ConfirmAllAsync">
+				@(isConfirmingAll ? "Bestätigt..." : "Alle bestätigen")
+			</button>
+		</div>
 			<span class="review-group-count">@group.Photos.Count Foto(s)</span>
 		</div>
 
@@ -110,12 +115,6 @@
 					</div>
 				</article>
 			}
-		</div>
-
-		<div class="review-confirm-all">
-			<button class="btn btn-primary" type="button" disabled="@isConfirmingAll" @onclick="ConfirmAllAsync">
-				@(isConfirmingAll ? "Bestaetigt..." : "Alle bestaetigen")
-			</button>
 		</div>
 	}
 </div>
