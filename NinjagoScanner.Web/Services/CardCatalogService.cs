@@ -159,6 +159,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             {
                 SeriesName = group.Key,
                 SortOrder = group.Min(card => card.SortOrder),
+                TotalCards = group.Count(),
                 CardNumbers = group.Select(card => card.CardNumber).ToHashSet(StringComparer.OrdinalIgnoreCase)
             })
             .ToArray();
@@ -179,7 +180,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                 {
                     SeriesName = series.SeriesName,
                     SortOrder = series.SortOrder,
-                    TotalCards = series.CardNumbers.Count,
+                    TotalCards = series.TotalCards,
                     OwnedCards = ownedCards,
                     TotalPhotos = photosForSeries.Count()
                 };

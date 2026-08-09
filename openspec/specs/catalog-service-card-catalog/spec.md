@@ -4,12 +4,15 @@
 
 Provides a flattened, deduplicated, consistently ordered view of every individual card across all series, for downstream cataloging and scanning workflows.
 
-<!-- TODO (not yet resolved, to be addressed later): Cards should be uniquely
-identified by series name + card number (both strings) rather than by
-series + category + name. Category is only an attribute of a card, not part
-of its identity. Card name will later have multiple values per card due to
-translations, so identity/dedup logic and requirements below need to be
-revisited to key on (series_name, card_number) instead. -->
+<!-- RESOLVED (was a TODO to key identity on series_name + card_number only):
+confirmed against the catalog data that series + card number is NOT unique.
+E.g. Serie_2 card #4 "Ultra Kai Airjitzu" exists once under category
+Good_Guys and again under category XXL_Cards — same series, same number,
+same name, different card. Category therefore stays part of a card's
+identity; see GLOSSARY.md's Card / Card Number / Category entries. Card
+name is still excluded from identity (translations give it multiple values
+per card), so the identity key remains (series_name, category,
+card_number). -->
 
 ## Requirements
 

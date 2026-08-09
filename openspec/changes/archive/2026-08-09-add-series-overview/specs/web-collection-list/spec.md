@@ -1,10 +1,12 @@
-# web-collection-overview Specification
-
 ## Purpose
 Gives a person a complete view of every card known to the catalog — owned or not — by merging CatalogService's full card list with locally owned photos, showing ownership counts, and letting them inspect and edit the sidecar data behind a selected card's photo.
-## Requirements
+
+## ADDED Requirements
+
 ### Requirement: The overview covers every catalog card, not just owned ones
 The `/collection` page SHALL list every card returned by CatalogService's card catalog, each annotated with the number of owned photo copies (`OwnedCopies`) determined by matching the card's series and card number, normalized, against scanned photo sidecars' set name and card number.
+
+Known limitation: series + card number does not uniquely identify a catalog card (see GLOSSARY.md's Card / Category entries — e.g. a regular card and its XXL parallel print can share both). Since a photo's sidecar does not record category, a single photo's `OwnedCopies` match is attributed to every catalog card sharing that series + card number, regardless of category. Fixing this requires capturing category on the sidecar, not just a sharper matching key.
 
 #### Scenario: A catalog card with no matching photo
 - **WHEN** a catalog card has no scanned photo whose set name and card number match it after normalization
@@ -91,3 +93,17 @@ Wherever series are listed or cards are grouped by series — the series filter 
 - **WHEN** a user clicks the "Serie" column header to sort
 - **THEN** rows are ordered by the catalog's `SortOrder` (ascending, or descending when toggled), not by the series name text
 
+### Requirement: The series filter can be pre-selected via a query-string parameter
+The `/collection` page SHALL read an optional `series` query-string parameter on load and, when it is present and matches a known series exactly (case-insensitive), pre-select that series in the series filter; the parameter SHALL be ignored — leaving the series filter unset and showing no error — when it is absent, blank, or does not match any known series.
+
+#### Scenario: Arriving with a valid series parameter
+- **WHEN** a user navigates to `/collection?series=Serie%205`
+- **THEN** the series filter is pre-selected to "Serie 5" and the card list is filtered accordingly, exactly as if the user had chosen it manually
+
+#### Scenario: Arriving with an unrecognized series parameter
+- **WHEN** a user navigates to `/collection?series=NotARealSeries`
+- **THEN** the series filter remains unset ("Alle Serien") and no error is shown
+
+#### Scenario: Arriving without a series parameter
+- **WHEN** a user navigates to `/collection` with no `series` parameter
+- **THEN** the page behaves exactly as before this change, with no series filter pre-selected

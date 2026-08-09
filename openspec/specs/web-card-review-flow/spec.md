@@ -9,6 +9,8 @@ Lets a person work through scanned card photos one catalog card at a time, compa
 ### Requirement: Photos are grouped by series and card number
 The review page SHALL group every scanned photo by the pair of its own sidecar `SetName` and `CardNumber`, independent of the catalog, so a group exists if and only if at least one photo currently carries that `SetName`/`CardNumber` pair.
 
+Known limitation: this grouping key does not distinguish catalog cards that share a series + card number but differ by category (see GLOSSARY.md's Card / Category entries), since sidecars don't record category — photos of two such distinct cards land in the same review group.
+
 #### Scenario: Photos sharing a series and card number are grouped together
 - **WHEN** two or more photos have the same `SetName` and `CardNumber` in their sidecar
 - **THEN** they appear together in the same group on the review page

@@ -22,21 +22,30 @@ symbol ("Kein Logo"). Used both for human identification and as a visual cue
 the scanning pipeline can match against when resolving a card's series.
 
 ### Category
-A grouping of cards within a **Series** by role or theme (e.g. "Good Guys").
-A card belongs to exactly one category within its series; category is an
-attribute of a card, not part of its identity.
+A grouping of cards within a **Series** by role or theme (e.g. "Good Guys",
+"XXL_Cards"). A card belongs to exactly one category within its series.
+Unlike card name, category **is** part of a card's identity: the catalog
+data contains cards that share a **Series** and **Card Number** but differ
+only by category — e.g. a normal card and its XXL parallel print can both
+be numbered `4` within the same series. Series + Card Number alone is
+therefore *not* a reliable identifier; see **Card**.
 
 ### Card
-A single catalog entry identified uniquely by its **Series** and **Card
-Number**. Category is a grouping attribute, not part of identity. Card name
-is also an attribute of a card, and may have multiple language-variant
-values for the same card.
+A single catalog entry identified uniquely by its **Series**, **Category**,
+and **Card Number**. Card name is a descriptive attribute, not part of
+identity, and may have multiple language-variant values for the same card.
+Series + Card Number *without* category is not sufficient to identify a
+card — see **Category** for a concrete example of two distinct cards
+sharing both. (Areas of the app that key only on series + card number — see
+**Owned Copies** — inherit this ambiguity as a known limitation rather than
+a design choice.)
 
 ### Card Number
 The identifying number printed on a card within its series (e.g. `42`, or
-prefixed forms like `LE1`, `XXL3`). Combined with series, it uniquely
-identifies a **Card**. Sorting treats plain numeric values, `LE`-prefixed,
-`XXL`-prefixed, and other formats as separate ordered groups.
+prefixed forms like `LE1`, `XXL3`). It is unique only *within a category* —
+combined with series and category, it identifies a **Card**. Sorting treats
+plain numeric values, `LE`-prefixed, `XXL`-prefixed, and other formats as
+separate ordered groups.
 
 ### Known Card Name
 The catalog's recorded name for a **Card** at a given number within a
@@ -46,7 +55,7 @@ evidence when matching a scanned photo to a series.
 ### Series Metadata
 Descriptive information about a **Series** beyond its structural entry —
 year, logo, theme, and highlights — used for richer catalog presentation
-(e.g. on the **Collection Overview** detail pane).
+(e.g. on the **Collection List** detail pane).
 
 ## Photo & Scanning Pipeline
 
@@ -131,27 +140,45 @@ person flagged it as wrong or incomplete). Never changed automatically by
 
 ## Collection & Ownership
 
-### Collection Overview
-The view that merges every catalog **Card** with a person's owned **Card
-Photo**s, showing which cards are owned, missing, or duplicated, and letting
-a person inspect and edit the **Sidecar** behind a selected card's photo.
+### Collection List
+The `/collection` page's view that merges every catalog **Card** with a
+person's owned **Card Photo**s, showing which cards are owned, missing, or
+duplicated, and letting a person inspect and edit the **Sidecar** behind a
+selected card's photo. Renamed from "Collection Overview" to avoid confusion
+with the **Overview** page.
 
 ### Owned Copies
 The number of scanned **Card Photo**s whose **Series Name** and **Card
 Number** match a given catalog **Card**, after normalization. Zero means the
-card is missing; more than one means it's a duplicate.
+card is missing; more than one means it's a duplicate. Note: a **Sidecar**
+does not record **Category**, so this match is series + card number only —
+if two catalog **Card**s share a series and card number but differ by
+category (see **Category**), a single photo is counted as owned by both. A
+correct fix requires capturing category on the **Sidecar**, not just a
+sharper matching key.
 
 ### Unmapped Photo
 A scanned **Card Photo** whose **Series Name** and **Card Number** don't
 match any catalog **Card** after normalization — e.g. from a typo, an
 unrecognized series, or a card not yet in the catalog.
 
+### Unknown Series Bucket
+The count of scanned **Card Photo**s on the **Overview** page whose
+**Series Name** doesn't exactly match (after trim/case-fold) any catalog
+**Series**, shown only when greater than zero. Uses a stricter matching rule
+than **Unmapped Photo** — Overview's per-series summary requires an exact
+**Series Name** match, while `/collection`'s **Owned Copies**/**Unmapped
+Photo** matching is more lenient (normalized). A photo counted here may
+still match a catalog card under `/collection`'s looser rule.
+
 ### Overview
-The application's home page ("/"), currently hosting only the **AI
-Analysis** trigger button. Not to be confused with the **Collection
-Overview** ("/collection"), which merges the catalog with owned photos —
-Overview is a lightweight entry point, with room for later at-a-glance
-collection status.
+The application's home page ("/"), hosting the **AI Analysis** trigger
+button and a per-series summary of catalog progress (total cards, owned
+cards, and photo counts per **Series**, plus an **Unknown Series Bucket**
+for photos that don't exactly match any series). Not to be confused with
+**Collection List** ("/collection"), which lists every catalog card with
+full filter/search/detail — Overview shows summary tiles only and links
+through to Collection List for a selected series.
 
 ## System / Software Components
 
@@ -167,6 +194,6 @@ edits. It consults the **Catalog Service** for known series when analyzing
 or matching photos.
 
 ### Web App
-The software component a person actually uses: the **Collection Overview**,
+The software component a person actually uses: the **Collection List**,
 gallery and table views, photo upload, and review screens. It talks to both
 **Catalog Service** and **Picture Service** on the person's behalf.
