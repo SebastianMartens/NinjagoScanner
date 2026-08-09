@@ -22,6 +22,35 @@
 		</div>
 	</header>
 
+	<section class="catalog-statistics">
+		<div class="series-summary-header">
+			<h2>Katalogstatistik</h2>
+		</div>
+
+		@if (isSummaryLoading)
+		{
+			<p>Lade Katalogstatistik...</p>
+		}
+		else
+		{
+			<div class="collection-stats">
+				<span>@seriesSummary.TotalCatalogCards Karte(n) im Katalog</span>
+				<span>@seriesSummary.OwnedCatalogCards im Besitz</span>
+				<span>@seriesSummary.TotalPhotos Foto(s)</span>
+			</div>
+			<div class="collection-stats">
+				<span>Analyse: @seriesSummary.AnalysisStatusCounts.Ok ok</span>
+				<span>@seriesSummary.AnalysisStatusCounts.Uncertain unsicher</span>
+				<span>@seriesSummary.AnalysisStatusCounts.Failed fehlgeschlagen</span>
+			</div>
+			<div class="collection-stats">
+				<span>Review: @seriesSummary.ReviewStatusCounts.Unreviewed ungeprueft</span>
+				<span>@seriesSummary.ReviewStatusCounts.Verified bestaetigt</span>
+				<span>@seriesSummary.ReviewStatusCounts.Incorrect fehlerhaft</span>
+			</div>
+		}
+	</section>
+
 	<section class="series-summary">
 		<div class="series-summary-header">
 			<h2>Serienübersicht</h2>

@@ -1,5 +1,12 @@
 namespace NinjagoScanner.Web.Models;
 
+internal static class AnalysisStatuses
+{
+    public const string Ok = "ok";
+    public const string Uncertain = "uncertain";
+    public const string Failed = "failed";
+}
+
 internal static class ReviewStatuses
 {
     public const string Unreviewed = "unreviewed";

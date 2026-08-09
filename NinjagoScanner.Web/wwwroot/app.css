@@ -779,6 +779,14 @@ body {
     line-height: 0.95;
 }
 
+.catalog-statistics {
+    margin-top: 2rem;
+}
+
+.catalog-statistics .collection-stats {
+    margin-bottom: 0.6rem;
+}
+
 .series-summary {
     margin-top: 2rem;
 }

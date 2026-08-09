@@ -195,7 +195,32 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         return new SeriesSummaryResult
         {
             Series = seriesItems,
-            UnknownSeriesPhotoCount = unknownSeriesPhotoCount
+            UnknownSeriesPhotoCount = unknownSeriesPhotoCount,
+            TotalCatalogCards = cardsFromCatalog.Count,
+            OwnedCatalogCards = seriesItems.Sum(item => item.OwnedCards),
+            TotalPhotos = photoEntries.Count,
+            AnalysisStatusCounts = BuildAnalysisStatusCounts(photoEntries),
+            ReviewStatusCounts = BuildReviewStatusCounts(photoEntries)
+        };
+    }
+
+    private static PhotoAnalysisStatusCounts BuildAnalysisStatusCounts(IReadOnlyList<CardEntry> entries)
+    {
+        return new PhotoAnalysisStatusCounts
+        {
+            Ok = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Ok, StringComparison.OrdinalIgnoreCase)),
+            Uncertain = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase)),
+            Failed = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        };
+    }
+
+    private static PhotoReviewStatusCounts BuildReviewStatusCounts(IReadOnlyList<CardEntry> entries)
+    {
+        return new PhotoReviewStatusCounts
+        {
+            Unreviewed = entries.Count(entry => (NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed) == ReviewStatuses.Unreviewed),
+            Verified = entries.Count(entry => NormalizeNullable(entry.ReviewStatus) == ReviewStatuses.Verified),
+            Incorrect = entries.Count(entry => NormalizeNullable(entry.ReviewStatus) == ReviewStatuses.Incorrect)
         };
     }
 
