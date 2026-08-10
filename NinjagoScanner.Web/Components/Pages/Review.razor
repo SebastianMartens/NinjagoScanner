@@ -94,6 +94,15 @@
 							}
 						</div>
 
+						<form class="review-card-number-edit" @onsubmit="() => SaveCardNumberAsync(photo)">
+							<label>
+								<span>Kartennummer</span>
+								<input type="text" class="review-card-number-input" value="@GetCardNumberDraft(photo)" disabled="@isBusy"
+									@oninput="e => cardNumberDrafts[photo.ImageFileName] = e.Value?.ToString() ?? string.Empty" />
+							</label>
+							<button class="review-btn" type="submit" disabled="@isBusy">Nummer speichern</button>
+						</form>
+
 						<button class="review-details-toggle" type="button" @onclick="() => ToggleDetails(photo)">
 							@(IsExpanded(photo) ? "Details ausblenden" : "Details anzeigen")
 						</button>
@@ -139,6 +148,7 @@
 	private bool isConfirmingAll;
 	private string? busyPhotoFileName;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
 
 	private IReadOnlyList<CardReviewGroup> FilteredGroups => groups.Where(MatchesReviewStatusFilter).ToArray();
 
@@ -154,8 +164,26 @@
 	{
 		knownSeries = await CardCatalogService.GetKnownSeriesAsync();
 		groups = await CardCatalogService.GetReviewGroupsAsync();
+		SyncCardNumberDrafts();
 		currentIndex = 0;
 		isLoading = false;
+	}
+
+	private void SyncCardNumberDrafts()
+	{
+		cardNumberDrafts.Clear();
+		foreach (var group in groups)
+		{
+			foreach (var photo in group.Photos)
+			{
+				cardNumberDrafts[photo.ImageFileName] = photo.CardNumber ?? string.Empty;
+			}
+		}
+	}
+
+	private string GetCardNumberDraft(CardListItem photo)
+	{
+		return cardNumberDrafts.TryGetValue(photo.ImageFileName, out var draft) ? draft : photo.CardNumber ?? string.Empty;
 	}
 
 	internal static string GroupTitle(CardReviewGroup group)
@@ -220,6 +248,12 @@
 		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, reviewStatus));
 	}
 
+	private async Task SaveCardNumberAsync(CardListItem photo)
+	{
+		var cardNumber = GetCardNumberDraft(photo);
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateCardNumberAsync(photo.ImageFileName, cardNumber));
+	}
+
 	private static string GetSegmentClass(CardListItem photo, string reviewStatus)
 	{
 		if (!string.Equals(photo.ReviewStatus, reviewStatus, StringComparison.OrdinalIgnoreCase))
@@ -255,6 +289,7 @@
 
 			var key = CurrentGroup?.Key;
 			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
 
 			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
 				? index
@@ -277,6 +312,7 @@
 
 			var key = CurrentGroup?.Key;
 			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
 
 			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
 				? index
@@ -307,6 +343,7 @@
 			}
 
 			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
 			currentIndex = FindNextFilteredIndexAfter(confirmedKey);
 		}
 		finally

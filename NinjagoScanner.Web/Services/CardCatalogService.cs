@@ -409,6 +409,23 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         await client.UpdateSetNameAsync(request, cancellationToken: cancellationToken);
     }
 
+    public async Task UpdateCardNumberAsync(string imageFileName, string? cardNumber, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+
+        var request = new UpdateCardNumberRequest
+        {
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory,
+            CardNumber = string.IsNullOrWhiteSpace(cardNumber) ? string.Empty : cardNumber.Trim()
+        };
+
+        await client.UpdateCardNumberAsync(request, cancellationToken: cancellationToken);
+    }
+
     private async Task<IReadOnlyList<CardEntry>> LoadCardEntriesAsync(CancellationToken cancellationToken)
     {
         using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
