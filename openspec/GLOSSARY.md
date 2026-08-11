@@ -28,6 +28,16 @@ Category is descriptive/grouping metadata, not part of a card's identity —
 every card number is unique within its series regardless of category; see
 **Card**.
 
+### Puzzle Sub-Group
+A **Category** whose cards are pieces of one image meant to be assembled
+together rather than distinct collectibles to identify individually — the
+catalog's "Puzzle Cards" grouping, further split by picture (e.g. "Puzzle
+Cards / Rapid Vehicles"), typically 9 cards per sub-group. Because pieces
+are viewed as parts of a whole, the gallery page renders a puzzle sub-group
+as a tighter 3-tiles-per-row grid with a small gap and small corner radius,
+and omits card names from its tiles — showing a card's number in place of
+the name when a tile has no matched photo yet.
+
 ### Card
 A single catalog entry identified uniquely by its **Series** and **Card
 Number**. Card name is a descriptive attribute, not part of identity, and

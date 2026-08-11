@@ -1178,6 +1178,7 @@ body {
     .gallery-grid-puzzle {
         grid-template-columns: repeat(3, 1fr);
         max-width: none;
+        gap: 0.35rem;
     }
 
     .gallery-lightbox-backdrop {
@@ -1251,6 +1252,7 @@ body {
 .gallery-grid-puzzle {
     grid-template-columns: repeat(3, 1fr);
     max-width: 640px;
+    gap: 0.35rem;
 }
 
 .gallery-tile {
@@ -1266,6 +1268,10 @@ body {
     text-align: left;
     font: inherit;
     color: inherit;
+}
+
+.gallery-tile-puzzle {
+    border-radius: 4px;
 }
 
 .gallery-tile-photo {

@@ -68,20 +68,32 @@
                     {
                         @if (card.ImageUrl is not null)
                         {
-                            <button type="button" class="gallery-tile gallery-tile-photo" @onclick="() => OpenLightbox(card)">
+                            <button type="button" class="gallery-tile @(section.IsPuzzle ? "gallery-tile-puzzle" : "") gallery-tile-photo" @onclick="() => OpenLightbox(card)">
                                 <span class="gallery-tile-media">
                                     <img class="gallery-tile-image" src="@card.ImageUrl" alt="@card.CardName" loading="lazy" />
                                 </span>
-                                <span class="gallery-tile-caption">Nr. @card.CardNumber &middot; @card.CardName</span>
+                                @if (!section.IsPuzzle)
+                                {
+                                    <span class="gallery-tile-caption">Nr. @card.CardNumber &middot; @card.CardName</span>
+                                }
                             </button>
                         }
                         else
                         {
-                            <div class="gallery-tile gallery-tile-placeholder">
-                                <span class="gallery-tile-media gallery-tile-media-placeholder">
-                                    <span class="gallery-tile-placeholder-name">@card.CardName</span>
-                                </span>
-                                <span class="gallery-tile-caption">Nr. @card.CardNumber</span>
+                            <div class="gallery-tile @(section.IsPuzzle ? "gallery-tile-puzzle" : "") gallery-tile-placeholder">
+                                @if (section.IsPuzzle)
+                                {
+                                    <span class="gallery-tile-media gallery-tile-media-placeholder">
+                                        <span class="gallery-tile-placeholder-name">Nr. @card.CardNumber</span>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="gallery-tile-media gallery-tile-media-placeholder">
+                                        <span class="gallery-tile-placeholder-name">@card.CardName</span>
+                                    </span>
+                                    <span class="gallery-tile-caption">Nr. @card.CardNumber</span>
+                                }
                             </div>
                         }
                     }
