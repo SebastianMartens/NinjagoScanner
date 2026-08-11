@@ -47,14 +47,14 @@ internal static class GeminiApiService
         var seriesPrompt = SeriesCatalogService.BuildPrompt(seriesCatalog);
         var prompt = """
     Du analysierst genau ein Foto einer Lego Ninjago Sammelkarte.
-    Gib ausschliesslich gueltiges JSON ohne Markdown oder Codeblock zurueck.
+    Gib ausschliesslich gueltiges JSON ohne Markdown oder Codeblock zurück.
     Wenn du dir nicht sicher bist, setze status auf \"uncertain\" und confidence entsprechend niedrig.
     Wenn das Bild keine klar lesbare einzelne Karte zeigt, setze status auf \"failed\".
-    Bestimme setName primaer ueber das Symbol in der unteren rechten Ecke der Karte.
+    Bestimme setName primär ueber das Symbol in der unteren rechten Ecke der Karte.
     Wenn kein Symbol vorhanden ist, gehoert die Karte zu Serie 1.
-    Bestimme language anhand des gedruckten Textes und Charakternamens auf der Karte:
-    "de" fuer deutschen Text, "en" fuer englischen Text, "unknown" wenn die Sprache
-    nicht sicher bestimmt werden kann.
+    Bestimme die Sprache (language) anhand des gedruckten Textes und Charakternamens auf der Karte:
+    "de" für deutschen Text, "en" für englischen Text, "pl" für polnischen Text,
+    "unknown" wenn die Sprache nicht sicher bestimmt werden kann.
 
     Verwende exakt dieses JSON-Schema:
     {
@@ -63,7 +63,7 @@ internal static class GeminiApiService
       "cardNumber": "string|null",
       "setName": "string|null",
       "rarity": "string|null",
-      "language": "de|en|unknown",
+      "language": "de|en|pl|unknown",
       "confidence": 0.0,
       "reasoningSummary": "string",
       "detectedText": ["string"]
@@ -232,6 +232,11 @@ internal static class GeminiApiService
         if (string.Equals(language, Languages.English, StringComparison.OrdinalIgnoreCase))
         {
             return Languages.English;
+        }
+
+        if (string.Equals(language, Languages.Polish, StringComparison.OrdinalIgnoreCase))
+        {
+            return Languages.Polish;
         }
 
         return Languages.Unknown;

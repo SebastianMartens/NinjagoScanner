@@ -1011,6 +1011,26 @@ body {
     font-size: 0.85rem;
 }
 
+.review-language-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #6b5f4a;
+    margin-bottom: 0.7rem;
+}
+
+.review-language-control select {
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(96, 78, 42, 0.2);
+    background: rgba(255, 255, 255, 0.85);
+    color: #473f32;
+    font: inherit;
+    font-size: 0.85rem;
+}
+
 .review-btn {
     padding: 0.4rem 0.75rem;
     border-radius: 999px;
@@ -1025,6 +1045,20 @@ body {
 
 .review-btn:hover {
     background: rgba(231, 221, 196, 0.95);
+}
+
+.review-series-buttons .review-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.review-series-logo {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: 4px;
+    flex-shrink: 0;
 }
 
 .review-status-control {

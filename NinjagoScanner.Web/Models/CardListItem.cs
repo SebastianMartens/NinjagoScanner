@@ -18,6 +18,7 @@ internal static class Languages
 {
     public const string German = "de";
     public const string English = "en";
+    public const string Polish = "pl";
     public const string Unknown = "unknown";
     public const string Default = German;
 }
@@ -31,6 +32,7 @@ internal sealed class CardListItem
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
+    public string? Language { get; init; }
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();

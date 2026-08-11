@@ -21,6 +21,7 @@ internal static class Languages
 {
     public const string German = "de";
     public const string English = "en";
+    public const string Polish = "pl";
     public const string Unknown = "unknown";
     public const string Default = German;
 }

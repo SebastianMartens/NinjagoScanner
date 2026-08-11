@@ -426,6 +426,23 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         await client.UpdateCardNumberAsync(request, cancellationToken: cancellationToken);
     }
 
+    public async Task UpdateCardLanguageAsync(string imageFileName, string? language, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+
+        var request = new UpdateCardLanguageRequest
+        {
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory,
+            Language = string.IsNullOrWhiteSpace(language) ? string.Empty : language.Trim()
+        };
+
+        await client.UpdateCardLanguageAsync(request, cancellationToken: cancellationToken);
+    }
+
     private async Task<IReadOnlyList<CardEntry>> LoadCardEntriesAsync(CancellationToken cancellationToken)
     {
         using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
@@ -498,6 +515,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             CardNumber = NormalizeNullable(entry.CardNumber),
             SetName = NormalizeNullable(entry.SetName),
             Rarity = NormalizeNullable(entry.Rarity),
+            Language = NormalizeNullable(entry.Language) ?? Languages.Default,
             Confidence = entry.Confidence,
             ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
             DetectedText = entry.DetectedText.ToArray(),

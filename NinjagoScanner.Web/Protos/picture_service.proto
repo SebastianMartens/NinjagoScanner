@@ -10,6 +10,7 @@ service CardPictureService {
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
   rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
   rpc UpdateCardNumber (UpdateCardNumberRequest) returns (UpdateCardNumberResponse);
+  rpc UpdateCardLanguage (UpdateCardLanguageRequest) returns (UpdateCardLanguageResponse);
   rpc UpdateReviewStatus (UpdateReviewStatusRequest) returns (UpdateReviewStatusResponse);
   rpc UploadPhoto (stream UploadPhotoChunk) returns (UploadPhotoResponse);
   rpc MigrateSidecars (MigrateSidecarsRequest) returns (MigrateSidecarsResponse);
@@ -99,6 +100,16 @@ message UpdateCardNumberRequest {
 }
 
 message UpdateCardNumberResponse {
+  bool success = 1;
+}
+
+message UpdateCardLanguageRequest {
+  string image_file_name = 1;
+  optional string card_photos_directory = 2;
+  string language = 3;
+}
+
+message UpdateCardLanguageResponse {
   bool success = 1;
 }
 
