@@ -71,6 +71,10 @@
                             <button type="button" class="gallery-tile @(section.IsPuzzle ? "gallery-tile-puzzle" : "") gallery-tile-photo" @onclick="() => OpenLightbox(card)">
                                 <span class="gallery-tile-media">
                                     <img class="gallery-tile-image" src="@card.ImageUrl" alt="@card.CardName" loading="lazy" />
+                                    @if (!section.IsPuzzle)
+                                    {
+                                        <span class="gallery-tile-badge">@card.PhotoCount</span>
+                                    }
                                 </span>
                                 @if (!section.IsPuzzle)
                                 {

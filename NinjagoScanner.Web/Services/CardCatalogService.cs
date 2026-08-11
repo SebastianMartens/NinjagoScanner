@@ -160,11 +160,13 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             .Select(card =>
             {
                 var ownershipKey = BuildOwnershipKey(card.Series, card.CardNumber);
-                var matchedPhoto = string.IsNullOrWhiteSpace(ownershipKey)
-                    ? null
-                    : photosByKey[ownershipKey]
+                var hasOwnershipKey = !string.IsNullOrWhiteSpace(ownershipKey);
+                var photoCount = hasOwnershipKey ? photosByKey[ownershipKey].Count() : 0;
+                var matchedPhoto = hasOwnershipKey
+                    ? photosByKey[ownershipKey]
                         .OrderBy(entry => entry.ImageFileName, StringComparer.OrdinalIgnoreCase)
-                        .FirstOrDefault();
+                        .FirstOrDefault()
+                    : null;
 
                 return new GalleryCardItem
                 {
@@ -173,7 +175,8 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                     Category = card.Category,
                     CardNumber = card.CardNumber,
                     CardName = card.CardName,
-                    ImageUrl = matchedPhoto is null ? null : BuildImageUrl(matchedPhoto.ImageFileName)
+                    ImageUrl = matchedPhoto is null ? null : BuildImageUrl(matchedPhoto.ImageFileName),
+                    PhotoCount = photoCount
                 };
             })
             .OrderBy(card => card.SortOrder)
@@ -247,7 +250,11 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         {
             Ok = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Ok, StringComparison.OrdinalIgnoreCase)),
             Uncertain = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase)),
-            Failed = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+            Failed = entries.Count(entry => string.Equals(entry.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase)),
+            NotAnalyzed = entries.Count(entry =>
+                !string.Equals(entry.AnalysisStatus, AnalysisStatuses.Ok, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(entry.AnalysisStatus, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(entry.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
         };
     }
 

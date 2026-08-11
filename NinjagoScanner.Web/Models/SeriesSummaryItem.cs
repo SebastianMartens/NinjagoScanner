@@ -25,6 +25,7 @@ internal sealed class PhotoAnalysisStatusCounts
     public int Ok { get; init; }
     public int Uncertain { get; init; }
     public int Failed { get; init; }
+    public int NotAnalyzed { get; init; }
 }
 
 internal sealed class PhotoReviewStatusCounts

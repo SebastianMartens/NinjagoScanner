@@ -1284,9 +1284,26 @@ body {
 }
 
 .gallery-tile-media {
+    position: relative;
     display: block;
     aspect-ratio: 3 / 4;
     background: rgba(244, 239, 228, 0.95);
+}
+
+.gallery-tile-badge {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    min-width: 1.4rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(43, 33, 16, 0.78);
+    color: #f7f1e3;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .gallery-tile-image {
