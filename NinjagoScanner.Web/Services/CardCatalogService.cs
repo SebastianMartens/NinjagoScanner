@@ -133,8 +133,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                 };
             })
             .OrderBy(card => card.SortOrder)
-            .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
+            .ThenBy(card => CardNumberSorting.BuildSortKey(card.CardNumber), StringComparer.Ordinal)
             .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
@@ -144,6 +143,43 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
             TotalPhotos = totalPhotos,
             MappedPhotos = mappedPhotos
         };
+    }
+
+    public async Task<IReadOnlyList<GalleryCardItem>> GetGalleryCardsAsync(string series, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var cardsFromCatalog = await LoadCardsFromCatalogServiceAsync(cancellationToken);
+        var photoEntries = await LoadCardEntriesAsync(cancellationToken);
+        var photosByKey = photoEntries.ToLookup(entry => BuildOwnershipKey(entry.SetName, entry.CardNumber));
+
+        var seriesKey = NormalizeSeriesKey(series);
+
+        return cardsFromCatalog
+            .Where(card => string.Equals(NormalizeSeriesKey(card.Series), seriesKey, StringComparison.Ordinal))
+            .Select(card =>
+            {
+                var ownershipKey = BuildOwnershipKey(card.Series, card.CardNumber);
+                var matchedPhoto = string.IsNullOrWhiteSpace(ownershipKey)
+                    ? null
+                    : photosByKey[ownershipKey]
+                        .OrderBy(entry => entry.ImageFileName, StringComparer.OrdinalIgnoreCase)
+                        .FirstOrDefault();
+
+                return new GalleryCardItem
+                {
+                    Series = card.Series,
+                    SortOrder = card.SortOrder,
+                    Category = card.Category,
+                    CardNumber = card.CardNumber,
+                    CardName = card.CardName,
+                    ImageUrl = matchedPhoto is null ? null : BuildImageUrl(matchedPhoto.ImageFileName)
+                };
+            })
+            .OrderBy(card => card.SortOrder)
+            .ThenBy(card => CardNumberSorting.BuildSortKey(card.CardNumber), StringComparer.Ordinal)
+            .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public async Task<SeriesSummaryResult> GetSeriesSummaryAsync(CancellationToken cancellationToken = default)
@@ -352,7 +388,7 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
 
         var groups = catalogGroups.Values
             .OrderBy(group => group.SortOrder)
-            .ThenBy(group => group.CardNumber, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(group => CardNumberSorting.BuildSortKey(group.CardNumber), StringComparer.Ordinal)
             .Select(group => new CardReviewGroup
             {
                 IsCatchAll = false,
@@ -667,28 +703,6 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         }
 
         return normalized;
-    }
-
-    private static string ToSortKey(string cardNumber)
-    {
-        if (int.TryParse(cardNumber, out var numericValue))
-        {
-            return $"0-{numericValue:D6}";
-        }
-
-        if (cardNumber.StartsWith("LE", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(cardNumber.AsSpan(2), out var leValue))
-        {
-            return $"1-{leValue:D6}";
-        }
-
-        if (cardNumber.StartsWith("XXL", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(cardNumber.AsSpan(3), out var xxlValue))
-        {
-            return $"2-{xxlValue:D6}";
-        }
-
-        return $"9-{cardNumber}";
     }
 
     private static string? NormalizeNullable(string? value)

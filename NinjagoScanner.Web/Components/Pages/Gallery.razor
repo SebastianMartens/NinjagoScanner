@@ -1,0 +1,214 @@
+@page "/gallery"
+@using Microsoft.AspNetCore.Components
+@using NinjagoScanner.Web.Models
+@inject CardCatalogService CardCatalogService
+
+<PageTitle>Galerie</PageTitle>
+
+<div class="gallery-page">
+    <header class="gallery-header">
+        <p class="eyebrow">Ninjago Scanner</p>
+        <h1>Kartengalerie</h1>
+        <p class="lede">Bildergalerie einer Serie, gruppiert nach Kategorie. Karten ohne Foto werden als Platzhalter angezeigt.</p>
+    </header>
+
+    <div class="gallery-controls">
+        <label>
+            <span>Serie</span>
+            <select value="@selectedSeries" @onchange="OnSeriesChangedAsync">
+                @foreach (var series in availableSeries)
+                {
+                    <option value="@series">@series</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <span>Kategorie</span>
+            <select @bind="SelectedCategory">
+                <option value="">Alle Kategorien</option>
+                @foreach (var category in AvailableCategories)
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (isLoading)
+    {
+        <p>Lade Galerie...</p>
+    }
+    else if (string.IsNullOrWhiteSpace(selectedSeries))
+    {
+        <div class="empty-state">
+            <h2>Keine Serie im Katalog</h2>
+            <p>Es wurden keine Serien im Katalog gefunden.</p>
+        </div>
+    }
+    else if (seriesCards.Count == 0)
+    {
+        <div class="empty-state">
+            <h2>Keine Karten</h2>
+            <p>Fuer die Serie "@selectedSeries" wurden keine Karten im Katalog gefunden.</p>
+        </div>
+    }
+    else
+    {
+        @foreach (var section in GallerySections)
+        {
+            <section class="gallery-section">
+                <div class="gallery-section-header">
+                    <h2>@section.Category</h2>
+                    <span>@section.Cards.Count Karte(n)</span>
+                </div>
+
+                <div class="gallery-grid @(section.IsPuzzle ? "gallery-grid-puzzle" : "gallery-grid-standard")">
+                    @foreach (var card in section.Cards)
+                    {
+                        @if (card.ImageUrl is not null)
+                        {
+                            <button type="button" class="gallery-tile gallery-tile-photo" @onclick="() => OpenLightbox(card)">
+                                <span class="gallery-tile-media">
+                                    <img class="gallery-tile-image" src="@card.ImageUrl" alt="@card.CardName" loading="lazy" />
+                                </span>
+                                <span class="gallery-tile-caption">Nr. @card.CardNumber &middot; @card.CardName</span>
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="gallery-tile gallery-tile-placeholder">
+                                <span class="gallery-tile-media gallery-tile-media-placeholder">
+                                    <span class="gallery-tile-placeholder-name">@card.CardName</span>
+                                </span>
+                                <span class="gallery-tile-caption">Nr. @card.CardNumber</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@if (lightboxCard is not null)
+{
+    <div class="gallery-lightbox-backdrop" @onclick="CloseLightbox">
+        <div class="gallery-lightbox-dialog" @onclick:stopPropagation="true">
+            <button type="button" class="gallery-lightbox-close" @onclick="CloseLightbox" aria-label="Vorschau schliessen">Schliessen</button>
+            <img class="gallery-lightbox-image" src="@lightboxCard.ImageUrl" alt="@lightboxCard.CardName" />
+            <div class="gallery-lightbox-caption">@lightboxCard.CardName</div>
+        </div>
+    </div>
+}
+
+@code {
+    private const string PuzzleCategoryPrefix = "Puzzle Cards";
+
+    [SupplyParameterFromQuery(Name = "series")]
+    public string? SeriesQueryParameter { get; set; }
+
+    private bool isLoading = true;
+    private List<string> availableSeries = [];
+    private string selectedSeries = string.Empty;
+    private string selectedCategory = string.Empty;
+    private List<GalleryCardItem> seriesCards = [];
+    private GalleryCardItem? lightboxCard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        availableSeries = (await CardCatalogService.GetKnownSeriesAsync()).ToList();
+
+        var initialSeries = availableSeries.FirstOrDefault(series =>
+            string.Equals(series, SeriesQueryParameter, StringComparison.OrdinalIgnoreCase));
+        selectedSeries = initialSeries ?? availableSeries.FirstOrDefault() ?? string.Empty;
+
+        await LoadSeriesCardsAsync();
+    }
+
+    private string SelectedCategory
+    {
+        get => selectedCategory;
+        set
+        {
+            lightboxCard = null;
+            selectedCategory = value;
+        }
+    }
+
+    private IEnumerable<string> AvailableCategories => seriesCards
+        .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+        .Select(group => group.Key);
+
+    private IEnumerable<GallerySection> GallerySections
+    {
+        get
+        {
+            var cards = string.IsNullOrWhiteSpace(selectedCategory)
+                ? seriesCards
+                : seriesCards.Where(card => string.Equals(card.Category, selectedCategory, StringComparison.OrdinalIgnoreCase));
+
+            return cards
+                .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+                .Select(group => new GallerySection(
+                    group.Key,
+                    IsPuzzleCategory(group.Key),
+                    group.ToList()));
+        }
+    }
+
+    private static bool IsPuzzleCategory(string category)
+    {
+        return category.StartsWith(PuzzleCategoryPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task OnSeriesChangedAsync(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        if (string.Equals(selectedSeries, value, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        selectedSeries = value;
+        await LoadSeriesCardsAsync();
+    }
+
+    private async Task LoadSeriesCardsAsync()
+    {
+        isLoading = true;
+        lightboxCard = null;
+        StateHasChanged();
+
+        seriesCards = string.IsNullOrWhiteSpace(selectedSeries)
+            ? []
+            : (await CardCatalogService.GetGalleryCardsAsync(selectedSeries)).ToList();
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory)
+            && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedCategory = string.Empty;
+        }
+
+        isLoading = false;
+    }
+
+    private void OpenLightbox(GalleryCardItem card)
+    {
+        if (card.ImageUrl is null)
+        {
+            return;
+        }
+
+        lightboxCard = card;
+    }
+
+    private void CloseLightbox()
+    {
+        lightboxCard = null;
+    }
+
+    private sealed record GallerySection(string Category, bool IsPuzzle, List<GalleryCardItem> Cards);
+}

@@ -11,7 +11,7 @@ The `/table` page SHALL render scanned cards in one table per group, each row sh
 - **THEN** cards are rendered in grouped tables with a row per card, showing the columns Bild, Name, Nummer, Set, Status, Review-Status, Seltenheit, Confidence, and Details
 
 ### Requirement: Rows can be grouped
-The table view SHALL let a user group rows by set/series, by `AnalysisStatus`, by rarity, or not at all, with each group header showing the group name and card count. When grouped by status or rarity, groups SHALL be sorted alphabetically by group key. When grouped by set/series, groups for known catalog series SHALL be sorted by the catalog's `SortOrder`, with any set name that does not match a known catalog series sorted after all known series and ordered alphabetically among themselves. Within every grouping, rows SHALL be ordered by set name, then card number, then card name.
+The table view SHALL let a user group rows by set/series, by `AnalysisStatus`, by rarity, or not at all, with each group header showing the group name and card count. When grouped by status or rarity, groups SHALL be sorted alphabetically by group key. When grouped by set/series, groups for known catalog series SHALL be sorted by the catalog's `SortOrder`, with any set name that does not match a known catalog series sorted after all known series and ordered alphabetically among themselves. Within every grouping, rows SHALL be ordered by set name, then card number, then card name; the card-number tiebreak SHALL follow the same rule used everywhere else in the application: purely numeric card numbers first ordered by value, then alphabetic-prefix-plus-number card numbers ordered by prefix alphabetically and then by numeric suffix, then anything else ordered alphabetically by raw text.
 
 #### Scenario: Grouping by status
 - **WHEN** a user selects the "status" grouping option
@@ -24,6 +24,10 @@ The table view SHALL let a user group rows by set/series, by `AnalysisStatus`, b
 #### Scenario: Cards with no matching catalog series are grouped last
 - **WHEN** cards have no set assigned, or a set name that isn't a known catalog series
 - **THEN** their group appears after every known-series group
+
+#### Scenario: Rows within a group order card numbers numerically before alphanumerically
+- **WHEN** a group contains rows with both purely numeric card numbers and alphanumeric card numbers (e.g. `2`, `10`, `LE1`, `XXL1`)
+- **THEN** rows with numeric card numbers appear first, ordered by value, followed by rows with alphanumeric card numbers ordered by prefix and then numeric suffix
 
 ### Requirement: Rows can be filtered
 The table view SHALL let a user narrow the displayed rows by free-text search, matched case-insensitively against card name, card number, set name, rarity, `AnalysisStatus`, and image file name.

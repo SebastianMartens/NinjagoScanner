@@ -110,7 +110,7 @@
                                 <TemplateColumn Title="Kategorie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.Category)">
                                     <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.Category</div>
                                 </TemplateColumn>
-                                <TemplateColumn Title="Nr." SortBy="GridSort<CollectionCardItem>.ByAscending(c => BuildCardNumberSortKey(c.CardNumber))">
+                                <TemplateColumn Title="Nr." SortBy="GridSort<CollectionCardItem>.ByAscending(c => CardNumberSorting.BuildSortKey(c.CardNumber))">
                                     <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.CardNumber</div>
                                 </TemplateColumn>
                                 <TemplateColumn Title="Name" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.CardName)">
@@ -343,9 +343,9 @@
     private IEnumerable<string> AvailableCategories => allCards
         .Where(card => string.IsNullOrWhiteSpace(selectedSeries)
             || string.Equals(card.Series, selectedSeries, StringComparison.OrdinalIgnoreCase))
-        .Select(card => card.Category)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .OrderBy(category => category, StringComparer.OrdinalIgnoreCase);
+        .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+        .Select(group => group.Key);
 
     private string SelectedSeries
     {
@@ -408,7 +408,7 @@
     private IEnumerable<CardGroup> GroupedCards => groupBy switch
     {
         "none" => [new CardGroup("Alle Karten", FilteredCards.ToList())],
-        "category" => BuildGroups(FilteredCards, card => card.Category),
+        "category" => BuildCategoryGroups(FilteredCards),
         "ownership" => BuildGroups(FilteredCards, GetOwnershipGroup),
         _ => BuildSeriesGroups(FilteredCards)
     };
@@ -562,6 +562,14 @@
             .Select(group => new CardGroup(group.Key, group.ToList()));
     }
 
+    private static IEnumerable<CardGroup> BuildCategoryGroups(IEnumerable<CollectionCardItem> source)
+    {
+        return source
+            .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+            .Select(group => new CardGroup(group.Key, group.ToList()));
+    }
+
     private static IEnumerable<CardGroup> BuildSeriesGroups(IEnumerable<CollectionCardItem> source)
     {
         return source
@@ -578,61 +586,6 @@
         }
 
         return card.IsDuplicateOwned ? "Mehrfach vorhanden" : "Einmal vorhanden";
-    }
-
-    private static string BuildCardNumberSortKey(string cardNumber)
-    {
-        if (TryExtractNumber(cardNumber, out var number))
-        {
-            return $"{number:D9}-{cardNumber}";
-        }
-
-        return $"999999999-{cardNumber}";
-    }
-
-    private static bool TryExtractNumber(string? value, out int number)
-    {
-        number = 0;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var text = value.Trim();
-        var start = -1;
-        var end = -1;
-
-        for (var index = 0; index < text.Length; index++)
-        {
-            if (!char.IsDigit(text[index]))
-            {
-                if (start >= 0)
-                {
-                    end = index;
-                    break;
-                }
-
-                continue;
-            }
-
-            if (start < 0)
-            {
-                start = index;
-            }
-        }
-
-        if (start < 0)
-        {
-            return false;
-        }
-
-        if (end < 0)
-        {
-            end = text.Length;
-        }
-
-        var digits = text[start..end];
-        return int.TryParse(digits, out number);
     }
 
     private static SidecarDraft BuildDraft(CollectionCardSidecarData? sidecar, CollectionCardItem? fallbackCard)

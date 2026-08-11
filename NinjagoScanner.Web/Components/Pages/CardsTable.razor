@@ -192,7 +192,7 @@
 			.Where(MatchesSearch)
 			.Where(MatchesReviewStatus)
 			.OrderBy(card => card.SetName ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-			.ThenBy(card => card.CardNumber ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+			.ThenBy(card => CardNumberSorting.BuildSortKey(card.CardNumber), StringComparer.Ordinal)
 			.ThenBy(card => card.CardName ?? card.ImageFileName, StringComparer.OrdinalIgnoreCase);
 
 		if (groupBy == "none")

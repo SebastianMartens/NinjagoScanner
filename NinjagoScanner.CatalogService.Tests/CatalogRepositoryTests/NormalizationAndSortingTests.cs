@@ -33,7 +33,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
     }
 
     [Fact]
-    public void GetSnapshot_OrdersCards_NumericFirst_ThenLE_ThenXXL_ThenOther_ByCardNumberOrName()
+    public void GetSnapshot_OrdersCards_NumericFirst_ThenAlphanumericByPrefixThenNumber_ThenOther()
     {
         directory.WriteFile("series_1.json", """
         {
@@ -56,11 +56,65 @@ public sealed class NormalizationAndSortingTests : IDisposable
         var repository = directory.CreateRepository();
         var cardNumbers = repository.GetSnapshot().Cards.Select(card => card.CardNumber).ToArray();
 
-        Assert.Equal(["2", "10", "LE1", "LE3", "XXL1", "XXL2", "OTHER1"], cardNumbers);
+        // "OTHER1" is a valid alphabetic-prefix-plus-number card number, so it sorts into the
+        // alphanumeric group by its own prefix ("OTHER" falls between "LE" and "XXL"
+        // alphabetically) instead of a separate catch-all group.
+        Assert.Equal(["2", "10", "LE1", "LE3", "OTHER1", "XXL1", "XXL2"], cardNumbers);
     }
 
     [Fact]
-    public void GetSnapshot_OrdersCards_BySortOrderThenCategoryThenNumberThenName()
+    public void GetSnapshot_OrdersCards_NovelPrefix_SortsByItsOwnPrefixAmongKnownPrefixes()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": "XXL1", "Name": "XXL One"},
+                {"Karten-Nr.": "AB1", "Name": "AB One"},
+                {"Karten-Nr.": "LE1", "Name": "LE One"},
+                {"Karten-Nr.": "1", "Name": "One"}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var cardNumbers = repository.GetSnapshot().Cards.Select(card => card.CardNumber).ToArray();
+
+        // "AB" is a prefix the app has never hardcoded for; it must still sort correctly among
+        // the others purely by alphabetical prefix comparison ("AB" before "LE" before "XXL").
+        Assert.Equal(["1", "AB1", "LE1", "XXL1"], cardNumbers);
+    }
+
+    [Fact]
+    public void GetSnapshot_OrdersCards_NonConformingCardNumber_SortsAfterAlphanumericGroup()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": "XXL1", "Name": "XXL One"},
+                {"Karten-Nr.": "1A2B", "Name": "Non Conforming"},
+                {"Karten-Nr.": "1", "Name": "One"}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var cardNumbers = repository.GetSnapshot().Cards.Select(card => card.CardNumber).ToArray();
+
+        // "1A2B" matches neither the purely-numeric nor the prefix-plus-number pattern, so it
+        // falls into the trailing catch-all group, ordered by raw text.
+        Assert.Equal(["1", "XXL1", "1A2B"], cardNumbers);
+    }
+
+    [Fact]
+    public void GetSnapshot_OrdersCards_BySortOrderThenCardNumberThenName_CategoryIsNotASortKey()
     {
         directory.WriteFile("series_1.json", """
         {
@@ -71,9 +125,9 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "SortOrder": 10,
             "Kategorien": {
-              "Villains": [ {"Karten-Nr.": "1", "Name": "A"} ],
+              "Villains": [ {"Karten-Nr.": "1", "Name": "V-One"} ],
               "Good_Guys": [
-                {"Karten-Nr.": "1", "Name": "Z"},
+                {"Karten-Nr.": "2", "Name": "G-Two"},
                 {"Karten-Nr.": "1", "Name": "A"}
               ]
             }
@@ -86,13 +140,44 @@ public sealed class NormalizationAndSortingTests : IDisposable
             .Select(card => (card.SeriesName, card.Category, card.CardName))
             .ToArray();
 
+        // Within Serie 1, "Villains" card #1 sorts ahead of "Good Guys" card #2 - card number
+        // wins over category, even though "Good Guys" sorts alphabetically before "Villains".
+        // The two cards tied on card number #1 ("Good Guys"/A vs "Villains"/V-One) fall back to
+        // card name.
         Assert.Equal(
         [
             ("Serie 1", "Good Guys", "A"),
-            ("Serie 1", "Good Guys", "Z"),
-            ("Serie 1", "Villains", "A"),
+            ("Serie 1", "Villains", "V-One"),
+            ("Serie 1", "Good Guys", "G-Two"),
             ("Serie 2", "Good Guys", "B"),
         ], ordered);
+    }
+
+    [Fact]
+    public void GetSnapshot_OrdersCards_CardNumberWinsOverCategory_EvenWhenAnEarlierCategoryStartsLater()
+    {
+        // Mirrors the real catalog shape: "Action Cards" sorts alphabetically before "Heroes",
+        // but its card numbers start at 101 while "Heroes" starts at 1.
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Action_Cards": [
+                {"Karten-Nr.": 101, "Name": "First Action Card"}
+              ],
+              "Heroes": [
+                {"Karten-Nr.": 1, "Name": "First Hero"},
+                {"Karten-Nr.": 2, "Name": "Second Hero"}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var cardNumbers = repository.GetSnapshot().Cards.Select(card => card.CardNumber).ToArray();
+
+        Assert.Equal(["1", "2", "101"], cardNumbers);
     }
 
     [Fact]

@@ -61,7 +61,6 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             var cards = detailData.Values
                 .SelectMany(entry => entry.Cards)
                 .OrderBy(card => card.SortOrder)
-                .ThenBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(card => ToSortKey(card.CardNumber), StringComparer.OrdinalIgnoreCase)
                 .ThenBy(card => card.CardName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -412,16 +411,10 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             return $"0-{numericValue:D6}";
         }
 
-        if (cardNumber.StartsWith("LE", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(cardNumber.AsSpan(2), out var leValue))
+        var match = AlphaPrefixNumberRegex().Match(cardNumber);
+        if (match.Success && int.TryParse(match.Groups["number"].Value, out var suffixValue))
         {
-            return $"1-{leValue:D6}";
-        }
-
-        if (cardNumber.StartsWith("XXL", StringComparison.OrdinalIgnoreCase)
-            && int.TryParse(cardNumber.AsSpan(3), out var xxlValue))
-        {
-            return $"2-{xxlValue:D6}";
+            return $"1-{match.Groups["prefix"].Value}-{suffixValue:D6}";
         }
 
         return $"9-{cardNumber}";
@@ -435,6 +428,9 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
 
     [GeneratedRegex("^\\d+$")]
     private static partial Regex NumberOnlyRegex();
+
+    [GeneratedRegex("^(?<prefix>[A-Z]+)(?<number>\\d+)$")]
+    private static partial Regex AlphaPrefixNumberRegex();
 
     private sealed class SeriesDetailData
     {

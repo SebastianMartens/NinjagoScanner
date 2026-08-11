@@ -26,7 +26,7 @@ The page SHALL show, once loaded, the total number of catalog cards, the number 
 - **THEN** the "nicht zugeordnet" (unmapped) statistic is shown with that count; otherwise it is omitted
 
 ### Requirement: Cards can be grouped, filtered, and searched
-The overview SHALL let a user group cards by series, category, ownership status (missing / owned once / owned more than once), or not at all; filter by a selected series (which also narrows the available categories) and by category; restrict to only missing or only duplicate-owned cards; and search by card number or card name substring, with all active filters applied together.
+The overview SHALL let a user group cards by series, category, ownership status (missing / owned once / owned more than once), or not at all; filter by a selected series (which also narrows the available categories) and by category; restrict to only missing or only duplicate-owned cards; and search by card number or card name substring, with all active filters applied together. When grouping by category, and when populating the category filter's options, categories SHALL be ordered by each category's lowest card number (using the catalog's card-number ordering), not alphabetically by category name.
 
 #### Scenario: Selecting a series narrows available categories
 - **WHEN** a user selects a series in the series filter
@@ -35,6 +35,14 @@ The overview SHALL let a user group cards by series, category, ownership status 
 #### Scenario: Combining "only missing" with a series filter
 - **WHEN** a user selects a series and also enables "Nur fehlende Karten"
 - **THEN** only cards in that series with zero owned copies are shown
+
+#### Scenario: Grouping by category orders groups by lowest card number
+- **WHEN** a user groups the collection by category, and one category's lowest card number is higher than another's despite the first category's name sorting alphabetically earlier (e.g. "Action Cards" starting at card `101` versus "Heroes" starting at card `1`)
+- **THEN** the "Heroes" group appears before the "Action Cards" group, ordered by each group's lowest card number rather than by category name
+
+#### Scenario: Category filter dropdown lists categories by lowest card number
+- **WHEN** the category filter's options are populated for the selected series
+- **THEN** the options appear ordered by each category's lowest card number, not alphabetically by category name
 
 ### Requirement: Selecting a card loads its full details
 Selecting a card row SHALL load that card's series metadata (year, logo, theme, highlights) and its matching photos, and SHALL clear the currently displayed details while loading.
@@ -94,6 +102,17 @@ Wherever series are listed or cards are grouped by series — the series filter 
 #### Scenario: Sorting the table by the Series column
 - **WHEN** a user clicks the "Serie" column header to sort
 - **THEN** rows are ordered by the catalog's `SortOrder` (ascending, or descending when toggled), not by the series name text
+
+### Requirement: Sorting the table by the Nr. column follows the canonical card-number order
+Clicking the "Nr." column header to sort the card list SHALL order rows using the same card-number rule used everywhere else in the application: purely numeric card numbers first, ordered by value; then alphabetic-prefix-plus-number card numbers (e.g. `LE4`, `XXL1`), ordered by prefix alphabetically and then by numeric suffix; then any remaining format ordered alphabetically by raw text. Toggling the sort direction SHALL reverse this order.
+
+#### Scenario: Sorting by Nr. ascending
+- **WHEN** a user clicks the "Nr." column header on a list containing both numeric and alphanumeric card numbers
+- **THEN** rows are ordered with all numeric card numbers first by ascending value, followed by alphanumeric card numbers ordered by prefix alphabetically and then by numeric suffix
+
+#### Scenario: Toggling sort direction
+- **WHEN** a user clicks the "Nr." column header a second time
+- **THEN** the same ordering rule applies in reverse
 
 ### Requirement: The series filter can be pre-selected via a query-string parameter
 The `/collection` page SHALL read an optional `series` query-string parameter on load and, when it is present and matches a known series exactly (case-insensitive), pre-select that series in the series filter; the parameter SHALL be ignored — leaving the series filter unset and showing no error — when it is absent, blank, or does not match any known series.

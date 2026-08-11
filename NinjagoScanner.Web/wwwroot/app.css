@@ -1165,4 +1165,204 @@ body {
     .upload-actions {
         flex-direction: column;
     }
+
+    .gallery-header {
+        flex-direction: column;
+        align-items: start;
+    }
+
+    .gallery-grid-standard {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .gallery-grid-puzzle {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: none;
+    }
+
+    .gallery-lightbox-backdrop {
+        padding: 1rem;
+    }
+}
+
+.gallery-page {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+}
+
+.gallery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1.5rem;
+    margin-bottom: 1.2rem;
+}
+
+.gallery-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.gallery-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: #5b5649;
+    font-weight: 700;
+}
+
+.gallery-controls select {
+    min-width: 220px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 12px;
+    border: 1px solid rgba(96, 78, 42, 0.22);
+    background: rgba(255, 255, 255, 0.88);
+}
+
+.gallery-section {
+    margin-bottom: 2.2rem;
+}
+
+.gallery-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.8rem;
+}
+
+.gallery-section-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.gallery-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.gallery-grid-standard {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.gallery-grid-puzzle {
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 640px;
+}
+
+.gallery-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    border: 1px solid rgba(96, 78, 42, 0.14);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 12px 24px rgba(59, 46, 20, 0.08);
+    overflow: hidden;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+}
+
+.gallery-tile-photo {
+    cursor: zoom-in;
+}
+
+.gallery-tile-photo:focus-visible {
+    outline: 2px solid #8b3f1f;
+    outline-offset: 3px;
+}
+
+.gallery-tile-media {
+    display: block;
+    aspect-ratio: 3 / 4;
+    background: rgba(244, 239, 228, 0.95);
+}
+
+.gallery-tile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.gallery-tile-media-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(96, 78, 42, 0.07),
+        rgba(96, 78, 42, 0.07) 10px,
+        rgba(96, 78, 42, 0.03) 10px,
+        rgba(96, 78, 42, 0.03) 20px
+    );
+}
+
+.gallery-tile-placeholder-name {
+    font-weight: 700;
+    text-align: center;
+    color: #5b5649;
+}
+
+.gallery-tile-caption {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.82rem;
+    color: #5b5649;
+    border-top: 1px solid rgba(96, 78, 42, 0.1);
+}
+
+.gallery-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: rgba(31, 29, 25, 0.78);
+    backdrop-filter: blur(8px);
+}
+
+.gallery-lightbox-dialog {
+    max-width: min(92vw, 900px);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    border-radius: 24px;
+    background: rgba(255, 251, 243, 0.98);
+    box-shadow: 0 28px 56px rgba(0, 0, 0, 0.28);
+}
+
+.gallery-lightbox-close {
+    align-self: end;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid rgba(96, 78, 42, 0.2);
+    border-radius: 999px;
+    background: rgba(242, 236, 223, 0.9);
+    color: #473f32;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gallery-lightbox-image {
+    max-width: 100%;
+    max-height: calc(92vh - 8rem);
+    object-fit: contain;
+    border-radius: 18px;
+    display: block;
+}
+
+.gallery-lightbox-caption {
+    color: #473f32;
+    font-weight: 700;
+    text-align: center;
 }

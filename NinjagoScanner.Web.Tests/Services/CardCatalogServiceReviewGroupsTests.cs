@@ -124,3 +124,82 @@ public sealed class CardCatalogServiceReviewGroupsTests : IAsyncLifetime
         Assert.Contains(catchAll.Photos, photo => photo.ImageFileName == "photo6.jpg");
     }
 }
+
+public sealed class CardCatalogServiceReviewGroupsCardNumberOrderingTests : IAsyncLifetime
+{
+    private readonly CatalogServiceTestHost catalogHost = new();
+    private readonly PictureServiceTestHost pictureHost = new();
+    private CardCatalogService cardCatalogService = null!;
+
+    static CardCatalogServiceReviewGroupsCardNumberOrderingTests()
+    {
+        AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+    }
+
+    public async Task InitializeAsync()
+    {
+        catalogHost.WriteCatalogFile("series_test.json", """
+        {
+          "Serie_2": {
+            "SortOrder": 2,
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": 10, "Name": "Ten"},
+                {"Karten-Nr.": 2, "Name": "Two"}
+              ],
+              "Limited_Edition_Cards": [
+                {"Karten-Nr.": "LE1", "Name": "LE One"},
+                {"Karten-Nr.": "XXL1", "Name": "XXL One"}
+              ]
+            }
+          }
+        }
+        """);
+
+        await catalogHost.StartAsync();
+        await pictureHost.StartAsync();
+
+        pictureHost.WritePhoto("photo_xxl1.jpg", Sidecar(setName: "Serie 2", cardNumber: "XXL1"));
+        pictureHost.WritePhoto("photo_10.jpg", Sidecar(setName: "Serie 2", cardNumber: "10"));
+        pictureHost.WritePhoto("photo_le1.jpg", Sidecar(setName: "Serie 2", cardNumber: "LE1"));
+        pictureHost.WritePhoto("photo_2.jpg", Sidecar(setName: "Serie 2", cardNumber: "2"));
+
+        cardCatalogService = new CardCatalogService(
+            cardPhotosDirectory: pictureHost.CardPhotosDirectory,
+            maxUploadBytes: 10 * 1024 * 1024,
+            catalogServiceAddress: catalogHost.Address,
+            pictureServiceAddress: pictureHost.Address);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await catalogHost.DisposeAsync();
+        await pictureHost.DisposeAsync();
+    }
+
+    private static string Sidecar(string setName, string cardNumber)
+    {
+        return $$"""
+        {
+          "AnalysisStatus": "ok",
+          "CardName": "irrelevant",
+          "CardNumber": "{{cardNumber}}",
+          "SetName": "{{setName}}",
+          "Rarity": "Common",
+          "Confidence": 0.9,
+          "ReviewStatus": "unreviewed"
+        }
+        """;
+    }
+
+    [Fact]
+    public async Task GetReviewGroupsAsync_OrdersGroups_NumericFirstByValue_ThenAlphanumericByPrefix()
+    {
+        var groups = await cardCatalogService.GetReviewGroupsAsync();
+
+        var cardNumbers = groups.Select(group => group.CardNumber).ToArray();
+
+        string?[] expected = ["2", "10", "LE1", "XXL1"];
+        Assert.Equal(expected, cardNumbers);
+    }
+}
