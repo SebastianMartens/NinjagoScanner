@@ -81,7 +81,7 @@ When the model-reported status is `ok` or `uncertain` but series-name matching f
 - **THEN** the analysis result's status is not escalated because of series matching, and the stored `SetName` is the resolved canonical catalog series name
 
 ### Requirement: Analysis result includes a detected language
-The parsed analysis result SHALL include a `Language` value normalized to one of `de`, `en`, or `unknown`: a model-reported value matching `de` or `en` (case-insensitively) is kept as that value, and any other, unrecognized, or missing value is normalized to `unknown`.
+The parsed analysis result SHALL include a `Language` value normalized to one of `de`, `en`, `pl`, or `unknown`: a model-reported value matching `de`, `en`, or `pl` (case-insensitively) is kept as that value, and any other, unrecognized, or missing value is normalized to `unknown`.
 
 #### Scenario: Model reports German
 - **WHEN** the model payload's language is `de`
@@ -91,8 +91,12 @@ The parsed analysis result SHALL include a `Language` value normalized to one of
 - **WHEN** the model payload's language is `EN`
 - **THEN** the analysis result's `Language` is `en`
 
+#### Scenario: Model reports Polish
+- **WHEN** the model payload's language is `pl`
+- **THEN** the analysis result's `Language` is `pl`
+
 #### Scenario: Model reports a language outside the closed set
-- **WHEN** the model payload's language is a value other than `de` or `en` (e.g. `fr`)
+- **WHEN** the model payload's language is a value other than `de`, `en`, or `pl` (e.g. `fr`)
 - **THEN** the analysis result's `Language` is `unknown`
 
 #### Scenario: Model omits the language entirely

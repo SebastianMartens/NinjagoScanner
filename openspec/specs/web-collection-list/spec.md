@@ -62,7 +62,7 @@ While focus is within the card list, pressing the down or up arrow key SHALL mov
 - **THEN** the selection does not change
 
 ### Requirement: A selected photo's sidecar can be edited and saved
-The detail pane SHALL provide a form to edit the selected photo's card name, card number, set name (chosen from known series), rarity, language (chosen from German, English, or Unknown), confidence, reasoning summary, detected text (one entry per line), error message, and review status, and saving SHALL persist all of those fields via a single sidecar update, then reload the overview and re-select the current card.
+The detail pane SHALL provide a form to edit the selected photo's card name, card number, set name (chosen from known series), rarity, language (chosen from German, English, Polish, or Unknown), confidence, reasoning summary, detected text (one entry per line), error message, and review status, and saving SHALL persist all of those fields via a single sidecar update, then reload the overview and re-select the current card.
 
 #### Scenario: Saving valid sidecar edits
 - **WHEN** a user edits sidecar fields and submits the form with a valid numeric confidence value
@@ -74,7 +74,7 @@ The detail pane SHALL provide a form to edit the selected photo's card name, car
 
 #### Scenario: Language control offers a closed set of options
 - **WHEN** a user opens the Language control on the sidecar edit form
-- **THEN** German, English, and Unknown are the only selectable options
+- **THEN** German, English, Polish, and Unknown are the only selectable options
 
 #### Scenario: Language control is pre-filled with the resolved value
 - **WHEN** the detail pane loads a photo's sidecar into the edit form
