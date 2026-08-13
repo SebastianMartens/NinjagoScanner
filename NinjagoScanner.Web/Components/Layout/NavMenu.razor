@@ -1,47 +1,43 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Ninjago Scanner</a>
+<header class="cv-nav-top">
+    <div class="cv-nav-top-inner">
+        <a class="cv-brand" href="">
+            <span class="cv-brand-mark"></span>
+            <span class="cv-brand-text">NINJAGO SCANNER</span>
+        </a>
+        <nav class="cv-nav-links">
+            <NavLink class="cv-nav-link" href="" Match="NavLinkMatch.All">Übersicht</NavLink>
+            <NavLink class="cv-nav-link" href="gallery">Galerie</NavLink>
+            <NavLink class="cv-nav-link" href="table">Tabelle</NavLink>
+            <NavLink class="cv-nav-link" href="collection">Sammlung</NavLink>
+            <NavLink class="cv-nav-link" href="review">Review</NavLink>
+            <NavLink class="cv-nav-link" href="upload">Upload</NavLink>
+        </nav>
     </div>
-</div>
+</header>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Übersicht
-            </NavLink>
-        </div>
-
-		<div class="nav-item px-3">
-			<NavLink class="nav-link" href="table">
-				<span class="bi bi-table" aria-hidden="true"></span> Tabelle
-			</NavLink>
-		</div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="review">
-                <span class="bi bi-check2-square" aria-hidden="true"></span> Review
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="upload">
-                <span class="bi bi-camera" aria-hidden="true"></span> Upload
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="collection">
-                <span class="bi bi-collection" aria-hidden="true"></span> Sammlung
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="gallery">
-                <span class="bi bi-images" aria-hidden="true"></span> Galerie
-            </NavLink>
-        </div>
-    </nav>
-</div>
+<nav class="cv-nav-bottom">
+    <NavLink class="cv-tab" href="" Match="NavLinkMatch.All">
+        <span class="cv-tab-dot"></span>
+        <span>Start</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="gallery">
+        <span class="cv-tab-dot"></span>
+        <span>Galerie</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="table">
+        <span class="cv-tab-dot"></span>
+        <span>Tabelle</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="collection">
+        <span class="cv-tab-dot"></span>
+        <span>Sammlung</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="review">
+        <span class="cv-tab-dot"></span>
+        <span>Review</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="upload">
+        <span class="cv-tab-dot"></span>
+        <span>Upload</span>
+    </NavLink>
+</nav>

@@ -175,8 +175,11 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
                     Category = card.Category,
                     CardNumber = card.CardNumber,
                     CardName = card.CardName,
+                    ImageFileName = matchedPhoto?.ImageFileName,
                     ImageUrl = matchedPhoto is null ? null : BuildImageUrl(matchedPhoto.ImageFileName),
-                    PhotoCount = photoCount
+                    PhotoCount = photoCount,
+                    Rarity = matchedPhoto?.Rarity,
+                    ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus)
                 };
             })
             .OrderBy(card => card.SortOrder)
@@ -349,6 +352,22 @@ internal sealed class CardCatalogService(string cardPhotosDirectory, long maxUpl
         };
 
         await client.UpdateReviewStatusAsync(request, cancellationToken: cancellationToken);
+    }
+
+    public async Task DeletePhotoAsync(string imageFileName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+
+        var request = new DeletePhotoRequest
+        {
+            ImageFileName = imageFileName,
+            CardPhotosDirectory = cardPhotosDirectory
+        };
+
+        await client.DeletePhotoAsync(request, cancellationToken: cancellationToken);
     }
 
     public async Task<IReadOnlyList<CardReviewGroup>> GetReviewGroupsAsync(CancellationToken cancellationToken = default)

@@ -4,11 +4,15 @@
 Gives a person a dense, tabular alternative to the tile gallery for comparing many scanned cards at once, with grouping, search, inline set assignment, and inline detail expansion.
 ## Requirements
 ### Requirement: Cards are rendered as a grouped table
-The `/table` page SHALL render scanned cards in one table per group, each row showing a clickable thumbnail, card name (or file name if undetected) with the image file name, card number, an editable set selector, `AnalysisStatus` badge, `ReviewStatus` badge, rarity, confidence, and a details toggle.
+The `/table` page SHALL render scanned cards in one table per group, each row showing a clickable thumbnail, card name (or file name if undetected) with the image file name, card number, an editable set selector, `AnalysisStatus` badge, `ReviewStatus` badge, rarity, a placeholder tags display derived client-side from rarity, confidence, and a details toggle.
 
 #### Scenario: Viewing the table with scanned cards present
 - **WHEN** a user opens `/table` and at least one scanned card exists
-- **THEN** cards are rendered in grouped tables with a row per card, showing the columns Bild, Name, Nummer, Set, Status, Review-Status, Seltenheit, Confidence, and Details
+- **THEN** cards are rendered in grouped tables with a row per card, showing the columns Bild, Name, Nummer, Set, Status, Review-Status, Seltenheit, Tags, Confidence, and Details
+
+#### Scenario: Tags are derived from rarity, not a stored field
+- **WHEN** a row's tags display is rendered
+- **THEN** its value is computed from that card's rarity rather than read from a separate stored `Tags` field, since no such field exists in the sidecar or catalog data yet
 
 ### Requirement: Rows can be grouped
 The table view SHALL let a user group rows by set/series, by `AnalysisStatus`, by rarity, or not at all, with each group header showing the group name and card count. When grouped by status or rarity, groups SHALL be sorted alphabetically by group key. When grouped by set/series, groups for known catalog series SHALL be sorted by the catalog's `SortOrder`, with any set name that does not match a known catalog series sorted after all known series and ordered alphabetically among themselves. Within every grouping, rows SHALL be ordered by set name, then card number, then card name; the card-number tiebreak SHALL follow the same rule used everywhere else in the application: purely numeric card numbers first ordered by value, then alphabetic-prefix-plus-number card numbers ordered by prefix alphabetically and then by numeric suffix, then anything else ordered alphabetically by raw text.

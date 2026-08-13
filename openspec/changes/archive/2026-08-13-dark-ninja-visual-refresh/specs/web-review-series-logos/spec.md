@@ -1,10 +1,4 @@
-# web-review-series-logos Specification
-
-## Purpose
-
-Lets a user visually compare a card photo's printed series symbol against each series' official logo directly on the Review page's series-reassignment buttons, instead of relying on memory of what each series symbol looks like.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Series reassignment buttons show a mapped logo icon
 When a series has a known logo mapping (image and caption), the Review page's series-reassignment popover SHALL display, for that series' grid cell, only the mapped logo image with no visible series-name caption, with the mapped caption exposed as the image's accessible/alt text and the series name exposed as the cell's tooltip (`title`).

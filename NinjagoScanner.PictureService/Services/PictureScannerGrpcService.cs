@@ -423,6 +423,29 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return false;
     }
 
+    public override Task<DeletePhotoResponse> DeletePhoto(DeletePhotoRequest request, ServerCallContext context)
+    {
+        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
+        var imagePath = Path.Combine(directory, request.ImageFileName);
+
+        if (!File.Exists(imagePath))
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Die Datei '{request.ImageFileName}' wurde nicht gefunden."));
+        }
+
+        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+
+        File.Delete(imagePath);
+        if (File.Exists(sidecarPath))
+        {
+            File.Delete(sidecarPath);
+        }
+
+        sidecarCache.Remove(sidecarPath);
+
+        return Task.FromResult(new DeletePhotoResponse { Success = true });
+    }
+
     public override async Task<UploadPhotoResponse> UploadPhoto(IAsyncStreamReader<UploadPhotoChunk> requestStream, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;

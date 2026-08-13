@@ -37,6 +37,11 @@ internal sealed class SidecarCache
         entries[NormalizeKey(sidecarPath)] = ToSidecarRecord(result);
     }
 
+    public void Remove(string sidecarPath)
+    {
+        entries.TryRemove(NormalizeKey(sidecarPath), out _);
+    }
+
     private static string NormalizeKey(string sidecarPath)
     {
         return Path.GetFullPath(sidecarPath);

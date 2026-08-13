@@ -87,16 +87,32 @@
 							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Incorrect)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Incorrect)">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</button>
 						</div>
 
-						<div class="review-series-buttons">
-							@foreach (var series in knownSeries)
+						<div class="review-series-picker">
+							<button type="button" class="review-series-trigger" disabled="@isBusy"
+								aria-haspopup="true" aria-expanded="@(IsSeriesPopoverOpen(photo) ? "true" : "false")"
+								@onclick="() => ToggleSeriesPopover(photo)">
+								<span class="review-series-trigger-swatch"></span>
+								<span class="review-series-trigger-label">@(photo.SetName ?? "Ohne Serie")</span>
+								<span class="review-series-trigger-caret">▾</span>
+							</button>
+
+							@if (IsSeriesPopoverOpen(photo))
 							{
-								<button class="review-btn" type="button" disabled="@isBusy" @onclick="() => ReassignSeriesAsync(photo, series)">
-									@if (SeriesLogos.TryGetValue(series, out var logo) && !string.IsNullOrEmpty(logo.ImageFile))
+								<div class="review-series-popover" role="menu">
+									@foreach (var series in knownSeries)
 									{
-										<img class="review-series-logo" src="@($"/images/{logo.ImageFile}")" alt="@logo.Caption" />
+										<button type="button" class="review-series-cell" disabled="@isBusy" title="@series" @onclick="() => PickSeriesAsync(photo, series)">
+											@if (SeriesLogos.TryGetValue(series, out var logo) && !string.IsNullOrEmpty(logo.ImageFile))
+											{
+												<img class="review-series-cell-logo" src="@($"/images/{logo.ImageFile}")" alt="@logo.Caption" />
+											}
+											else
+											{
+												<span class="review-series-cell-label">@series</span>
+											}
+										</button>
 									}
-									@series
-								</button>
+								</div>
 							}
 						</div>
 
@@ -146,12 +162,34 @@
 								}
 							</div>
 						}
+
+						<div class="review-photo-actions">
+							<button class="review-btn review-btn-danger" type="button" disabled="@isBusy" @onclick="() => RequestDeletePhoto(photo)">Löschen</button>
+						</div>
 					</div>
 				</article>
 			}
 		</div>
 	}
 </div>
+
+@if (photoPendingDeletion is not null)
+{
+	var pendingPhoto = photoPendingDeletion;
+
+	<div class="review-delete-dialog-backdrop" @onclick="CancelDeletePhoto">
+		<div class="review-delete-dialog" @onclick:stopPropagation="true">
+			<h2>Foto löschen?</h2>
+			<p>Das Foto <strong>@pendingPhoto.ImageFileName</strong> und die zugehörige Sidecar-Datei werden unwiderruflich von der Festplatte gelöscht.</p>
+			<div class="review-delete-dialog-actions">
+				<button class="review-btn" type="button" disabled="@IsBusy(pendingPhoto)" @onclick="CancelDeletePhoto">Abbrechen</button>
+				<button class="review-btn review-btn-danger" type="button" disabled="@IsBusy(pendingPhoto)" @onclick="ConfirmDeletePhotoAsync">
+					@(IsBusy(pendingPhoto) ? "Löschen..." : "Endgültig löschen")
+				</button>
+			</div>
+		</div>
+	</div>
+}
 
 @code {
 	private const string AllFilterValue = "all";
@@ -183,6 +221,8 @@
 	private bool isLoading = true;
 	private bool isConfirmingAll;
 	private string? busyPhotoFileName;
+	private string? openSeriesPopoverPhotoFileName;
+	private CardListItem? photoPendingDeletion;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
 
@@ -340,6 +380,44 @@
 		{
 			busyPhotoFileName = null;
 		}
+	}
+
+	private void RequestDeletePhoto(CardListItem photo)
+	{
+		photoPendingDeletion = photo;
+	}
+
+	private void CancelDeletePhoto()
+	{
+		photoPendingDeletion = null;
+	}
+
+	private async Task ConfirmDeletePhotoAsync()
+	{
+		var photo = photoPendingDeletion;
+		if (photo is null)
+		{
+			return;
+		}
+
+		await RunPhotoActionAsync(photo, () => CardCatalogService.DeletePhotoAsync(photo.ImageFileName));
+		photoPendingDeletion = null;
+	}
+
+	private bool IsSeriesPopoverOpen(CardListItem photo)
+	{
+		return string.Equals(openSeriesPopoverPhotoFileName, photo.ImageFileName, StringComparison.Ordinal);
+	}
+
+	private void ToggleSeriesPopover(CardListItem photo)
+	{
+		openSeriesPopoverPhotoFileName = IsSeriesPopoverOpen(photo) ? null : photo.ImageFileName;
+	}
+
+	private async Task PickSeriesAsync(CardListItem photo, string seriesName)
+	{
+		openSeriesPopoverPhotoFileName = null;
+		await ReassignSeriesAsync(photo, seriesName);
 	}
 
 	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)

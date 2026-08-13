@@ -136,4 +136,24 @@ public sealed class CardCatalogServiceGalleryTests : IAsyncLifetime
         var puzzle = cards.Single(card => card.CardName == "Puzzle1");
         Assert.Equal("Puzzle Cards / Day of the Departed", puzzle.Category);
     }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_CardWithMatchedPhoto_ExposesImageFileNameAndReviewStatus()
+    {
+        var cards = await cardCatalogService.GetGalleryCardsAsync("Serie 2");
+
+        var cole = cards.Single(card => card.CardName == "Cole");
+        Assert.Equal("photo1.jpg", cole.ImageFileName);
+        Assert.Equal("unreviewed", cole.ReviewStatus);
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_CardWithNoMatchedPhoto_HasNullImageFileNameAndReviewStatus()
+    {
+        var cards = await cardCatalogService.GetGalleryCardsAsync("Serie 2");
+
+        var puzzle = cards.Single(card => card.CardName == "Puzzle1");
+        Assert.Null(puzzle.ImageFileName);
+        Assert.Null(puzzle.ReviewStatus);
+    }
 }

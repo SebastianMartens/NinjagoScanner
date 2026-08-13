@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @keyframes cv-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+  </style>
+</helmet>
+<div style="{{ wrapStyle }}" style-hover="{{ wrapHoverStyle }}">
+  <div style="{{ artStyle }}">
+    <div style="{{ scanlineStyle }}"></div>
+    <div style="{{ artLabelStyle }}">card photo</div>
+  </div>
+  <sc-if value="{{ card.owned }}" hint-placeholder-val="{{ false }}">
+    <div style="{{ ownedBadgeStyle }}">×{{ card.qty }}</div>
+  </sc-if>
+  <div style="{{ elementDotStyle }}"></div>
+  <div style="{{ infoStyle }}">
+    <div style="{{ numberStyle }}">#{{ card.number }}</div>
+    <div style="{{ nameStyle }}">{{ card.name }}</div>
+    <sc-if value="{{ hasTags }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ tagsRowStyle }}">
+        <sc-for list="{{ card.tags }}" as="tag" hint-placeholder-count="1">
+          <div style="{{ tagChipStyle }}">{{ tag }}</div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:170,&quot;height&quot;:240}}">
+class Component extends DCLogic {
+  renderVals() {
+    const card = this.props.card || {};
+    const owned = !!card.owned;
+    const seed = (card.number || 1) * 37 + (card.series ? card.series.length : 1);
+    const hue = seed % 360;
+    return {
+      card,
+      hasTags: !!(card.tags && card.tags.length),
+      tagsRowStyle: `display:flex; flex-wrap:wrap; gap:5px;`,
+      tagChipStyle: `display:inline-flex;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700;font-family:'Rajdhani',sans-serif;letter-spacing:0.04em;text-transform:uppercase;background:oklch(30% 0.06 300 / 0.5);color:oklch(80% 0.14 300);border:1px solid oklch(45% 0.08 300 / 0.6);`,
+      wrapStyle: `position:relative;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:oklch(19% 0.02 290);border:1px solid ${owned ? 'oklch(38% 0.05 290)' : 'oklch(26% 0.02 290)'};opacity:${owned ? 1 : 0.55};transition:transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;`,
+      wrapHoverStyle: `transform:translateY(-5px);box-shadow:0 14px 30px rgba(0,0,0,0.45);opacity:1;`,
+      artStyle: `position:relative;aspect-ratio:3/4;overflow:hidden;background:repeating-linear-gradient(135deg, oklch(28% 0.04 ${hue}), oklch(28% 0.04 ${hue}) 6px, oklch(22% 0.03 ${hue}) 6px, oklch(22% 0.03 ${hue}) 12px);display:flex;align-items:center;justify-content:center;`,
+      scanlineStyle: `position:absolute;inset:0;background:linear-gradient(180deg, transparent, oklch(65% 0.19 300 / 0.12), transparent);animation:cv-scan 4s linear infinite;`,
+      artLabelStyle: `font-family:monospace;font-size:10px;color:oklch(70% 0.02 290 / 0.6);letter-spacing:0.05em;`,
+      ownedBadgeStyle: `position:absolute;top:8px;right:8px;background:oklch(30% 0.06 150);color:oklch(85% 0.14 150);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;`,
+      elementDotStyle: `position:absolute;top:8px;left:8px;width:11px;height:11px;border-radius:50%;background:${card.elColor || 'oklch(60% 0.1 200)'};box-shadow:0 0 8px ${card.elColor || 'oklch(60% 0.1 200)'};`,
+      infoStyle: `padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;`,
+      numberStyle: `font-family:'Rajdhani',sans-serif;font-size:11px;color:oklch(55% 0.02 290);letter-spacing:0.04em;`,
+      nameStyle: `font-family:'Noto Sans JP',sans-serif;font-weight:700;font-size:14px;color:oklch(94% 0.01 290);line-height:1.2;`,
+    };
+  }
+}
+</script>
+</body>
+</html>

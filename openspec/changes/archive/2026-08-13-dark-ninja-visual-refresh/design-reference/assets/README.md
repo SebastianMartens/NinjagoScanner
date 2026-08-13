@@ -1,0 +1,3 @@
+The four generated background/hero art PNGs (`circuit-dojo.png`, `elemental-mist.png`, `hero-rooftop.png`, `misty-peaks.png`) could not be pulled into this repo automatically: they exceed the design-sync tool's 256KB per-file read cap and come back truncated.
+
+**Resolved**: the user manually exported `circuit-dojo.png` from the source Claude Design project ("Lego Ninjago Trading Card App") and placed it at `NinjagoScanner.Web/wwwroot/images/background.png`. It's wired in as the app-wide `body` background in `app.css` (see task 8.1 in `../../tasks.md`). The other three hero images were never referenced by any page in this change and were not needed.

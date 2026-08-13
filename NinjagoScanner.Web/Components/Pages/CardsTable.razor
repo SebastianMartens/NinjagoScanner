@@ -72,6 +72,7 @@
 								<th>Status</th>
 								<th>Review-Status</th>
 								<th>Seltenheit</th>
+								<th>Tags</th>
 								<th>Confidence</th>
 								<th>Details</th>
 							</tr>
@@ -107,9 +108,26 @@
 											<div class="table-set-hint">Speichert...</div>
 										}
 									</td>
-									<td><span class="table-status @GetStatusClass(card.AnalysisStatus)">@GetStatusLabel(card.AnalysisStatus)</span></td>
-									<td><span class="table-status @GetReviewStatusClass(card.ReviewStatus)">@GetReviewStatusLabel(card.ReviewStatus)</span></td>
-									<td>@(card.Rarity ?? "-")</td>
+									<td><span class="table-status cv-chip @GetStatusClass(card.AnalysisStatus)">@GetStatusLabel(card.AnalysisStatus)</span></td>
+									<td><span class="table-status cv-chip @GetReviewStatusClass(card.ReviewStatus)">@GetReviewStatusLabel(card.ReviewStatus)</span></td>
+									<td>
+										@if (string.IsNullOrWhiteSpace(card.Rarity))
+										{
+											@:-
+										}
+										else
+										{
+											<span class="cv-chip cv-chip-muted">@card.Rarity</span>
+										}
+									</td>
+									<td>
+										<div class="table-tags">
+											@foreach (var tag in CardTagHelper.TagsForRarity(card.Rarity))
+											{
+												<span class="cv-chip cv-chip-purple">@tag</span>
+											}
+										</div>
+									</td>
 									<td>@card.Confidence.ToString("0.00")</td>
 									<td>
 										@if (HasDetails(card))
