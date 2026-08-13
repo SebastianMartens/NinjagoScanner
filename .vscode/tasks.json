@@ -9,7 +9,8 @@
                 "build",
                 "${workspaceFolder}/NinjagoScanner.slnx",
                 "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+                "/consoleloggerparameters:NoSummary;ForceNoAlign",
+                "-maxcpucount:1" // fix race condition in Nuget restore
             ],
             "problemMatcher": "$msCompile"
         },
