@@ -18,13 +18,6 @@ Series name and card number uniquely identify a catalog card (see GLOSSARY.md's 
 - **WHEN** more than one scanned photo's set name and card number match the same catalog card after normalization
 - **THEN** the card's `OwnedCopies` reflects the count of matching photos and it is treated as a duplicate
 
-### Requirement: Summary statistics are shown
-The page SHALL show, once loaded, the total number of catalog cards, the number owned, the number owned more than once, the total number of scanned photos, the number of those photos mapped to a catalog card, and (only when greater than zero) the number of unmapped photos.
-
-#### Scenario: Photos exist that don't match any catalog card
-- **WHEN** at least one scanned photo's set name/card number does not match any catalog card
-- **THEN** the "nicht zugeordnet" (unmapped) statistic is shown with that count; otherwise it is omitted
-
 ### Requirement: Cards can be grouped, filtered, and searched
 The overview SHALL let a user group cards by series, category, ownership status (missing / owned once / owned more than once), or not at all; filter by a selected series (which also narrows the available categories) and by category; restrict to only missing or only duplicate-owned cards; and search by card number or card name substring, with all active filters applied together. When grouping by category, and when populating the category filter's options, categories SHALL be ordered by each category's lowest card number (using the catalog's card-number ordering), not alphabetically by category name.
 
