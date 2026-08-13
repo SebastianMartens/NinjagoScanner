@@ -13,20 +13,6 @@
             <p class="lede">Kompakte Listenansicht aller Karten aus den series_x.json Dateien mit Besitzstatus basierend auf Fotos im Ordner <strong>cardFotos</strong>.</p>
         </div>
 
-        @if (!isLoading)
-        {
-            <div class="collection-stats">
-                <span>@allCards.Count Karte(n) gesamt</span>
-                <span>@allCards.Count(card => card.IsOwned) im Besitz</span>
-                <span>@allCards.Count(card => card.IsDuplicateOwned) mehrfach</span>
-                <span>@overview.TotalPhotos Fotos</span>
-                <span>@overview.MappedPhotos zugeordnet</span>
-                @if (overview.UnmappedPhotos > 0)
-                {
-                    <span>@overview.UnmappedPhotos nicht zugeordnet</span>
-                }
-            </div>
-        }
     </header>
 
     <div class="collection-controls">
