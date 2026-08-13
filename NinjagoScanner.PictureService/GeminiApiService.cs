@@ -50,7 +50,8 @@ internal static class GeminiApiService
     Gib ausschliesslich gueltiges JSON ohne Markdown oder Codeblock zurück.
     Wenn du dir nicht sicher bist, setze status auf \"uncertain\" und confidence entsprechend niedrig.
     Wenn das Bild keine klar lesbare einzelne Karte zeigt, setze status auf \"failed\".
-    Bestimme setName primär ueber das Symbol in der unteren rechten Ecke der Karte.
+    Bestimme setName primär über die Kartennummer und den Text auf der Karte (Kartenname).
+    Du kannst auch das Symbol in der unteren rechten Ecke der Karte benutzen.
     Wenn kein Symbol vorhanden ist, gehoert die Karte zu Serie 1.
     Bestimme die Sprache (language) anhand des gedruckten Textes und Charakternamens auf der Karte:
     "de" für deutschen Text, "en" für englischen Text, "pl" für polnischen Text,
