@@ -785,6 +785,33 @@ h1:focus {
     color: var(--cv-status-failed-fg);
 }
 
+/* ===== About page ===== */
+
+.about-section {
+    margin-top: 2rem;
+    max-width: 52rem;
+}
+
+.about-section h2 {
+    margin: 0 0 0.8rem;
+    font-size: 1.4rem;
+}
+
+.about-section p {
+    margin: 0 0 0.9rem;
+    color: var(--cv-text-soft);
+}
+
+.about-section ul {
+    margin: 0 0 0.9rem;
+    padding-left: 1.3rem;
+    color: var(--cv-text-soft);
+}
+
+.about-section li {
+    margin-bottom: 0.4rem;
+}
+
 /* ===== Overview page ===== */
 
 .overview-page {
