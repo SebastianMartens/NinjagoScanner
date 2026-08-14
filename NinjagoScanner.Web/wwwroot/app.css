@@ -1170,7 +1170,8 @@ h1:focus {
     font-size: 0.82rem;
 }
 
-.review-filter select {
+.review-filter select,
+.review-filter input {
     padding: 0.4rem 0.75rem;
     border-radius: 999px;
     border: 1px solid var(--cv-border);

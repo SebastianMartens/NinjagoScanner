@@ -24,6 +24,20 @@
 						<option value="@ReviewStatuses.Incorrect">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</option>
 					</select>
 				</label>
+				<label class="review-filter">
+					<span>Analyse-Filter</span>
+					<select value="@analysisStatusFilter" @onchange="OnAnalysisStatusFilterChanged">
+						<option value="@AllFilterValue">Alle</option>
+						<option value="@AnalysisStatuses.Ok">@GetAnalysisStatusLabel(AnalysisStatuses.Ok)</option>
+						<option value="@AnalysisStatuses.Uncertain">@GetAnalysisStatusLabel(AnalysisStatuses.Uncertain)</option>
+						<option value="@AnalysisStatuses.Failed">@GetAnalysisStatusLabel(AnalysisStatuses.Failed)</option>
+						<option value="@AnalysisStatuses.Pending">@GetAnalysisStatusLabel(AnalysisStatuses.Pending)</option>
+					</select>
+				</label>
+				<label class="review-filter">
+					<span>Suche</span>
+					<input value="@searchText" placeholder="Kartennummer oder Kartenname" @oninput="OnSearchTextChanged" />
+				</label>
 				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : currentIndex + 1) / @FilteredGroups.Count</span>
 				<button class="review-btn" type="button" disabled="@(currentIndex <= 0)" @onclick="GoToPrevious">← Zurueck</button>
 				<button class="review-btn" type="button" disabled="@(currentIndex >= FilteredGroups.Count - 1)" @onclick="GoToNext">Weiter →</button>
@@ -217,6 +231,8 @@
 	private IReadOnlyList<CardReviewGroup> groups = Array.Empty<CardReviewGroup>();
 	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
 	private string reviewStatusFilter = AllFilterValue;
+	private string analysisStatusFilter = AllFilterValue;
+	private string searchText = string.Empty;
 	private int currentIndex;
 	private bool isLoading = true;
 	private bool isConfirmingAll;
@@ -226,12 +242,39 @@
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
 
-	private IReadOnlyList<CardReviewGroup> FilteredGroups => groups.Where(MatchesReviewStatusFilter).ToArray();
+	private IReadOnlyList<CardReviewGroup> FilteredGroups =>
+		groups.Where(group => MatchesFilters(group, reviewStatusFilter, analysisStatusFilter, searchText)).ToArray();
 
-	private bool MatchesReviewStatusFilter(CardReviewGroup group)
+	internal static bool MatchesFilters(CardReviewGroup group, string reviewStatusFilter, string analysisStatusFilter, string searchText)
+	{
+		return MatchesReviewStatusFilter(group, reviewStatusFilter)
+			&& MatchesAnalysisStatusFilter(group, analysisStatusFilter)
+			&& MatchesSearchFilter(group, searchText);
+	}
+
+	internal static bool MatchesReviewStatusFilter(CardReviewGroup group, string reviewStatusFilter)
 	{
 		return string.Equals(reviewStatusFilter, AllFilterValue, StringComparison.Ordinal)
 			|| group.Photos.Any(photo => string.Equals(photo.ReviewStatus, reviewStatusFilter, StringComparison.OrdinalIgnoreCase));
+	}
+
+	internal static bool MatchesAnalysisStatusFilter(CardReviewGroup group, string analysisStatusFilter)
+	{
+		return string.Equals(analysisStatusFilter, AllFilterValue, StringComparison.Ordinal)
+			|| group.Photos.Any(photo => string.Equals(photo.AnalysisStatus, analysisStatusFilter, StringComparison.OrdinalIgnoreCase));
+	}
+
+	internal static bool MatchesSearchFilter(CardReviewGroup group, string searchText)
+	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			return true;
+		}
+
+		var term = searchText.Trim();
+		return group.Photos.Any(photo =>
+			(photo.CardName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+			|| (photo.CardNumber?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
 	}
 
 	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < FilteredGroups.Count ? FilteredGroups[currentIndex] : null;
@@ -319,6 +362,18 @@
 		currentIndex = 0;
 	}
 
+	private void OnAnalysisStatusFilterChanged(ChangeEventArgs e)
+	{
+		analysisStatusFilter = e.Value?.ToString() ?? AllFilterValue;
+		currentIndex = 0;
+	}
+
+	private void OnSearchTextChanged(ChangeEventArgs e)
+	{
+		searchText = e.Value?.ToString() ?? string.Empty;
+		currentIndex = 0;
+	}
+
 	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
 	{
 		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.ImageFileName, reviewStatus));
@@ -357,6 +412,14 @@
 		ReviewStatuses.Verified => "Bestätigt",
 		ReviewStatuses.Incorrect => "Fehlerhaft",
 		_ => "Nicht geprüft"
+	};
+
+	private static string GetAnalysisStatusLabel(string analysisStatus) => analysisStatus.ToLowerInvariant() switch
+	{
+		AnalysisStatuses.Ok => "Erkannt",
+		AnalysisStatuses.Uncertain => "Unsicher",
+		AnalysisStatuses.Pending => "Kein Sidecar",
+		_ => "Fehler"
 	};
 
 	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
@@ -478,7 +541,7 @@
 
 		foreach (var candidate in groups)
 		{
-			var matches = MatchesReviewStatusFilter(candidate);
+			var matches = MatchesFilters(candidate, reviewStatusFilter, analysisStatusFilter, searchText);
 
 			if (confirmedSeen && matches)
 			{

@@ -5,6 +5,7 @@ internal static class AnalysisStatuses
     public const string Ok = "ok";
     public const string Uncertain = "uncertain";
     public const string Failed = "failed";
+    public const string Pending = "pending";
 }
 
 internal static class ReviewStatuses
