@@ -17,6 +17,6 @@
 
 ## 4. Verify
 
-- [ ] 4.1 Build the solution (`dotnet build NinjagoScanner.slnx`) and confirm no compilation errors (no other code referenced `CardsTable`)
-- [ ] 4.2 Run the Web app and confirm `/table` no longer appears in navigation and the route returns a 404 (or redirects, per Blazor default routing behavior)
-- [ ] 4.3 Confirm Gallery and Collection pages still render correctly with unaffected styling
+- [x] 4.1 Build the solution (`dotnet build NinjagoScanner.slnx`) and confirm no compilation errors (no other code referenced `CardsTable`)
+- [x] 4.2 Run the Web app and confirm `/table` no longer appears in navigation and the route returns a 404 (or redirects, per Blazor default routing behavior) — verified via curl: home page has no "Tabelle" references, `/table` returns HTTP 404 rendering the app's `NotFound` page
+- [x] 4.3 Confirm Gallery and Collection pages still render correctly with unaffected styling — verified via curl: `/gallery` returns 200 with "Galerie" heading and `gallery-tile` markup present, `/collection` returns 200 with "Sammlung" heading and `collection-grid` markup present
