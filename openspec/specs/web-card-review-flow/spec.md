@@ -106,19 +106,15 @@ A photo tile's status control SHALL reflect that photo's current `ReviewStatus` 
 - **THEN** every photo tile in that group has its `Verified` segment highlighted without a page reload
 
 ### Requirement: A single photo can be reassigned to a different series via a popover
-Each photo tile SHALL provide a single trigger control, showing the photo's current series, that opens a popover grid listing every known catalog series; activating a series within the open popover SHALL update only that photo's `SetName` to the selected series, leaving its `ReviewStatus` and every other sidecar field unchanged, and SHALL close the popover. Activating the trigger control itself SHALL only open or close the popover and SHALL NOT change the photo's `SetName`.
+Each photo tile SHALL display, always visible with no trigger or popover step, a grid of controls listing every known catalog series; activating a series control SHALL update only that photo's `SetName` to the selected series, leaving its `ReviewStatus` and every other sidecar field unchanged.
 
 #### Scenario: Reassigning a misclassified photo
-- **WHEN** a user opens a photo tile's series popover and activates a series control for a series different from the group the photo is currently shown in
-- **THEN** that photo's `SetName` is updated to the selected series, its `ReviewStatus` is unchanged, the popover closes, and the photo no longer appears in the current group on the next load
+- **WHEN** a user activates a series control for a series different from the group the photo is currently shown in
+- **THEN** that photo's `SetName` is updated to the selected series, its `ReviewStatus` is unchanged, and the photo no longer appears in the current group on the next load
 
-#### Scenario: Opening and closing the popover does not reassign the photo
-- **WHEN** a user activates a photo tile's series trigger control to open or close its popover, without activating a series within it
-- **THEN** that photo's `SetName` is unchanged
-
-#### Scenario: The trigger control reflects the photo's current series
+#### Scenario: Series controls are visible without any extra step
 - **WHEN** a photo tile is displayed
-- **THEN** its series trigger control shows that photo's current series
+- **THEN** every known catalog series' control is visible on that tile with no action required to reveal them
 
 ### Requirement: A single photo's card number can be corrected inline
 Each photo tile SHALL provide an inline control for editing that photo's `CardNumber`, pre-filled with its current value. Submitting the control SHALL update only that photo's `CardNumber`, leaving its `ReviewStatus`, `SetName`, and every other sidecar field unchanged.

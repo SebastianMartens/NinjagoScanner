@@ -14,14 +14,14 @@ When a series has a known logo mapping (image and caption), the Review page's se
 - **THEN** the cell shows only the mapped logo image, with no visible series-name label, the image's alt text set to the mapped caption, and the cell's tooltip set to the series name
 
 ### Requirement: Series without a logo mapping fall back to text only
-When a series has no entry in the logo mapping, the Review page's series-reassignment popover SHALL render that series' grid cell as plain text-only, identical to current behavior, without any icon placeholder or broken-image indicator.
+When a series has no entry in the logo mapping, the Review page's series-reassignment grid SHALL render that series' cell as plain text-only, identical to current behavior, without any icon placeholder or broken-image indicator.
 
 #### Scenario: Series has no logo mapping
-- **WHEN** the Review page renders a popover grid cell for a series that has no entry in the logo mapping (e.g. `Serie 1`)
+- **WHEN** the Review page renders a series-reassignment grid cell for a series that has no entry in the logo mapping (e.g. `Serie 1`)
 - **THEN** the cell shows only the series name label, with no icon element rendered
 
 #### Scenario: Series exists in the catalog but its logo has not yet been mapped
-- **WHEN** the Review page renders a popover grid cell for a series returned by the catalog service that has not yet been added to the logo mapping (e.g. `Serie 10`)
+- **WHEN** the Review page renders a series-reassignment grid cell for a series returned by the catalog service that has not yet been added to the logo mapping
 - **THEN** the cell behaves identically to a series with no official logo - text only, no icon, no error
 
 ### Requirement: Logo icon does not change reassignment behavior
