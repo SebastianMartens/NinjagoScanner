@@ -163,6 +163,8 @@ A photo tile's language control SHALL be re-initialized to that photo's current 
 ### Requirement: Groups can be filtered by review status
 The review page SHALL provide a review-status filter control offering `All`, `Unreviewed`, `Verified`, and `Incorrect`. When a status other than `All` is selected, a group SHALL be included in the list used for display and navigation if and only if at least one of its photos currently has that `ReviewStatus`; every photo in an included group SHALL still be shown, regardless of that individual photo's own `ReviewStatus`. Selecting `All` includes every group, matching the page's behavior without this filter. This filter combines with the analysis-status filter and the free-text search filter using AND: a group is included only if it satisfies this filter and every other currently active filter.
 
+The review-status filter SHALL default to `Unreviewed` when the review page is loaded.
+
 #### Scenario: Filtering to groups with an unreviewed photo
 - **WHEN** a user selects `Unreviewed` in the review-status filter
 - **THEN** only groups containing at least one photo whose `ReviewStatus` is `unreviewed` are shown, and every photo in each shown group is displayed regardless of its own `ReviewStatus`
@@ -178,6 +180,10 @@ The review page SHALL provide a review-status filter control offering `All`, `Un
 #### Scenario: No groups match the active filters
 - **WHEN** the active review-status filter, combined with any active analysis-status filter or search text, excludes every group
 - **THEN** the review page shows the same empty state used when there is nothing left to review
+
+#### Scenario: Review-status filter defaults to Unreviewed
+- **WHEN** a user loads the review page
+- **THEN** the review-status filter is set to `Unreviewed`, so only groups with at least one unreviewed photo are shown initially
 
 ### Requirement: Groups can be filtered by analysis status
 The review page SHALL provide an analysis-status filter control offering `All`, `Ok`, `Uncertain`, `Failed`, and `Pending`. When a status other than `All` is selected, a group SHALL be included in the list used for display and navigation if and only if at least one of its photos currently has that `AnalysisStatus`; every photo in an included group SHALL still be shown, regardless of that individual photo's own `AnalysisStatus`. Selecting `All` removes this filter's constraint, matching the page's behavior without it. This filter combines with the review-status filter and the free-text search filter using AND: a group is included only if it satisfies this filter and every other currently active filter.

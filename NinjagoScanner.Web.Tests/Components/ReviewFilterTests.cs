@@ -1,3 +1,4 @@
+using System.Reflection;
 using NinjagoScanner.Web.Components.Pages;
 using NinjagoScanner.Web.Models;
 
@@ -5,6 +6,16 @@ namespace NinjagoScanner.Web.Tests.Components;
 
 public sealed class ReviewFilterTests
 {
+    [Fact]
+    public void ReviewStatusFilter_DefaultsToUnreviewed()
+    {
+        var field = typeof(Review).GetField("reviewStatusFilter", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        var defaultValue = (string?)field.GetValue(new Review());
+
+        Assert.Equal(ReviewStatuses.Unreviewed, defaultValue);
+    }
+
     private static CardListItem Photo(string imageFileName, string reviewStatus = ReviewStatuses.Unreviewed, string analysisStatus = AnalysisStatuses.Ok, string? cardName = null, string? cardNumber = null) => new()
     {
         ImageFileName = imageFileName,
