@@ -12,5 +12,5 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Run `dotnet build NinjagoScanner.slnx` to confirm the Web project builds
+- [x] 3.1 Run `dotnet build NinjagoScanner.slnx` to confirm the Web project builds
 - [ ] 3.2 Start the Web app (`Set-Location NinjagoScanner.Web; dotnet run`) and manually verify: `/about` renders without CatalogService/PictureService running, both nav entries link to it and show active state, and all required text (intro + "Ist das kostenlos?" section, verbatim) is present
