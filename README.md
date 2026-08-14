@@ -1,14 +1,38 @@
 # NinjagoScanner
 
-Dieses Repository enthaelt drei .NET-10-Projekte fuer das Erfassen und Anzeigen von Lego-Ninjago-Sammelkarten.
+*[Deutsche Version](readme_de.md)*
 
-- `NinjagoScanner.PictureService`: Eigenstaendiger gRPC-Microservice fuer die Bildanalyse mit Gemini und das Schreiben von Sidecar-JSON-Dateien.
-- `NinjagoScanner.Web`: Blazor-Webanwendung zur Anzeige der Karten als Kacheln und in Tabellenform.
-- `NinjagoScanner.CatalogService`: Eigenstaendiger gRPC-Microservice, der die Katalogdaten (`cardInfos/*.json`) besitzt und als API bereitstellt.
+## What is NinjagoScanner?
 
-Die Projektmappe im Root ist `NinjagoScanner.slnx`.
+Do you collect Ninjago trading cards? NinjagoScanner helps you keep all your cards organized!
 
-## Projektstruktur
+Just take a photo of a card. The app looks at the picture and figures out which card it is — all by itself. No typing, no searching, no guessing.
+
+Every card you scan gets added to your own collection. You can:
+
+- **See all your cards** in one place, as neat little pictures.
+- **Check which cards you already have** — is my puzzle complete?
+- **Find out which cards you're still missing** from a series.
+- **Fix a card** if the app got it wrong, so your collection stays correct.
+- **Upload photos from your phone**, right from where you're sitting with your cards.
+
+No more messy piles of cards on the table. No more flipping through folders to check what you have. NinjagoScanner keeps your whole collection tidy, searchable, and easy to enjoy — for card fans of any age.
+
+---
+
+## Developer guide
+
+The rest of this document covers how the project is built, and how to run it yourself.
+
+This repository contains three .NET 10 projects for capturing and displaying Lego Ninjago trading cards.
+
+- `NinjagoScanner.PictureService`: Standalone gRPC microservice for image analysis with Gemini and writing sidecar JSON files.
+- `NinjagoScanner.Web`: Blazor web application for displaying the cards as tiles and in table form.
+- `NinjagoScanner.CatalogService`: Standalone gRPC microservice that owns the catalog data (`cardInfos/*.json`) and exposes it as an API.
+
+The solution at the root is `NinjagoScanner.slnx`.
+
+### Project structure
 
 ```text
 NinjagoScanner/
@@ -18,213 +42,213 @@ NinjagoScanner/
 |-- NinjagoScanner.slnx
 ```
 
-## Voraussetzungen
+### Prerequisites
 
 - .NET SDK 10
-- Ein Gemini-API-Key fuer den PictureService
+- A Gemini API key for the PictureService
 
-## Kartenbilder
+### Card photos
 
-Der gemeinsame Bildordner ist `cardFotos` im Repository-Root.
+The shared photo folder is `cardFotos` at the repository root.
 
-In diesem Ordner liegen:
+This folder contains:
 
-- die Bilddateien, zum Beispiel `IMG_20260707_162946.jpg`
-- die Sidecar-Dateien, zum Beispiel `IMG_20260707_162946.jpg.json`
+- the image files, for example `IMG_20260707_162946.jpg`
+- the sidecar files, for example `IMG_20260707_162946.jpg.json`
 
-## PictureService
+### PictureService
 
-Projektpfad:
+Project path:
 
 - [NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj)
 
-Der PictureService ist ein eigenstaendiger gRPC-Microservice.
-Die Webanwendung startet den Gemini-Scan ueber einen gRPC-Aufruf (`PictureScanner/Scan`) gegen diesen Service.
+The PictureService is a standalone gRPC microservice.
+The web application triggers the Gemini scan via a gRPC call (`PictureScanner/Scan`) against this service.
 
-### Starten
+#### Starting
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
 dotnet run
 ```
 
-### gRPC-Endpunkte
+#### gRPC endpoints
 
 - `PictureScanner/Scan`
 
-Konfigurierbare Service-Adresse (auf Seite der Webanwendung):
+Configurable service address (on the web application side):
 
 - `PictureService:Address`
 - `PICTURE_SERVICE_ADDRESS`
 
-Default-Adresse:
+Default address:
 
 - `http://localhost:5169`
 
-### Gemini konfigurieren
+#### Configuring Gemini
 
-Empfohlen ueber User Secrets:
+Recommended via user secrets:
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
-dotnet user-secrets set "Gemini:ApiKey" "DEIN_KEY"
+dotnet user-secrets set "Gemini:ApiKey" "YOUR_KEY"
 dotnet user-secrets set "Gemini:Model" "gemini-2.5-flash"
 ```
 
-Alternativ ueber Umgebungsvariablen:
+Alternatively via environment variables:
 
 ```powershell
-$env:GEMINI_API_KEY="DEIN_KEY"
+$env:GEMINI_API_KEY="YOUR_KEY"
 $env:GEMINI_MODEL="gemini-2.5-flash"
 ```
 
-### Verhalten bei `cardFotos`
+#### Behavior for `cardFotos`
 
-Der PictureService sucht standardmaessig in dieser Reihenfolge nach dem Bildordner:
+By default, the PictureService looks for the photo folder in this order:
 
-1. `cardFotos` direkt neben der EXE
-2. `cardFotos` im aktuellen Arbeitsverzeichnis
-3. `..\cardFotos` relativ zum aktuellen Arbeitsverzeichnis
-4. Entwicklungs-Fallback relativ zur Build-Ausgabe
+1. `cardFotos` directly next to the EXE
+2. `cardFotos` in the current working directory
+3. `..\cardFotos` relative to the current working directory
+4. Development fallback relative to the build output
 
-Zusatzlich kann der Bildordner explizit gesetzt werden:
+The photo folder can also be set explicitly:
 
 - `CardPhotos:Directory`
 - `CARD_PHOTOS_DIRECTORY`
 
-### Build
+#### Build
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.PictureService
 dotnet build
 ```
 
-Der Build-Ordner liegt standardmaessig unter:
+The build output folder is located by default at:
 
 - `NinjagoScanner.PictureService\bin\Debug\net10.0`
 
-Wichtig: Die Sidecar-Dateien werden im konfigurierten `cardFotos`-Ordner geschrieben.
+Important: the sidecar files are written to the configured `cardFotos` folder.
 
-## Webanwendung
+### Web application
 
-Projektpfad:
+Project path:
 
 - [NinjagoScanner.Web/NinjagoScanner.Web.csproj](c:/sma/github/NinjagoScanner/NinjagoScanner.Web/NinjagoScanner.Web.csproj)
 
-### Entwicklung starten
+#### Starting development
 
-Fuer den vollen Funktionsumfang (inkl. Gemini-Scan und Katalogdaten) muessen `NinjagoScanner.PictureService` und `NinjagoScanner.CatalogService` zusaetzlich laufen.
+For full functionality (including the Gemini scan and catalog data), `NinjagoScanner.PictureService` and `NinjagoScanner.CatalogService` must also be running.
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.Web
 dotnet run
 ```
 
-Danach ist die App lokal erreichbar, typischerweise unter einer URL wie:
+The app is then reachable locally, typically at a URL such as:
 
 - `http://localhost:xxxx`
 
-### Verfuegbare Seiten
+#### Available pages
 
-- `/` : Kartenansicht als Kacheln mit Bildvorschau und Details
-- `/table` : tabellarische Ansicht mit Gruppierung und Filter
-- `/upload` : mobiler Foto-Upload direkt nach `cardFotos`
+- `/` : card view as tiles with image preview and details
+- `/table` : tabular view with grouping and filtering
+- `/upload` : mobile photo upload directly to `cardFotos`
 
-### Mobiler Upload (Android)
+#### Mobile upload (Android)
 
-1. Starte die Webanwendung auf dem Rechner im lokalen Netzwerk (z. B. `dotnet run --urls "http://0.0.0.0:5000"`).
-2. Oeffne die App auf dem Android-Handy ueber die LAN-Adresse des Rechners.
-3. Gehe auf `/upload` und waehle Kamera oder Galerie.
-4. Das Bild wird direkt in `cardFotos` gespeichert.
-5. Starte danach wie gewohnt manuell den Gemini-Scan.
+1. Start the web application on the machine on the local network (e.g. `dotnet run --urls "http://0.0.0.0:5000"`).
+2. Open the app on the Android phone via the machine's LAN address.
+3. Go to `/upload` and choose camera or gallery.
+4. The image is saved directly to `cardFotos`.
+5. Then start the Gemini scan manually as usual.
 
-Optional kann die maximale Upload-Dateigroesse konfiguriert werden:
+Optionally, the maximum upload file size can be configured:
 
 - `CardPhotos:MaxUploadBytes`
 - `CardPhotosMaxUploadBytes`
 - `CARD_PHOTOS_MAX_UPLOAD_BYTES`
 
-### Verhalten bei `cardFotos`
+#### Behavior for `cardFotos`
 
-Die Webanwendung nutzt einen konfigurierbaren Bildordner und versucht standardmaessig den gemeinsamen `cardFotos`-Ordner ausserhalb von `bin` zu finden.
+The web application uses a configurable photo folder and by default tries to find the shared `cardFotos` folder outside of `bin`.
 
-Konfigurationsreihenfolge:
+Configuration order:
 
 1. `CardPhotos:Directory`
 2. `CardPhotosDirectory`
 3. `NINJAGO_CARD_PHOTOS_DIR`
 4. `CARD_PHOTOS_DIRECTORY`
 
-Wenn nichts gesetzt ist, wird der naechste vorhandene `cardFotos`-Ordner in den uebergeordneten Verzeichnissen gesucht (mit Praeferenz ausserhalb von `bin`).
+If nothing is set, the nearest existing `cardFotos` folder is searched for in the parent directories (preferring one outside `bin`).
 
-## Root-Build
+### Root build
 
-Das gesamte Repository kann ueber die Solution im Root gebaut werden:
+The entire repository can be built via the solution at the root:
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner
 dotnet build
 ```
 
-## Catalog Microservice (gRPC)
+### Catalog microservice (gRPC)
 
-Projektpfad:
+Project path:
 
 - [NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj](NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj)
 
-Der Service verwaltet den Serienkatalog unabhaengig als eigene Komponente.
-Die JSON-Dateien liegen innerhalb des Service-Projekts in `NinjagoScanner.CatalogService/cardInfos` und werden beim Build in die Ausgabe kopiert.
+The service manages the series catalog independently as its own component.
+The JSON files live inside the service project at `NinjagoScanner.CatalogService/cardInfos` and are copied to the output on build.
 
-### Starten
+#### Starting
 
 ```powershell
 Set-Location c:\sma\github\NinjagoScanner\NinjagoScanner.CatalogService
 dotnet run
 ```
 
-### gRPC-Endpunkte
+#### gRPC endpoints
 
 - `CardCatalog/ListSeries`
 - `CardCatalog/GetSeries`
 - `CardCatalog/GetServiceInfo`
 
-Konfiguration des Datenordners optional ueber:
+Data folder configuration optionally via:
 
 - `Catalog:Directory`
 - `CATALOG_DIRECTORY`
 
-### Nutzung durch PictureService und Web
+#### Usage by PictureService and Web
 
-PictureService-Scanner und Webanwendung lesen die Katalogdaten nicht mehr lokal aus `cardInfos`,
-sondern ausschliesslich ueber gRPC vom CatalogService.
+The PictureService scanner and the web application no longer read catalog data locally from `cardInfos`,
+but exclusively via gRPC from the CatalogService.
 
-Konfigurierbare Service-Adresse:
+Configurable service address:
 
 - `CatalogService:Address`
 - `CATALOG_SERVICE_ADDRESS`
 
-Default-Adresse:
+Default address:
 
 - `http://localhost:5073`
 
-## Typische Probleme
+### Common issues
 
-### 1. Gemini-Fehler `429 TooManyRequests`
+#### 1. Gemini error `429 TooManyRequests`
 
-Das ist ein Quota- oder Billing-Thema der Gemini-API, nicht zwingend ein Codefehler.
+This is a quota or billing issue with the Gemini API, not necessarily a code error.
 
-### 2. Gemini-Fehler `404 NotFound`
+#### 2. Gemini error `404 NotFound`
 
-Das kann auf einen veralteten Modellnamen hinweisen. Aktueller Default ist:
+This can indicate an outdated model name. The current default is:
 
 - `gemini-2.5-flash`
 
-### 3. Webprojekt baut nicht wegen gesperrter EXE
+#### 3. Web project fails to build due to a locked EXE
 
-Wenn `dotnet build` im Webprojekt mit einer gesperrten `NinjagoScanner.Web.exe` fehlschlaegt, laeuft meistens noch eine Instanz der App. Die laufende App beenden und dann erneut bauen.
+If `dotnet build` in the web project fails with a locked `NinjagoScanner.Web.exe`, an instance of the app is usually still running. Stop the running app and then build again.
 
-## Naechste sinnvolle Erweiterungen
+### Sensible next extensions
 
-1. Sortierung in der Tabellenansicht per Spaltenkopf
-2. Re-Scan einzelner Karten direkt aus der Weboberflaeche
-3. Konfigurierbaren Kartenordner auch fuer das Webprojekt einfuehren
+1. Sorting in the table view via column header
+2. Re-scanning individual cards directly from the web interface
+3. Introducing a configurable card folder for the web project as well
