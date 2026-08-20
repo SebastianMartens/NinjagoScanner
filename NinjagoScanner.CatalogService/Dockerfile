@@ -16,7 +16,7 @@ RUN dotnet publish NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.c
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-RUN groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
+# mcr.microsoft.com/dotnet/aspnet:10.0 already ships a non-root "app" user/group; reuse it.
 USER app
 
 COPY --from=build --chown=app:app /app .
