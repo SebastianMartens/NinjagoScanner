@@ -77,6 +77,13 @@ locals {
   picture_service_name   = "picture-service"
   service_container_port = 8080
 
+  # Separate, HTTP/1.1-only port for the NLB's health check GET "/" — see
+  # modules/internal-lb's health_check comment: Kestrel can't serve both
+  # HTTP/1.1 and cleartext HTTP/2 (gRPC) on the same unencrypted port, so
+  # service_container_port stays HTTP/2-only and the health probe gets its
+  # own port instead.
+  service_health_check_port = 8082
+
   # The internal NLB's two listener ports (modules/internal-lb's `targets`
   # list below) — pulled into locals so the BFF Lambda module (task 9) can
   # be pointed at the same values without hardcoding them a second time.
@@ -122,12 +129,14 @@ module "internal_lb" {
       listener_port     = local.catalog_service_listener_port
       target_port       = local.service_container_port
       health_check_path = "/"
+      health_check_port = local.service_health_check_port
     },
     {
       name              = local.picture_service_name
       listener_port     = local.picture_service_listener_port
       target_port       = local.service_container_port
       health_check_path = "/"
+      health_check_port = local.service_health_check_port
     },
   ]
 
@@ -147,6 +156,7 @@ module "catalog_service" {
   ecr_repository_arn = module.ecr_catalog_service.repository_arn
   container_image    = "${module.ecr_catalog_service.repository_url}:${var.catalog_service_image_tag}"
   container_port     = local.service_container_port
+  health_check_port  = local.service_health_check_port
   cpu                = var.catalog_service_cpu
   memory             = var.catalog_service_memory
   desired_count      = var.catalog_service_desired_count
@@ -176,6 +186,7 @@ module "picture_service" {
   ecr_repository_arn = module.ecr_picture_service.repository_arn
   container_image    = "${module.ecr_picture_service.repository_url}:${var.picture_service_image_tag}"
   container_port     = local.service_container_port
+  health_check_port  = local.service_health_check_port
   cpu                = var.picture_service_cpu
   memory             = var.picture_service_memory
   desired_count      = var.picture_service_desired_count

@@ -40,6 +40,19 @@ variable "container_port" {
   default = 8080
 }
 
+variable "health_check_port" {
+  description = <<-EOT
+    Optional second container port for a plain HTTP/1.1 liveness probe, distinct from
+    container_port. CatalogService/PictureService serve gRPC (HTTP/2) on container_port;
+    Kestrel can't multiplex HTTP/1.1 and HTTP/2 on one unencrypted port (ALPN needs TLS
+    to negotiate), so the NLB's HTTP health check (modules/internal-lb) needs its own
+    port when container_port is HTTP/2-only. Pass null to skip it (no extra port mapping
+    or security group ingress) for services that don't need a health check.
+  EOT
+  type        = number
+  default     = null
+}
+
 variable "cpu" {
   type    = number
   default = 256

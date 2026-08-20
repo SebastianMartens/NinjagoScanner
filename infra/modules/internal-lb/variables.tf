@@ -38,6 +38,7 @@ variable "targets" {
     listener_port     = number
     target_port       = number
     health_check_path = string
+    health_check_port = number
   }))
 }
 

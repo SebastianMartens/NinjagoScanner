@@ -151,6 +151,17 @@ resource "aws_security_group" "task" {
     cidr_blocks = [var.vpc_cidr]
   }
 
+  dynamic "ingress" {
+    for_each = var.health_check_port == null ? [] : [var.health_check_port]
+    content {
+      description = "Health check port, from inside the VPC (internal NLB health probes only)"
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = [var.vpc_cidr]
+    }
+  }
+
   egress {
     # Needed for: pulling the image from ECR, writing CloudWatch Logs,
     # PictureService's outbound HTTPS calls to the Gemini API
@@ -184,16 +195,32 @@ resource "aws_ecs_task_definition" "this" {
       image     = var.container_image
       essential = true
 
-      portMappings = [
-        {
-          name          = var.service_connect_discovery_name
-          containerPort = var.container_port
-          protocol      = "tcp"
-        }
-      ]
+      portMappings = concat(
+        [
+          {
+            name          = var.service_connect_discovery_name
+            containerPort = var.container_port
+            protocol      = "tcp"
+          }
+        ],
+        var.health_check_port == null ? [] : [
+          {
+            name          = "${var.service_connect_discovery_name}-health"
+            containerPort = var.health_check_port
+            protocol      = "tcp"
+          }
+        ]
+      )
 
-      environment = [for key, value in var.environment_variables : { name = key, value = value }]
-      secrets     = [for secret in var.secrets : { name = secret.name, valueFrom = secret.value_from }]
+      # Kestrel__HealthCheckPort tells Program.cs to open the extra HTTP/1.1-only
+      # health-check listener above — see Program.cs's ConfigureKestrel comment.
+      environment = [
+        for key, value in merge(
+          var.environment_variables,
+          var.health_check_port == null ? {} : { Kestrel__HealthCheckPort = tostring(var.health_check_port) }
+        ) : { name = key, value = value }
+      ]
+      secrets = [for secret in var.secrets : { name = secret.name, valueFrom = secret.value_from }]
 
       logConfiguration = {
         logDriver = "awslogs"

@@ -100,16 +100,18 @@ resource "aws_lb_target_group" "this" {
   vpc_id      = var.vpc_id
   target_type = "ip"
 
-  # HTTP health check over the same TCP data-plane port: both services
-  # expose a plain GET "/" (see CatalogService/PictureService Program.cs —
-  # "This service exposes card catalog/photo scanning via gRPC...") which
-  # Kestrel serves over HTTP/1.1 on the same port as the gRPC (HTTP/2)
-  # traffic, so it works as a lightweight liveness probe without either
-  # service needing a dedicated health endpoint.
+  # HTTP health check on its own dedicated port, separate from the gRPC data-plane
+  # port (target_port): Kestrel can't serve both HTTP/1.1 and cleartext HTTP/2 on one
+  # unencrypted port (ALPN negotiation needs TLS, which this NLB hop deliberately
+  # doesn't have — see this file's header comment), so target_port is HTTP/2-only for
+  # gRPC and health_check_port is a second, HTTP/1.1-only listener Kestrel opens
+  # (Program.cs's Kestrel__HealthCheckPort) purely for this plain GET "/" probe (see
+  # CatalogService/PictureService Program.cs — "This service exposes card
+  # catalog/photo scanning via gRPC...").
   health_check {
     protocol            = "HTTP"
     path                = each.value.health_check_path
-    port                = tostring(each.value.target_port)
+    port                = tostring(each.value.health_check_port)
     healthy_threshold   = 3
     unhealthy_threshold = 3
     interval            = 30
