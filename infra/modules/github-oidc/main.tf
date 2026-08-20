@@ -32,10 +32,11 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
 
+  # data.tls_certificate orders its chain root-first, leaf-last (the
+  # opposite of the order a TLS handshake presents certificates in) — index
+  # 0 is the root CA AWS expects here, not the last index.
   thumbprint_list = [
-    data.tls_certificate.github_actions[0].certificates[
-      length(data.tls_certificate.github_actions[0].certificates) - 1
-    ].sha1_fingerprint,
+    data.tls_certificate.github_actions[0].certificates[0].sha1_fingerprint,
   ]
 
   tags = var.tags
@@ -47,8 +48,13 @@ locals {
 
 data "aws_iam_policy_document" "plan_trust" {
   statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect = "Allow"
+    # sts:TagSession is required alongside sts:AssumeRoleWithWebIdentity
+    # because aws-actions/configure-aws-credentials@v4 attaches session tags
+    # (repository/workflow/actor/branch/commit, etc.) by default; without
+    # this, AWS rejects the whole call as "not authorized" the moment any
+    # tag is attached, not just the tagging part specifically.
+    actions = ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
 
     principals {
       type        = "Federated"
@@ -74,8 +80,13 @@ data "aws_iam_policy_document" "plan_trust" {
 
 data "aws_iam_policy_document" "deploy_trust" {
   statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect = "Allow"
+    # sts:TagSession is required alongside sts:AssumeRoleWithWebIdentity
+    # because aws-actions/configure-aws-credentials@v4 attaches session tags
+    # (repository/workflow/actor/branch/commit, etc.) by default; without
+    # this, AWS rejects the whole call as "not authorized" the moment any
+    # tag is attached, not just the tagging part specifically.
+    actions = ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
 
     principals {
       type        = "Federated"
