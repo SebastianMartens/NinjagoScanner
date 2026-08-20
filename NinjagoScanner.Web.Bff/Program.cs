@@ -7,6 +7,12 @@ using NinjagoScanner.Web.Shared.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CatalogService/PictureService are only reachable over plain HTTP inside the VPC (the internal
+// NLB in front of them terminates no TLS - see infra/modules/bff-lambda/main.tf). Grpc.Net.Client
+// requires HTTP/2, and SocketsHttpHandler refuses cleartext HTTP/2 (h2c) unless this switch is
+// set, so without it every GrpcChannel.ForAddress("http://...") call below throws.
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
 // No-op outside a Lambda runtime, so this stays safe for local `dotnet run` and Fargate-style
 // hosting too. Wires this app up to run behind API Gateway (HTTP API) once someone deploys it
 // as a Lambda function (see openspec task 9.1) without any further code changes here.
