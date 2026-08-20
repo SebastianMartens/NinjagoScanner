@@ -44,6 +44,19 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 
 locals {
   oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github_actions[0].arn : var.existing_oidc_provider_arn
+
+  # GitHub's OIDC sub claim is NOT simply "repo:OWNER/REPO:..." — it's
+  # "repo:OWNER@ownerId/REPO@repoId:...", including GitHub's own immutable
+  # numeric IDs for the owner and repository (confirmed via CloudTrail
+  # against a real rejected AssumeRoleWithWebIdentity call: the presented
+  # identity was "repo:SebastianMartens@5823455/NinjagoScanner@1315298946:
+  # environment:production", not "repo:SebastianMartens/NinjagoScanner:...").
+  # Those IDs aren't knowable from Terraform config, so every sub pattern
+  # below wildcards them with StringLike instead of hardcoding the plain
+  # "owner/repo" form.
+  repo_owner    = split("/", var.github_repo)[0]
+  repo_name     = split("/", var.github_repo)[1]
+  repo_sub_stem = "${local.repo_owner}*/${local.repo_name}*"
 }
 
 data "aws_iam_policy_document" "plan_trust" {
@@ -71,8 +84,8 @@ data "aws_iam_policy_document" "plan_trust" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repo}:pull_request",
-        "repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}",
+        "repo:${local.repo_sub_stem}:pull_request",
+        "repo:${local.repo_sub_stem}:ref:refs/heads/${var.deploy_branch}",
       ]
     }
   }
@@ -103,8 +116,8 @@ data "aws_iam_policy_document" "deploy_trust" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = concat(
-        ["repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}"],
-        var.deploy_environment_name == "" ? [] : ["repo:${var.github_repo}:environment:${var.deploy_environment_name}"]
+        ["repo:${local.repo_sub_stem}:ref:refs/heads/${var.deploy_branch}"],
+        var.deploy_environment_name == "" ? [] : ["repo:${local.repo_sub_stem}:environment:${var.deploy_environment_name}"]
       )
     }
   }
