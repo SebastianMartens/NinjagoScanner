@@ -27,6 +27,6 @@ jobs:
     with:
       dockerfile-path: NinjagoScanner.CatalogService/Dockerfile
       ecr-repository-url: ${{ vars.ECR_CATALOG_SERVICE_REPOSITORY_URL }}
-      ecs-service-name: catalog-service
+      ecs-service-name: ninjago-scanner-catalog-service
       container-name: catalog-service
     secrets: inherit
