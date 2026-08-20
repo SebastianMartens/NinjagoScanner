@@ -105,9 +105,13 @@ await Parallel.ForEachAsync(
                 await sidecarTable!.PutAsync(photoId, record, cancellationToken);
             }
 
-            manifest.RecordAndMaybeFlush(imageFileName, photoId);
+            if (!dryRun)
+            {
+                manifest.RecordAndMaybeFlush(imageFileName, photoId);
+            }
+
             Interlocked.Increment(ref migratedCount);
-            ReportProgress(imageFileName, $"migriert -> {photoId}");
+            ReportProgress(imageFileName, dryRun ? "würde migriert werden" : $"migriert -> {photoId}");
         }
         catch (Exception exception)
         {
@@ -116,7 +120,10 @@ await Parallel.ForEachAsync(
         }
     });
 
-manifest.Flush();
+if (!dryRun)
+{
+    manifest.Flush();
+}
 
 Console.WriteLine();
 Console.WriteLine("Zusammenfassung:");

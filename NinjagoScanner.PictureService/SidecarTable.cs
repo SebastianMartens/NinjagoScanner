@@ -31,7 +31,9 @@ internal sealed class SidecarTable : ISidecarStore
 
     public SidecarTable(IAmazonDynamoDB dynamoDb, string tableName)
     {
-        table = new TableBuilder(dynamoDb, tableName).Build();
+        table = new TableBuilder(dynamoDb, tableName)
+            .AddHashKey(PhotoIdAttribute, DynamoDBEntryType.String)
+            .Build();
     }
 
     public async Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken)
@@ -89,7 +91,9 @@ internal sealed class SidecarTable : ISidecarStore
         SetIfPresent(document, nameof(SidecarRecord.ReasoningSummary), record.ReasoningSummary);
         if (record.DetectedText is { Length: > 0 })
         {
-            document[nameof(SidecarRecord.DetectedText)] = record.DetectedText;
+            // Explicit DynamoDBList (not the default Set conversion for string[]) because
+            // OCR-detected text legitimately contains duplicate entries, which a Set rejects.
+            document[nameof(SidecarRecord.DetectedText)] = (DynamoDBList)record.DetectedText;
         }
         if (record.ScannedAtUtc is { } scannedAt)
         {
