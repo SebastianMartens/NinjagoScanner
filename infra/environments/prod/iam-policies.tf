@@ -275,11 +275,18 @@ data "aws_iam_policy_document" "manage_resources_fargate" {
     sid    = "EcsTaskDefinitions"
     effect = "Allow"
     actions = [
-      "ecs:RegisterTaskDefinition", "ecs:DeregisterTaskDefinition", "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition", "ecs:DeregisterTaskDefinition",
       "ecs:TagResource", "ecs:UntagResource",
     ]
     resources = local.ecs_task_definition_arns
   }
+
+  statement {
+  +  sid       = "EcsDescribeTaskDefinitions"
+  +  effect    = "Allow"
+  +  actions   = ["ecs:DescribeTaskDefinition"]
+  +  resources = ["*"]
++ }
 
   statement {
     sid       = "EcsListAndDescribeTasks"
