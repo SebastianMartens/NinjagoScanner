@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- infra/modules/bff-lambda's provided.al2023 custom runtime always execs ./bootstrap at the
+         zip root regardless of the function's configured handler - see that module's header
+         comment. dotnet lambda package (deploy-web-bff.yml) does not rename the published
+         executable on its own, so the assembly must be named "bootstrap" for the self-contained
+         publish to produce the file Lambda actually looks for. -->
+    <AssemblyName>bootstrap</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
