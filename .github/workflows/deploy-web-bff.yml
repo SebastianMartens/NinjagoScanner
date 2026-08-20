@@ -14,6 +14,7 @@ on:
     paths:
       - "NinjagoScanner.Web.Bff/**"
       - "NinjagoScanner.Web.Shared/**"
+  workflow_dispatch: {}
 
 concurrency:
   group: deploy-web-bff-${{ github.ref }}

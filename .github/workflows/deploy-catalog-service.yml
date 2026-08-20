@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "NinjagoScanner.CatalogService/**"
+  workflow_dispatch: {}
 
 concurrency:
   group: deploy-catalog-service-${{ github.ref }}
