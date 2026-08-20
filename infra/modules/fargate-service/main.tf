@@ -176,7 +176,7 @@ resource "aws_ecs_task_definition" "this" {
   cpu                      = var.cpu
   memory                   = var.memory
   execution_role_arn       = aws_iam_role.execution.arn
-  task_role_arn             = var.create_task_role ? aws_iam_role.task[0].arn : null
+  task_role_arn            = var.create_task_role ? aws_iam_role.task[0].arn : null
 
   container_definitions = jsonencode([
     {
@@ -260,8 +260,8 @@ resource "aws_ecs_service" "this" {
     for_each = var.load_balancer_target_group_arn == null ? [] : [1]
     content {
       target_group_arn = var.load_balancer_target_group_arn
-      container_name    = var.service_name
-      container_port    = var.container_port
+      container_name   = var.service_name
+      container_port   = var.container_port
     }
   }
 

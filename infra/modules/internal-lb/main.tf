@@ -122,8 +122,8 @@ resource "aws_lb_listener" "this" {
   for_each = { for target in var.targets : target.name => target }
 
   load_balancer_arn = aws_lb.internal.arn
-  port               = each.value.listener_port
-  protocol           = "TCP"
+  port              = each.value.listener_port
+  protocol          = "TCP"
 
   default_action {
     type             = "forward"

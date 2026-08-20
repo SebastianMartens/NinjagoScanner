@@ -178,7 +178,7 @@ resource "aws_cloudfront_distribution" "web" {
 
   origin {
     origin_id                = "static-site"
-    domain_name               = aws_s3_bucket.web_client.bucket_regional_domain_name
+    domain_name              = aws_s3_bucket.web_client.bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.web_client.id
   }
 
@@ -197,10 +197,10 @@ resource "aws_cloudfront_distribution" "web" {
   default_cache_behavior {
     target_origin_id       = "static-site"
     viewer_protocol_policy = "redirect-to-https"
-    allowed_methods         = ["GET", "HEAD"]
-    cached_methods          = ["GET", "HEAD"]
-    compress                = true
-    cache_policy_id         = data.aws_cloudfront_cache_policy.caching_optimized.id
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
 
     function_association {
       event_type   = "viewer-request"
@@ -209,13 +209,13 @@ resource "aws_cloudfront_distribution" "web" {
   }
 
   ordered_cache_behavior {
-    path_pattern            = "/api/*"
-    target_origin_id        = "bff-api"
-    viewer_protocol_policy  = "https-only"
-    allowed_methods         = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods          = ["GET", "HEAD"]
-    compress                = true
-    cache_policy_id         = data.aws_cloudfront_cache_policy.caching_disabled.id
+    path_pattern             = "/api/*"
+    target_origin_id         = "bff-api"
+    viewer_protocol_policy   = "https-only"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD"]
+    compress                 = true
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
     origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host.id
   }
 

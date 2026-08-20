@@ -44,22 +44,22 @@ module "secrets" {
 module "github_oidc" {
   source = "../../modules/github-oidc"
 
-  github_repo        = var.github_repo
-  deploy_branch      = var.deploy_branch
-  plan_role_name     = var.github_plan_role_name
-  deploy_role_name   = var.github_deploy_role_name
+  github_repo      = var.github_repo
+  deploy_branch    = var.deploy_branch
+  plan_role_name   = var.github_plan_role_name
+  deploy_role_name = var.github_deploy_role_name
   # .github/workflows/terraform.yml's apply job declares `environment:
   # production`, which changes its OIDC sub claim's format — see
   # modules/github-oidc's deploy_environment_name variable for why this
   # needs to be listed explicitly.
   deploy_environment_name = "production"
-  plan_policy_jsons = [data.aws_iam_policy_document.plan.json]
+  plan_policy_jsons       = [data.aws_iam_policy_document.plan.json]
   deploy_policy_jsons = [
     data.aws_iam_policy_document.deploy_core.json,
     data.aws_iam_policy_document.manage_resources_fargate.json,
     data.aws_iam_policy_document.manage_resources_web_hosting.json,
   ]
-  tags               = local.common_tags
+  tags = local.common_tags
 }
 
 # ---- CatalogService and PictureService on Fargate (task 5) ----
@@ -199,8 +199,8 @@ module "picture_service" {
   ]
   secrets_manager_arns = [module.secrets.secret_arn]
 
-  create_task_role       = true
-  task_role_policy_json  = data.aws_iam_policy_document.picture_service_task.json
+  create_task_role      = true
+  task_role_policy_json = data.aws_iam_policy_document.picture_service_task.json
 
   service_connect_namespace_arn  = module.ecs_cluster.service_connect_namespace_arn
   service_connect_discovery_name = local.picture_service_name
@@ -225,18 +225,18 @@ module "bff_lambda" {
   vpc_cidr           = module.networking.vpc_cidr
   private_subnet_ids = module.networking.private_subnet_ids
 
-  internal_lb_dns_name           = module.internal_lb.dns_name
-  internal_lb_security_group_id  = module.internal_lb.security_group_id
-  catalog_service_listener_port  = local.catalog_service_listener_port
-  picture_service_listener_port  = local.picture_service_listener_port
+  internal_lb_dns_name          = module.internal_lb.dns_name
+  internal_lb_security_group_id = module.internal_lb.security_group_id
+  catalog_service_listener_port = local.catalog_service_listener_port
+  picture_service_listener_port = local.picture_service_listener_port
 
   photos_bucket_name = module.photo_storage.bucket_name
   photos_bucket_arn  = module.photo_storage.bucket_arn
 
   memory_size             = var.bff_lambda_memory_size
-  timeout_seconds          = var.bff_lambda_timeout_seconds
-  log_retention_days       = var.bff_lambda_log_retention_days
-  provisioned_concurrency  = var.bff_lambda_provisioned_concurrency
+  timeout_seconds         = var.bff_lambda_timeout_seconds
+  log_retention_days      = var.bff_lambda_log_retention_days
+  provisioned_concurrency = var.bff_lambda_provisioned_concurrency
 
   tags = local.common_tags
 }
@@ -254,9 +254,9 @@ module "web_client" {
 
   api_origin_domain_name = module.bff_lambda.api_domain_name
 
-  price_class          = var.web_client_cloudfront_price_class
-  domain_aliases        = var.web_client_domain_aliases
-  acm_certificate_arn   = var.web_client_acm_certificate_arn
+  price_class         = var.web_client_cloudfront_price_class
+  domain_aliases      = var.web_client_domain_aliases
+  acm_certificate_arn = var.web_client_acm_certificate_arn
 
   tags = local.common_tags
 }

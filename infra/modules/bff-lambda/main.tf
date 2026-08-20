@@ -170,19 +170,19 @@ resource "aws_security_group" "lambda" {
   vpc_id      = var.vpc_id
 
   egress {
-    description      = "CatalogService, via the internal NLB (modules/internal-lb)"
-    from_port        = var.catalog_service_listener_port
-    to_port          = var.catalog_service_listener_port
-    protocol         = "tcp"
-    security_groups  = [var.internal_lb_security_group_id]
+    description     = "CatalogService, via the internal NLB (modules/internal-lb)"
+    from_port       = var.catalog_service_listener_port
+    to_port         = var.catalog_service_listener_port
+    protocol        = "tcp"
+    security_groups = [var.internal_lb_security_group_id]
   }
 
   egress {
-    description      = "PictureService, via the internal NLB (modules/internal-lb)"
-    from_port        = var.picture_service_listener_port
-    to_port          = var.picture_service_listener_port
-    protocol         = "tcp"
-    security_groups  = [var.internal_lb_security_group_id]
+    description     = "PictureService, via the internal NLB (modules/internal-lb)"
+    from_port       = var.picture_service_listener_port
+    to_port         = var.picture_service_listener_port
+    protocol        = "tcp"
+    security_groups = [var.internal_lb_security_group_id]
   }
 
   # S3UploadUrlIssuer.cs's GetPreSignedURLAsync calls are local signing

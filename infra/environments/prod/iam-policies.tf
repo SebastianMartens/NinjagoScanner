@@ -426,9 +426,9 @@ data "aws_iam_policy_document" "manage_resources_web_hosting" {
   }
 
   statement {
-    sid    = "PassBffLambdaRole"
-    effect = "Allow"
-    actions = ["iam:PassRole"]
+    sid       = "PassBffLambdaRole"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
     resources = [local.bff_lambda_role_arn]
 
     condition {
