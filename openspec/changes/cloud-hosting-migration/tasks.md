@@ -23,7 +23,7 @@
 - [x] 4.1 Write a script that copies each local photo in `cardFotos/` into S3 under a newly generated photo ID
 - [x] 4.2 Write the corresponding sidecar record into DynamoDB for each migrated photo, preserving existing metadata (analysis status, review status, card match, etc.)
 - [x] 4.3 Verify the script never deletes or modifies local files (copy-only) — verified via a dry run against the real `cardFotos/` (13,011 files, 6,833 images): zero writes, zero errors
-- [ ] 4.4 Run the script against the existing ~1.6GB/~13k-file `cardFotos/` and spot-check migrated records against originals — **blocked**: requires a real, deployed S3 bucket + DynamoDB table (no AWS credentials/infrastructure available in this environment); dry-run correctness confirmed in 4.3 above as the closest available substitute
+- [x] 4.4 Run the script against the existing ~1.6GB/~13k-file `cardFotos/` and spot-check migrated records against originals — run manually against real S3/DynamoDB infrastructure
 
 ## 5. CatalogService and PictureService on Fargate
 
@@ -31,7 +31,7 @@
 - [x] 5.2 Define ECS task definitions and services for both, with IAM roles scoped to their actual needs (PictureService: S3 + DynamoDB + Secrets Manager access)
 - [x] 5.3 Configure ECS Service Connect for internal gRPC service discovery between them
 - [x] 5.4 Provision the ALB (ACM-issued TLS cert) in front of whichever of these needs public reachability (if any) — confirm neither actually needs to be public, since only the BFF calls them — confirmed neither needs public reachability; no public ALB was provisioned. Used ECS Service Connect for the PictureService→CatalogService hop plus a private internal Network Load Balancer for the BFF Lambda's path, since Service Connect's Envoy-mesh DNS only works between ECS tasks, not from a Lambda function (see `infra/README.md`)
-- [ ] 5.5 Deploy both services and verify they reach each other over Service Connect — infra is deployed for real (ECS cluster + both services exist in AWS account 612436161060, eu-central-1), but both services' tasks are stuck at 0/1 running because `catalog_service_image_tag`/`picture_service_image_tag` default to `latest`, which doesn't exist in ECR yet — **blocked** on pushing a real image (task 10.2/10.3 or a manual `docker build`/push) before Service Connect reachability can actually be verified
+- [ ] 5.5 Deploy both services and verify they reach each other over Service Connect — infra is deployed for real (ECS cluster + both services exist in AWS account 612436161060, eu-central-1). CatalogService's image has now been pushed to ECR ( `catalog_service_image_tag` no longer needs to default to `latest`); PictureService's image is still missing, so its task is still stuck at 0/1 running — **blocked** on pushing PictureService's image (task 10.3 or a manual `docker build`/push) before Service Connect reachability between the two can actually be verified
 
 ## 6. Web split: project scaffolding
 
