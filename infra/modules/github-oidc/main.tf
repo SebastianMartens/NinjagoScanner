@@ -147,10 +147,26 @@ resource "aws_iam_role_policy" "plan" {
   policy = each.value
 }
 
-resource "aws_iam_role_policy" "deploy" {
+# Customer-managed policies, not inline: AWS caps the *combined* size of all
+# inline policies on a single role at 10,240 bytes (not each document
+# separately — splitting deploy_policy_jsons into more inline documents
+# doesn't help once their total exceeds that). The deploy role's permissions
+# (networking, storage, ECS/Fargate, Lambda/API Gateway/CloudFront, ...)
+# exceed that combined total, so each document becomes its own managed
+# policy instead — capped individually at 6,144 bytes, but with no
+# cross-policy combined-size limit (only a per-role attachment count, default
+# quota 10, well above what deploy_policy_jsons needs).
+resource "aws_iam_policy" "deploy" {
   for_each = { for index, json in var.deploy_policy_jsons : tostring(index) => json }
 
   name   = "${var.deploy_role_name}-policy-${each.key}"
-  role   = aws_iam_role.deploy.id
   policy = each.value
+  tags   = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "deploy" {
+  for_each = aws_iam_policy.deploy
+
+  role       = aws_iam_role.deploy.name
+  policy_arn = each.value.arn
 }

@@ -54,6 +54,14 @@ locals {
   oidc_provider_arn  = "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
   self_iam_role_arns = [local.plan_role_arn, local.deploy_role_arn]
 
+  # The deploy role's own permission documents (modules/github-oidc's
+  # deploy_policy_jsons) are attached as customer-managed policies, not
+  # inline ones — see that variable's description for why. Their names are
+  # deterministic ("${deploy_role_name}-policy-${index}"), so — same
+  # reasoning as the role/OIDC ARNs above — this pattern can be computed
+  # before those policies exist.
+  deploy_managed_policy_arn_pattern = "arn:aws:iam::${local.account_id}:policy/${var.github_deploy_role_name}-policy-*"
+
   # Secrets Manager appends a random 6-character suffix to every secret's
   # ARN that isn't known until after creation, so — like the IAM role ARNs
   # above — the secretsmanager:CreateSecret grant below is scoped to a
@@ -325,6 +333,14 @@ data "aws_iam_policy_document" "manage_resources_fargate" {
     resources = local.ecs_log_group_arns
   }
 
+}
+
+# Split from manage_resources_fargate purely because a single inline IAM role
+# policy is capped at 10,240 bytes by AWS — manage_resources_fargate alone
+# (ECR/ECS/Fargate task roles/log groups) plus these statements no longer fit
+# in one document (see task 5's ecs:DescribeTaskDefinition wildcard-resource
+# fix, which is what tipped manage_resources_fargate over the cap).
+data "aws_iam_policy_document" "manage_resources_fargate_platform" {
   statement {
     sid    = "ServiceConnectNamespace"
     effect = "Allow"
@@ -364,11 +380,32 @@ data "aws_iam_policy_document" "manage_resources_fargate" {
     effect = "Allow"
     actions = [
       "iam:GetRole", "iam:CreateRole", "iam:DeleteRole", "iam:UpdateRole",
+      # PutRolePolicy/DeleteRolePolicy/GetRolePolicy/ListRolePolicies are for
+      # the plan role, which still uses an inline policy (see
+      # deploy_policy_jsons's description for why the deploy role doesn't
+      # anymore) — harmless to also grant on the deploy role's own ARN.
       "iam:GetRolePolicy", "iam:PutRolePolicy", "iam:DeleteRolePolicy",
       "iam:TagRole", "iam:UntagRole", "iam:ListRolePolicies",
       "iam:UpdateAssumeRolePolicy",
+      "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
     ]
     resources = local.self_iam_role_arns
+  }
+
+  # The deploy role's own permission documents are customer-managed
+  # policies (see SelfManagedIamRoles above), so — unlike the plan role's
+  # inline one — it needs rights to manage the policy objects themselves,
+  # not just attach/detach them to its own role.
+  statement {
+    sid    = "SelfManagedPolicies"
+    effect = "Allow"
+    actions = [
+      "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy",
+      "iam:GetPolicyVersion", "iam:ListPolicyVersions",
+      "iam:CreatePolicyVersion", "iam:DeletePolicyVersion",
+      "iam:TagPolicy", "iam:UntagPolicy",
+    ]
+    resources = [local.deploy_managed_policy_arn_pattern]
   }
 
   statement {
@@ -549,10 +586,16 @@ data "aws_iam_policy_document" "plan_only" {
   }
 
   statement {
-    sid       = "SelfManagedIamRolesRead"
-    effect    = "Allow"
-    actions   = ["iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies"]
-    resources = local.self_iam_role_arns
+    sid    = "SelfManagedIamRolesRead"
+    effect = "Allow"
+    actions = [
+      "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies",
+      # Read equivalents for the deploy role's customer-managed policies
+      # (see SelfManagedPolicies in manage_resources_fargate_platform) —
+      # `terraform plan` needs these to refresh those resources too.
+      "iam:ListAttachedRolePolicies", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions",
+    ]
+    resources = concat(local.self_iam_role_arns, [local.deploy_managed_policy_arn_pattern])
   }
 
   statement {

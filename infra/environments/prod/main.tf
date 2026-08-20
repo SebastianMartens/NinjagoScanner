@@ -58,6 +58,10 @@ module "github_oidc" {
     data.aws_iam_policy_document.deploy_core.json,
     data.aws_iam_policy_document.manage_resources_fargate.json,
     data.aws_iam_policy_document.manage_resources_web_hosting.json,
+    # Appended (not inserted) so existing policy-0/1/2 keep their names and
+    # aren't needlessly recreated — see manage_resources_fargate_platform's
+    # comment for why this 4th document exists.
+    data.aws_iam_policy_document.manage_resources_fargate_platform.json,
   ]
   tags = local.common_tags
 }

@@ -43,7 +43,7 @@ variable "plan_policy_jsons" {
 }
 
 variable "deploy_policy_jsons" {
-  description = "IAM policy documents (JSON) attached to the deploy role, one inline aws_iam_role_policy per entry. See plan_policy_jsons for why this is a list, not one document."
+  description = "IAM policy documents (JSON) attached to the deploy role, one customer-managed aws_iam_policy (via aws_iam_role_policy_attachment) per entry — not inline like plan_policy_jsons: this role's combined permissions exceed the 10,240-byte cap AWS enforces on the *total* of all inline policies on a role, which no amount of splitting into more inline documents can work around. Managed policies aren't subject to that combined cap (each is capped individually at 6,144 bytes instead, well above what any single entry here needs)."
   type        = list(string)
 }
 
