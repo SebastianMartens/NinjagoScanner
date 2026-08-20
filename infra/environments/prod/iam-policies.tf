@@ -275,17 +275,20 @@ data "aws_iam_policy_document" "manage_resources_fargate" {
     sid    = "EcsTaskDefinitions"
     effect = "Allow"
     actions = [
-      "ecs:RegisterTaskDefinition", "ecs:DeregisterTaskDefinition", "ecs:DescribeTaskDefinition",
+      "ecs:RegisterTaskDefinition", "ecs:DeregisterTaskDefinition",
       "ecs:TagResource", "ecs:UntagResource",
     ]
     resources = local.ecs_task_definition_arns
   }
 
   statement {
-    sid       = "EcsListAndDescribeTasks"
-    effect    = "Allow"
-    actions   = ["ecs:ListTaskDefinitions", "ecs:DescribeTasks", "ecs:ListTasks"]
-    resources = ["*"] # List actions don't support resource-level scoping.
+    sid    = "EcsListAndDescribeTasks"
+    effect = "Allow"
+    # ecs:DescribeTaskDefinition does not support resource-level permissions
+    # (AWS evaluates it against "*"), so it must live here rather than in
+    # EcsTaskDefinitions above.
+    actions   = ["ecs:ListTaskDefinitions", "ecs:DescribeTasks", "ecs:ListTasks", "ecs:DescribeTaskDefinition"]
+    resources = ["*"] # List/Describe actions don't support resource-level scoping.
   }
 
   statement {
