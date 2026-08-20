@@ -17,10 +17,10 @@ output "lock_table_arn" {
 output "state_backend_config" {
   description = "Paste these values into environments/<env>/backend.hcl (copied from backend.hcl.example)."
   value       = <<-EOT
-    bucket         = "${module.state_backend.state_bucket_name}"
-    key            = "${var.project_name}/<environment>/terraform.tfstate"
-    region         = "${var.aws_region}"
-    dynamodb_table = "${module.state_backend.lock_table_name}"
-    encrypt        = true
+    bucket       = "${module.state_backend.state_bucket_name}"
+    key          = "${var.project_name}/<environment>/terraform.tfstate"
+    region       = "${var.aws_region}"
+    use_lockfile = true
+    encrypt      = true
   EOT
 }

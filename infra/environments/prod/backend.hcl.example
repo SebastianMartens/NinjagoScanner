@@ -7,8 +7,8 @@
 # values are account-specific and only exist after infra/bootstrap has been
 # applied once, so they're supplied at `init` time instead of hardcoded.
 
-bucket         = "ninjago-scanner-tfstate-<ACCOUNT_ID>"
-key            = "ninjago-scanner/prod/terraform.tfstate"
-region         = "eu-central-1"
-dynamodb_table = "ninjago-scanner-tfstate-lock"
-encrypt        = true
+bucket       = "ninjago-scanner-tfstate-<ACCOUNT_ID>"
+key          = "ninjago-scanner/prod/terraform.tfstate"
+region       = "eu-central-1"
+use_lockfile = true
+encrypt      = true
