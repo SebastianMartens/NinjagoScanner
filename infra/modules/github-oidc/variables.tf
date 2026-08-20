@@ -9,6 +9,12 @@ variable "deploy_branch" {
   default     = "main"
 }
 
+variable "deploy_environment_name" {
+  description = "Name of the GitHub Environment (if any) a workflow job uses when it assumes the deploy role — e.g. terraform.yml's apply job declares `environment: production`. GitHub changes the OIDC token's sub claim to \"repo:OWNER/REPO:environment:NAME\" for any job that specifies an environment, instead of the usual ref-based \"repo:OWNER/REPO:ref:refs/heads/BRANCH\" — both forms need to be allowed if any deploy-role-assuming job uses an environment. Set to \"\" (default) if no job does."
+  type        = string
+  default     = ""
+}
+
 variable "create_oidc_provider" {
   description = "Whether to create the GitHub Actions OIDC provider. Set to false and supply existing_oidc_provider_arn if one already exists in this AWS account (an account can only have one provider per issuer URL — this matters if a second stack in the same account also wants GitHub OIDC federation)."
   type        = bool

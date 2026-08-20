@@ -48,6 +48,11 @@ module "github_oidc" {
   deploy_branch      = var.deploy_branch
   plan_role_name     = var.github_plan_role_name
   deploy_role_name   = var.github_deploy_role_name
+  # .github/workflows/terraform.yml's apply job declares `environment:
+  # production`, which changes its OIDC sub claim's format — see
+  # modules/github-oidc's deploy_environment_name variable for why this
+  # needs to be listed explicitly.
+  deploy_environment_name = "production"
   plan_policy_jsons = [data.aws_iam_policy_document.plan.json]
   deploy_policy_jsons = [
     data.aws_iam_policy_document.deploy_core.json,

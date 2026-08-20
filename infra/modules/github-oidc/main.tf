@@ -102,7 +102,10 @@ data "aws_iam_policy_document" "deploy_trust" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}"]
+      values = concat(
+        ["repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}"],
+        var.deploy_environment_name == "" ? [] : ["repo:${var.github_repo}:environment:${var.deploy_environment_name}"]
+      )
     }
   }
 }
