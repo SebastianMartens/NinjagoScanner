@@ -1,0 +1,636 @@
+@page "/collection"
+@inject CardCatalogService CardCatalogService
+@inject IJSRuntime JS
+
+<PageTitle>Sammlungsübersicht</PageTitle>
+
+<div class="collection-page">
+    <header class="collection-header">
+        <div>
+            <p class="eyebrow">Ninjago Scanner</p>
+            <h1>Alle Karten im Überblick</h1>
+            <p class="lede">Kompakte Listenansicht aller Karten aus dem Katalog mit Besitzstatus basierend auf deinen gescannten Fotos.</p>
+        </div>
+
+    </header>
+
+    <div class="collection-controls">
+        <label>
+            <span>Gruppierung</span>
+            <select @bind="groupBy">
+                <option value="series">Nach Serie</option>
+                <option value="category">Nach Kategorie</option>
+                <option value="ownership">Nach Besitzstatus</option>
+                <option value="none">Keine Gruppierung</option>
+            </select>
+        </label>
+
+        <label>
+            <span>Serie</span>
+            <select @bind="SelectedSeries">
+                <option value="">Alle Serien</option>
+                @foreach (var series in availableSeries)
+                {
+                    <option value="@series">@series</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <span>Kategorie</span>
+            <select @bind="selectedCategory">
+                <option value="">Alle Kategorien</option>
+                @foreach (var category in AvailableCategories)
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <span>Suche</span>
+            <input @bind="searchText" @bind:event="oninput" placeholder="Kartennummer oder Kartenname" />
+        </label>
+
+        <label class="collection-checkbox">
+            <input type="checkbox" @bind="showOnlyMissing" />
+            <span>Nur fehlende Karten</span>
+        </label>
+
+        <label class="collection-checkbox">
+            <input type="checkbox" @bind="showOnlyDuplicates" />
+            <span>Nur Mehrfachbesitz</span>
+        </label>
+    </div>
+
+    <div class="collection-layout">
+        <section class="collection-main" tabindex="-1" @ref="collectionMainRef" @onkeydown="HandleMainKeyDown">
+            @if (isLoading)
+            {
+                <p>Lade Sammlungsdaten...</p>
+            }
+            else if (!FilteredCards.Any())
+            {
+                <div class="empty-state">
+                    <h2>Keine Treffer</h2>
+                    <p>Fuer die aktuelle Filterkombination wurden keine Karten gefunden.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var group in GroupedCards)
+                {
+                    <section class="collection-group">
+                        <div class="collection-group-header">
+                            <h2>@group.Key</h2>
+                            <span>@group.Items.Count Karte(n)</span>
+                        </div>
+
+                        <div class="collection-table-wrapper">
+                            <QuickGrid Items="group.Items.AsQueryable()" Class="collection-grid"
+                                       RowClass="@(card => IsCardSelected(card) ? "is-selected" : null)">
+                                <TemplateColumn Title="Serie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.SortOrder)">
+                                    <div class="row-click-area" data-card-key="@CardRowKey(context)" @onclick="() => SelectAndFocusAsync(context)">@context.Series</div>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Kategorie" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.Category)">
+                                    <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.Category</div>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Nr." SortBy="GridSort<CollectionCardItem>.ByAscending(c => CardNumberSorting.BuildSortKey(c.CardNumber))">
+                                    <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">@context.CardNumber</div>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Name" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.CardName)">
+                                    <div class="row-click-area" title="@context.CardName" @onclick="() => SelectAndFocusAsync(context)">@context.CardName</div>
+                                </TemplateColumn>
+                                <TemplateColumn Title="Besitz" SortBy="GridSort<CollectionCardItem>.ByAscending(c => c.OwnedCopies)">
+                                    <div class="row-click-area" @onclick="() => SelectAndFocusAsync(context)">
+                                        @if (!context.IsOwned)
+                                        {
+                                            <span class="ownership-badge ownership-missing">Fehlt</span>
+                                        }
+                                        else if (context.IsDuplicateOwned)
+                                        {
+                                            <span class="ownership-badge ownership-duplicate">Mehrfach (@context.OwnedCopies)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="ownership-badge ownership-owned">Vorhanden</span>
+                                        }
+                                    </div>
+                                </TemplateColumn>
+                            </QuickGrid>
+                        </div>
+                    </section>
+                }
+            }
+        </section>
+
+        <aside class="collection-detail-pane">
+            <div class="collection-detail-card">
+                <h2>Details</h2>
+
+                @if (selectedCard is null)
+                {
+                    <p class="table-secondary">Waehle links eine Karte aus, um alle bekannten Details zu sehen.</p>
+                }
+                else if (isDetailsLoading)
+                {
+                    <p>Lade Kartendetails...</p>
+                }
+                else if (selectedDetails is null)
+                {
+                    <p class="table-secondary">Zu dieser Karte konnten keine Detaildaten geladen werden.</p>
+                }
+                else
+                {
+                    <div class="detail-title-block">
+                        <h3>@selectedDetails.CardName</h3>
+                        <p>@selectedDetails.Series | @selectedDetails.Category | Nr. @selectedDetails.CardNumber</p>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Kartenfoto</h4>
+                        @if (selectedDetails.Photos.Count == 0)
+                        {
+                            <p class="table-secondary">Kein Foto fuer diese Karte vorhanden.</p>
+                        }
+                        else
+                        {
+                            <label class="detail-photo-picker">
+                                <span>Foto waehlen</span>
+                                <select value="@selectedPhotoId" @onchange="OnSelectedPhotoChanged">
+                                    @foreach (var photo in selectedDetails.Photos)
+                                    {
+                                        <option value="@photo.PhotoId">@photo.SourceFileName</option>
+                                    }
+                                </select>
+                            </label>
+
+                            @if (SelectedPhoto is not null)
+                            {
+                                <img class="detail-image" src="@SelectedPhoto.ImageUrl" alt="@SelectedPhoto.SourceFileName" loading="lazy" />
+                            }
+                        }
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Sidecar bearbeiten</h4>
+
+                        @if (SelectedPhoto is null)
+                        {
+                            <p class="table-secondary">Ohne Foto ist keine Sidecar-Bearbeitung moeglich.</p>
+                        }
+                        else
+                        {
+                            <EditForm Model="sidecarDraft" OnValidSubmit="SaveSelectedSidecarAsync">
+                                <div class="detail-form-grid">
+                                    <label>
+                                        <span>Review-Status</span>
+                                        <select @bind="sidecarDraft.ReviewStatus">
+                                            <option value="@ReviewStatuses.Unreviewed">Nicht geprüft</option>
+                                            <option value="@ReviewStatuses.Verified">Bestätigt</option>
+                                            <option value="@ReviewStatuses.Incorrect">Fehlerhaft</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Kartenname</span>
+                                        <input @bind="sidecarDraft.CardName" />
+                                    </label>
+                                    <label>
+                                        <span>Kartennummer</span>
+                                        <input @bind="sidecarDraft.CardNumber" />
+                                    </label>
+                                    <label>
+                                        <span>Setname</span>
+                                        <select @bind="sidecarDraft.SetName">
+                                            <option value="">– bitte wählen –</option>
+                                            @foreach (var series in availableSeries)
+                                            {
+                                                <option value="@series">@series</option>
+                                            }
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Seltenheit</span>
+                                        <input @bind="sidecarDraft.Rarity" />
+                                    </label>
+                                    <label>
+                                        <span>Sprache</span>
+                                        <select @bind="sidecarDraft.Language">
+                                            <option value="@Languages.German">Deutsch</option>
+                                            <option value="@Languages.English">Englisch</option>
+                                            <option value="@Languages.Polish">Polnisch</option>
+                                            <option value="@Languages.Unknown">Unbekannt</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Confidence</span>
+                                        <input @bind="sidecarDraft.ConfidenceText" />
+                                    </label>
+                                </div>
+
+                                <label class="detail-textarea-field">
+                                    <span>Reasoning Summary</span>
+                                    <textarea rows="4" @bind="sidecarDraft.ReasoningSummary"></textarea>
+                                </label>
+
+                                <label class="detail-textarea-field">
+                                    <span>Detected Text (eine Zeile pro Eintrag)</span>
+                                    <textarea rows="4" @bind="sidecarDraft.DetectedTextLines"></textarea>
+                                </label>
+
+                                <label class="detail-textarea-field">
+                                    <span>Error Message</span>
+                                    <textarea rows="2" @bind="sidecarDraft.ErrorMessage"></textarea>
+                                </label>
+
+                                <p class="table-secondary">Analyse-Status (durch Gemini ermittelt, nicht editierbar): @(SelectedPhoto.Sidecar?.AnalysisStatus ?? "-")</p>
+
+                                @if (SelectedPhoto.Sidecar?.ScannedAtUtc is not null)
+                                {
+                                    <p class="table-secondary">Zuletzt gescannt: @SelectedPhoto.Sidecar.ScannedAtUtc.Value.LocalDateTime</p>
+                                }
+
+                                <div class="detail-actions">
+                                    <button type="submit" class="btn btn-primary" disabled="@isSavingSidecar">
+                                        @(isSavingSidecar ? "Speichert..." : "Sidecar speichern")
+                                    </button>
+                                </div>
+                            </EditForm>
+
+                            @if (!string.IsNullOrWhiteSpace(sidecarMessage))
+                            {
+                                <p class="sidecar-message">@sidecarMessage</p>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(sidecarError))
+                            {
+                                <p class="error-text">@sidecarError</p>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        </aside>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "series")]
+    public string? SeriesQueryParameter { get; set; }
+
+    private CollectionOverviewResult overview = new CollectionOverviewResult
+    {
+        Cards = Array.Empty<CollectionCardItem>()
+    };
+
+    private List<CollectionCardItem> allCards = [];
+    private List<string> availableSeries = [];
+    private bool isLoading = true;
+    private bool showOnlyMissing;
+    private bool showOnlyDuplicates;
+    private bool isDetailsLoading;
+    private bool isSavingSidecar;
+    private string selectedSeries = string.Empty;
+    private string selectedCategory = string.Empty;
+    private string groupBy = "series";
+    private string searchText = string.Empty;
+    private CollectionCardItem? selectedCard;
+    private CollectionCardDetails? selectedDetails;
+    private string? selectedPhotoId;
+    private SidecarDraft sidecarDraft = new();
+    private string? sidecarMessage;
+    private string? sidecarError;
+    private ElementReference collectionMainRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        overview = await CardCatalogService.GetCollectionOverviewAsync();
+        allCards = overview.Cards.ToList();
+        availableSeries = allCards
+            .Select(card => (card.Series, card.SortOrder))
+            .DistinctBy(pair => pair.Series, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(pair => pair.SortOrder)
+            .Select(pair => pair.Series)
+            .ToList();
+
+        if (!string.IsNullOrWhiteSpace(SeriesQueryParameter))
+        {
+            var matchedSeries = availableSeries.FirstOrDefault(series => string.Equals(series, SeriesQueryParameter, StringComparison.OrdinalIgnoreCase));
+            if (matchedSeries is not null)
+            {
+                SelectedSeries = matchedSeries;
+            }
+        }
+
+        isLoading = false;
+    }
+
+    private IEnumerable<string> AvailableCategories => allCards
+        .Where(card => string.IsNullOrWhiteSpace(selectedSeries)
+            || string.Equals(card.Series, selectedSeries, StringComparison.OrdinalIgnoreCase))
+        .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+        .Select(group => group.Key);
+
+    private string SelectedSeries
+    {
+        get => selectedSeries;
+        set
+        {
+            if (string.Equals(selectedSeries, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            selectedSeries = value;
+
+            if (!string.IsNullOrWhiteSpace(selectedCategory)
+                && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
+            {
+                selectedCategory = string.Empty;
+            }
+        }
+    }
+
+    private IEnumerable<CollectionCardItem> FilteredCards
+    {
+        get
+        {
+            IEnumerable<CollectionCardItem> query = allCards;
+
+            if (!string.IsNullOrWhiteSpace(selectedSeries))
+            {
+                query = query.Where(card => string.Equals(card.Series, selectedSeries, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (showOnlyMissing)
+            {
+                query = query.Where(card => !card.IsOwned);
+            }
+
+            if (showOnlyDuplicates)
+            {
+                query = query.Where(card => card.IsDuplicateOwned);
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedCategory))
+            {
+                query = query.Where(card => string.Equals(card.Category, selectedCategory, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                var term = searchText.Trim();
+                query = query.Where(card =>
+                    card.CardNumber.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || card.CardName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return query;
+        }
+    }
+
+    private IEnumerable<CardGroup> GroupedCards => groupBy switch
+    {
+        "none" => [new CardGroup("Alle Karten", FilteredCards.ToList())],
+        "category" => BuildCategoryGroups(FilteredCards),
+        "ownership" => BuildGroups(FilteredCards, GetOwnershipGroup),
+        _ => BuildSeriesGroups(FilteredCards)
+    };
+
+    private CollectionCardPhotoItem? SelectedPhoto => selectedDetails?.Photos
+        .FirstOrDefault(photo => string.Equals(photo.PhotoId, selectedPhotoId, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsCardSelected(CollectionCardItem card)
+    {
+        return selectedCard is not null
+            && string.Equals(selectedCard.Series, card.Series, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(selectedCard.Category, card.Category, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(selectedCard.CardNumber, card.CardNumber, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(selectedCard.CardName, card.CardName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CardRowKey(CollectionCardItem card) =>
+        $"{card.Series}|{card.CardNumber}|{card.CardName}";
+
+    private async Task SelectAndFocusAsync(CollectionCardItem card)
+    {
+        await SelectCardAsync(card);
+        await collectionMainRef.FocusAsync();
+    }
+
+    private async Task HandleMainKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is not ("ArrowDown" or "ArrowUp") || selectedCard is null)
+        {
+            return;
+        }
+
+        var flat = FilteredCards.ToList();
+        var currentIndex = flat.FindIndex(IsCardSelected);
+        var nextIndex = e.Key == "ArrowDown" ? currentIndex + 1 : currentIndex - 1;
+
+        if (nextIndex < 0 || nextIndex >= flat.Count)
+        {
+            return;
+        }
+
+        var next = flat[nextIndex];
+        await SelectCardAsync(next);
+        await JS.InvokeVoidAsync("scrollCardRowIntoView", CardRowKey(next));
+    }
+
+    private async Task SelectCardAsync(CollectionCardItem card)
+    {
+        selectedCard = card;
+        selectedDetails = null;
+        selectedPhotoId = null;
+        sidecarDraft = new SidecarDraft();
+        sidecarMessage = null;
+        sidecarError = null;
+        isDetailsLoading = true;
+
+        try
+        {
+            selectedDetails = await CardCatalogService.GetCollectionCardDetailsAsync(card.Series, card.CardNumber);
+            selectedPhotoId = selectedDetails?.Photos.FirstOrDefault()?.PhotoId;
+            sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, card);
+        }
+        finally
+        {
+            isDetailsLoading = false;
+        }
+    }
+
+    private void OnSelectedPhotoChanged(ChangeEventArgs args)
+    {
+        selectedPhotoId = args.Value?.ToString();
+        sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, selectedCard);
+        sidecarMessage = null;
+        sidecarError = null;
+    }
+
+    private async Task SaveSelectedSidecarAsync()
+    {
+        if (selectedCard is null || SelectedPhoto is null)
+        {
+            return;
+        }
+
+        isSavingSidecar = true;
+        sidecarMessage = null;
+        sidecarError = null;
+
+        try
+        {
+            if (!TryParseConfidence(sidecarDraft.ConfidenceText, out var confidence))
+            {
+                sidecarError = "Confidence muss eine gueltige Zahl sein.";
+                return;
+            }
+
+            var update = new CollectionCardSidecarUpdate
+            {
+                AnalysisStatus = sidecarDraft.AnalysisStatus,
+                CardName = sidecarDraft.CardName,
+                CardNumber = sidecarDraft.CardNumber,
+                SetName = sidecarDraft.SetName,
+                Rarity = sidecarDraft.Rarity,
+                Language = sidecarDraft.Language,
+                Confidence = confidence,
+                ReasoningSummary = sidecarDraft.ReasoningSummary,
+                DetectedText = SplitLines(sidecarDraft.DetectedTextLines),
+                ErrorMessage = sidecarDraft.ErrorMessage,
+                ReviewStatus = sidecarDraft.ReviewStatus
+            };
+
+            await CardCatalogService.UpdateCardSidecarAsync(SelectedPhoto.PhotoId, update);
+            await ReloadOverviewAsync();
+            await SelectCardAsync(selectedCard);
+            sidecarMessage = "Sidecar gespeichert.";
+        }
+        catch (Exception exception)
+        {
+            sidecarError = $"Speichern fehlgeschlagen: {exception.Message}";
+        }
+        finally
+        {
+            isSavingSidecar = false;
+        }
+    }
+
+    private async Task ReloadOverviewAsync()
+    {
+        overview = await CardCatalogService.GetCollectionOverviewAsync();
+        allCards = overview.Cards.ToList();
+        availableSeries = allCards
+            .Select(card => (card.Series, card.SortOrder))
+            .DistinctBy(pair => pair.Series, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(pair => pair.SortOrder)
+            .Select(pair => pair.Series)
+            .ToList();
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory)
+            && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedCategory = string.Empty;
+        }
+    }
+
+    private static IEnumerable<CardGroup> BuildGroups(
+        IEnumerable<CollectionCardItem> source,
+        Func<CollectionCardItem, string> keySelector)
+    {
+        return source
+            .GroupBy(keySelector)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new CardGroup(group.Key, group.ToList()));
+    }
+
+    private static IEnumerable<CardGroup> BuildCategoryGroups(IEnumerable<CollectionCardItem> source)
+    {
+        return source
+            .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal)
+            .Select(group => new CardGroup(group.Key, group.ToList()));
+    }
+
+    private static IEnumerable<CardGroup> BuildSeriesGroups(IEnumerable<CollectionCardItem> source)
+    {
+        return source
+            .GroupBy(card => card.Series)
+            .OrderBy(group => group.Min(card => card.SortOrder))
+            .Select(group => new CardGroup(group.Key, group.ToList()));
+    }
+
+    private static string GetOwnershipGroup(CollectionCardItem card)
+    {
+        if (!card.IsOwned)
+        {
+            return "Fehlend";
+        }
+
+        return card.IsDuplicateOwned ? "Mehrfach vorhanden" : "Einmal vorhanden";
+    }
+
+    private static SidecarDraft BuildDraft(CollectionCardSidecarData? sidecar, CollectionCardItem? fallbackCard)
+    {
+        return new SidecarDraft
+        {
+            AnalysisStatus = sidecar?.AnalysisStatus ?? "ok",
+            CardName = sidecar?.CardName ?? fallbackCard?.CardName ?? string.Empty,
+            CardNumber = sidecar?.CardNumber ?? fallbackCard?.CardNumber ?? string.Empty,
+            SetName = sidecar?.SetName ?? fallbackCard?.Series ?? string.Empty,
+            Rarity = sidecar?.Rarity ?? string.Empty,
+            Language = sidecar?.Language ?? Languages.Default,
+            ConfidenceText = sidecar?.Confidence.ToString("0.##") ?? "0",
+            ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
+            DetectedTextLines = sidecar is null ? string.Empty : string.Join(Environment.NewLine, sidecar.DetectedText),
+            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
+            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
+        };
+    }
+
+    private static IReadOnlyList<string> SplitLines(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<string>();
+        }
+
+        return value
+            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .ToArray();
+    }
+
+    private static bool TryParseConfidence(string? value, out double confidence)
+    {
+        confidence = 0;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        var normalized = value.Trim().Replace(',', '.');
+        return double.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out confidence);
+    }
+
+    private sealed class SidecarDraft
+    {
+        public string AnalysisStatus { get; set; } = "ok";
+        public string CardName { get; set; } = string.Empty;
+        public string CardNumber { get; set; } = string.Empty;
+        public string SetName { get; set; } = string.Empty;
+        public string Rarity { get; set; } = string.Empty;
+        public string Language { get; set; } = Languages.Default;
+        public string ConfidenceText { get; set; } = "0";
+        public string ReasoningSummary { get; set; } = string.Empty;
+        public string DetectedTextLines { get; set; } = string.Empty;
+        public string ErrorMessage { get; set; } = string.Empty;
+        public string ReviewStatus { get; set; } = ReviewStatuses.Unreviewed;
+    }
+
+    private sealed record CardGroup(string Key, List<CollectionCardItem> Items);
+}

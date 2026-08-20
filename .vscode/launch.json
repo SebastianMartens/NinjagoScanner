@@ -5,14 +5,14 @@
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
-            "name": ".NET Core Launch (Web)",
+            "name": ".NET Core Launch (Web.Bff)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/NinjagoScanner.Web/bin/Debug/net10.0/NinjagoScanner.Web.dll",
+            "program": "${workspaceFolder}/NinjagoScanner.Web.Bff/bin/Debug/net10.0/NinjagoScanner.Web.Bff.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/NinjagoScanner.Web",
+            "cwd": "${workspaceFolder}/NinjagoScanner.Web.Bff",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
             "stopAtEntry": false
@@ -45,12 +45,15 @@
     ],
     "compounds": [
         {
-            "name": "Launch All (CatalogService + PictureService + Web)",
+            // Web.Client (Blazor WASM) has no coreclr process to attach to - run it separately
+            // with `dotnet run` from NinjagoScanner.Web.Client/, or `dotnet watch` via the
+            // "watch-client" task below.
+            "name": "Launch All (CatalogService + PictureService + Web.Bff)",
             "preLaunchTask": "build",
             "configurations": [
                 ".NET Core Launch (CatalogService)",
                 ".NET Core Launch (PictureService)",
-                ".NET Core Launch (Web)"
+                ".NET Core Launch (Web.Bff)"
             ],
             "stopAll": true
         }

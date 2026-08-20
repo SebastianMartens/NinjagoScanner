@@ -1,8 +1,12 @@
 <Solution>
   <Project Path="NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj" />
-  <Project Path="NinjagoScanner.Web/NinjagoScanner.Web.csproj" />
   <Project Path="NinjagoScanner.CatalogService/NinjagoScanner.CatalogService.csproj" />
+  <Project Path="NinjagoScanner.CardFotosMigration/NinjagoScanner.CardFotosMigration.csproj" />
+  <Project Path="NinjagoScanner.Web.Shared/NinjagoScanner.Web.Shared.csproj" />
+  <Project Path="NinjagoScanner.Web.Bff/NinjagoScanner.Web.Bff.csproj" />
+  <Project Path="NinjagoScanner.Web.Client/NinjagoScanner.Web.Client.csproj" />
   <Project Path="NinjagoScanner.CatalogService.Tests/NinjagoScanner.CatalogService.Tests.csproj" />
   <Project Path="NinjagoScanner.PictureService.Tests/NinjagoScanner.PictureService.Tests.csproj" />
-  <Project Path="NinjagoScanner.Web.Tests/NinjagoScanner.Web.Tests.csproj" />
+  <Project Path="NinjagoScanner.Web.Bff.Tests/NinjagoScanner.Web.Bff.Tests.csproj" />
+  <Project Path="NinjagoScanner.Web.Client.Tests/NinjagoScanner.Web.Client.Tests.csproj" />
 </Solution>

@@ -1,0 +1,554 @@
+@page "/review"
+@inject CardCatalogService CardCatalogService
+
+<PageTitle>Karten-Review</PageTitle>
+
+<div class="review-page">
+	<header class="review-header">
+		<div>
+			<p class="eyebrow">Ninjago Scanner</p>
+			<h1>Karten-Review</h1>
+			<p class="lede">Vergleiche alle Fotos einer Karte, bestätige sie in einem Klick oder korrigiere die Serie.</p>
+		</div>
+
+		@if (!isLoading && groups.Count > 0)
+		{
+			<div class="review-nav">
+				<label class="review-filter">
+					<span>Status-Filter</span>
+					<select value="@reviewStatusFilter" @onchange="OnReviewStatusFilterChanged">
+						<option value="@AllFilterValue">Alle</option>
+						<option value="@ReviewStatuses.Unreviewed">@GetReviewStatusLabel(ReviewStatuses.Unreviewed)</option>
+						<option value="@ReviewStatuses.Verified">@GetReviewStatusLabel(ReviewStatuses.Verified)</option>
+						<option value="@ReviewStatuses.Incorrect">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</option>
+					</select>
+				</label>
+				<label class="review-filter">
+					<span>Analyse-Filter</span>
+					<select value="@analysisStatusFilter" @onchange="OnAnalysisStatusFilterChanged">
+						<option value="@AllFilterValue">Alle</option>
+						<option value="@AnalysisStatuses.Ok">@GetAnalysisStatusLabel(AnalysisStatuses.Ok)</option>
+						<option value="@AnalysisStatuses.Uncertain">@GetAnalysisStatusLabel(AnalysisStatuses.Uncertain)</option>
+						<option value="@AnalysisStatuses.Failed">@GetAnalysisStatusLabel(AnalysisStatuses.Failed)</option>
+						<option value="@AnalysisStatuses.Pending">@GetAnalysisStatusLabel(AnalysisStatuses.Pending)</option>
+					</select>
+				</label>
+				<label class="review-filter">
+					<span>Suche</span>
+					<input value="@searchText" placeholder="Kartennummer oder Kartenname" @oninput="OnSearchTextChanged" />
+				</label>
+				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : currentIndex + 1) / @FilteredGroups.Count</span>
+				<button class="review-btn" type="button" disabled="@(currentIndex <= 0)" @onclick="GoToPrevious">← Zurueck</button>
+				<button class="review-btn" type="button" disabled="@(currentIndex >= FilteredGroups.Count - 1)" @onclick="GoToNext">Weiter →</button>
+			</div>
+		}
+	</header>
+
+	@if (isLoading)
+	{
+		<p>Lade Karten...</p>
+	}
+	else if (groups.Count == 0)
+	{
+		<div class="empty-state">
+			<h2>Keine Fotos vorhanden</h2>
+			<p>Es sind derzeit keine gescannten Karten zum Pruefen vorhanden.</p>
+		</div>
+	}
+	else if (CurrentGroup is null)
+	{
+		<div class="empty-state">
+			<h2>Alle Karten geprüft</h2>
+			<p>Du hast das Ende der Liste erreicht.</p>
+			<button class="review-btn" type="button" @onclick="RestartFromBeginning">Von vorne beginnen</button>
+		</div>
+	}
+	else
+	{
+		var group = CurrentGroup;
+
+		<div class="review-group-summary">
+			<h2 class="review-group-title">@GroupTitle(group)</h2>
+			<div class="review-confirm-all">
+			<button class="btn btn-primary" type="button" disabled="@isConfirmingAll" @onclick="ConfirmAllAsync">
+				@(isConfirmingAll ? "Bestätigt..." : "Alle bestätigen")
+			</button>
+		</div>
+			<span class="review-group-count">@group.Photos.Count Foto(s)</span>
+		</div>
+
+		<div class="review-photo-grid">
+			@foreach (var photo in group.Photos)
+			{
+				var isBusy = IsBusy(photo);
+
+				<article class="review-photo-tile">
+					<div class="review-photo-image">
+						<img src="@photo.ImageUrl" alt="@photo.SourceFileName" loading="lazy" />
+					</div>
+
+					<div class="review-photo-body">
+						<p class="review-photo-meta">
+							<span class="review-photo-series">@(photo.SetName ?? "Ohne Serie")</span>
+							· @(photo.CardName ?? Path.GetFileNameWithoutExtension(photo.SourceFileName))
+							· <span class="review-photo-number">Nr. @(photo.CardNumber ?? "-")</span>
+						</p>
+
+						<div class="review-status-control" role="group" aria-label="Review-Status">
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Unreviewed)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Unreviewed)">@GetReviewStatusLabel(ReviewStatuses.Unreviewed)</button>
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Verified)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Verified)">@GetReviewStatusLabel(ReviewStatuses.Verified)</button>
+							<button type="button" class="@GetSegmentClass(photo, ReviewStatuses.Incorrect)" disabled="@isBusy" @onclick="() => SetReviewStatusAsync(photo, ReviewStatuses.Incorrect)">@GetReviewStatusLabel(ReviewStatuses.Incorrect)</button>
+						</div>
+
+						<div class="review-series-picker" role="group" aria-label="Serie zuweisen">
+							@foreach (var series in knownSeries)
+							{
+								<button type="button" class="review-series-cell" disabled="@isBusy" title="@series" @onclick="() => PickSeriesAsync(photo, series)">
+									@if (SeriesLogos.TryGetValue(series, out var logo) && !string.IsNullOrEmpty(logo.ImageFile))
+									{
+										<img class="review-series-cell-logo" src="@($"/images/{logo.ImageFile}")" alt="@logo.Caption" />
+									}
+									else
+									{
+										<span class="review-series-cell-label">@series</span>
+									}
+								</button>
+							}
+						</div>
+
+						<form class="review-card-number-edit" @onsubmit="() => SaveCardNumberAsync(photo)">
+							<label>
+								<span>Kartennummer</span>
+								<input type="text" class="review-card-number-input" value="@GetCardNumberDraft(photo)" disabled="@isBusy"
+									@oninput="e => cardNumberDrafts[photo.PhotoId] = e.Value?.ToString() ?? string.Empty" />
+							</label>
+							<button class="review-btn" type="submit" disabled="@isBusy">Nummer speichern</button>
+						</form>
+
+						<label class="review-language-control">
+							<span>Sprache</span>
+							<select value="@photo.Language" disabled="@isBusy" @onchange="e => SaveLanguageAsync(photo, e.Value?.ToString())">
+								<option value="@Languages.German">Deutsch</option>
+								<option value="@Languages.English">Englisch</option>
+								<option value="@Languages.Polish">Polnisch</option>
+								<option value="@Languages.Unknown">Unbekannt</option>
+							</select>
+						</label>
+
+						<button class="review-details-toggle" type="button" @onclick="() => ToggleDetails(photo)">
+							@(IsExpanded(photo) ? "Details ausblenden" : "Details anzeigen")
+						</button>
+
+						@if (IsExpanded(photo))
+						{
+							<div class="review-details">
+								<span>Seltenheit: @(photo.Rarity ?? "-")</span>
+								<span>Confidence: @photo.Confidence.ToString("0.00")</span>
+								@if (!string.IsNullOrWhiteSpace(photo.ReasoningSummary))
+								{
+									<span>Begruendung: @photo.ReasoningSummary</span>
+								}
+								@if (photo.DetectedText.Count > 0)
+								{
+									<span>Erkannter Text: @string.Join(", ", photo.DetectedText)</span>
+								}
+								@if (!string.IsNullOrWhiteSpace(photo.ErrorMessage))
+								{
+									<span>Fehler: @photo.ErrorMessage</span>
+								}
+								@if (photo.ScannedAtUtc is not null)
+								{
+									<span>Gescannt: @photo.ScannedAtUtc.Value.LocalDateTime</span>
+								}
+							</div>
+						}
+
+						<div class="review-photo-actions">
+							<button class="review-btn review-btn-danger" type="button" disabled="@isBusy" @onclick="() => RequestDeletePhoto(photo)">Löschen</button>
+						</div>
+					</div>
+				</article>
+			}
+		</div>
+	}
+</div>
+
+@if (photoPendingDeletion is not null)
+{
+	var pendingPhoto = photoPendingDeletion;
+
+	<div class="review-delete-dialog-backdrop" @onclick="CancelDeletePhoto">
+		<div class="review-delete-dialog" @onclick:stopPropagation="true">
+			<h2>Foto löschen?</h2>
+			<p>Das Foto <strong>@pendingPhoto.SourceFileName</strong> und die zugehörige Sidecar-Datei werden unwiderruflich gelöscht.</p>
+			<div class="review-delete-dialog-actions">
+				<button class="review-btn" type="button" disabled="@IsBusy(pendingPhoto)" @onclick="CancelDeletePhoto">Abbrechen</button>
+				<button class="review-btn review-btn-danger" type="button" disabled="@IsBusy(pendingPhoto)" @onclick="ConfirmDeletePhotoAsync">
+					@(IsBusy(pendingPhoto) ? "Löschen..." : "Endgültig löschen")
+				</button>
+			</div>
+		</div>
+	</div>
+}
+
+@code {
+	private const string AllFilterValue = "all";
+
+	private static readonly Dictionary<string, (string ImageFile, string Caption)> SeriesLogos = new(StringComparer.Ordinal)
+	{
+		["Serie 1"] = (string.Empty, "[kein Symbol]"),
+		["Serie 2"] = ("Series2_klein.jpg", "Silhouette einer Schlange"),
+		["Serie 3"] = ("Series3_klein.jpg", "Silhouette einer Oni-Maske (Maske der Täuschung)"),
+		["Serie 4"] = ("Series4_klein.jpg", "Auge eines Drachen"),
+		["Serie 5"] = ("Series5_klein.jpg", "Prime Empire (schwarz)"),
+		["Serie 5 Next Level"] = ("Series5NL_klein.jpg", "Prime Empire - Next Level (gelb oder rot)"),
+		["Serie 6"] = ("Series6_klein.jpg", "Rot (The Island)"),
+		["Serie 6 Next Level"] = ("Series6NL_klein.jpg", "Affenschädel (gelb)"),
+		["Serie 7"] = ("Series7_klein.jpg", "Seabound Logo"),
+		["Serie 7 Next Level"] = ("Series7NL_klein.jpg", "Seabound Logo - Next Level"),
+		["Serie 8"] = ("Series8_klein.jpg", "Crystalized Logo"),
+		["Serie 8 Next Level"] = ("Series8NL_klein.jpg", "Crystalized Logo - Next Level"),
+		["Serie 9"] = ("Series9_klein.jpg", "Drache (Quelldrache der Bewegung)"),
+		["Serie 9 Next Level"] = ("Series9NL_klein.jpg", "Drachenkopf Dragons Rising (Next Level)"),
+		["Serie 10"] = ("Series10_klein.jpg", "Wolfskopf"),
+		["Serie 11"] = ("Series11_klein.jpg", "Dragon Storm Logo")
+	};
+
+	private IReadOnlyList<CardReviewGroup> groups = Array.Empty<CardReviewGroup>();
+	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
+	private string reviewStatusFilter = ReviewStatuses.Unreviewed;
+	private string analysisStatusFilter = AllFilterValue;
+	private string searchText = string.Empty;
+	private int currentIndex;
+	private bool isLoading = true;
+	private bool isConfirmingAll;
+	private string? busyPhotoId;
+	private CardListItem? photoPendingDeletion;
+	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
+
+	private IReadOnlyList<CardReviewGroup> FilteredGroups =>
+		groups.Where(group => MatchesFilters(group, reviewStatusFilter, analysisStatusFilter, searchText)).ToArray();
+
+	internal static bool MatchesFilters(CardReviewGroup group, string reviewStatusFilter, string analysisStatusFilter, string searchText)
+	{
+		return MatchesReviewStatusFilter(group, reviewStatusFilter)
+			&& MatchesAnalysisStatusFilter(group, analysisStatusFilter)
+			&& MatchesSearchFilter(group, searchText);
+	}
+
+	internal static bool MatchesReviewStatusFilter(CardReviewGroup group, string reviewStatusFilter)
+	{
+		return string.Equals(reviewStatusFilter, AllFilterValue, StringComparison.Ordinal)
+			|| group.Photos.Any(photo => string.Equals(photo.ReviewStatus, reviewStatusFilter, StringComparison.OrdinalIgnoreCase));
+	}
+
+	internal static bool MatchesAnalysisStatusFilter(CardReviewGroup group, string analysisStatusFilter)
+	{
+		return string.Equals(analysisStatusFilter, AllFilterValue, StringComparison.Ordinal)
+			|| group.Photos.Any(photo => string.Equals(photo.AnalysisStatus, analysisStatusFilter, StringComparison.OrdinalIgnoreCase));
+	}
+
+	internal static bool MatchesSearchFilter(CardReviewGroup group, string searchText)
+	{
+		if (string.IsNullOrWhiteSpace(searchText))
+		{
+			return true;
+		}
+
+		var term = searchText.Trim();
+		return group.Photos.Any(photo =>
+			(photo.CardName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+			|| (photo.CardNumber?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
+	}
+
+	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < FilteredGroups.Count ? FilteredGroups[currentIndex] : null;
+
+	protected override async Task OnInitializedAsync()
+	{
+		knownSeries = await CardCatalogService.GetKnownSeriesAsync();
+		groups = await CardCatalogService.GetReviewGroupsAsync();
+		SyncCardNumberDrafts();
+		currentIndex = 0;
+		isLoading = false;
+	}
+
+	private void SyncCardNumberDrafts()
+	{
+		cardNumberDrafts.Clear();
+		foreach (var group in groups)
+		{
+			foreach (var photo in group.Photos)
+			{
+				cardNumberDrafts[photo.PhotoId] = photo.CardNumber ?? string.Empty;
+			}
+		}
+	}
+
+	private string GetCardNumberDraft(CardListItem photo)
+	{
+		return cardNumberDrafts.TryGetValue(photo.PhotoId, out var draft) ? draft : photo.CardNumber ?? string.Empty;
+	}
+
+	internal static string GroupTitle(CardReviewGroup group)
+	{
+		if (group.IsCatchAll)
+		{
+			return "Ohne bekannte Serie";
+		}
+
+		return string.IsNullOrWhiteSpace(group.CardName)
+			? $"{group.SeriesName} · Nr. {group.CardNumber}"
+			: $"{group.SeriesName} · Nr. {group.CardNumber} · {group.CardName}";
+	}
+
+	private bool IsBusy(CardListItem photo)
+	{
+		return isConfirmingAll || string.Equals(busyPhotoId, photo.PhotoId, StringComparison.Ordinal);
+	}
+
+	private bool IsExpanded(CardListItem photo)
+	{
+		return expandedPhotos.Contains(photo.PhotoId);
+	}
+
+	private void ToggleDetails(CardListItem photo)
+	{
+		if (!expandedPhotos.Add(photo.PhotoId))
+		{
+			expandedPhotos.Remove(photo.PhotoId);
+		}
+	}
+
+	private void GoToPrevious()
+	{
+		if (currentIndex > 0)
+		{
+			currentIndex--;
+		}
+	}
+
+	private void GoToNext()
+	{
+		if (currentIndex < FilteredGroups.Count - 1)
+		{
+			currentIndex++;
+		}
+	}
+
+	private void RestartFromBeginning()
+	{
+		currentIndex = 0;
+	}
+
+	private void OnReviewStatusFilterChanged(ChangeEventArgs e)
+	{
+		reviewStatusFilter = e.Value?.ToString() ?? AllFilterValue;
+		currentIndex = 0;
+	}
+
+	private void OnAnalysisStatusFilterChanged(ChangeEventArgs e)
+	{
+		analysisStatusFilter = e.Value?.ToString() ?? AllFilterValue;
+		currentIndex = 0;
+	}
+
+	private void OnSearchTextChanged(ChangeEventArgs e)
+	{
+		searchText = e.Value?.ToString() ?? string.Empty;
+		currentIndex = 0;
+	}
+
+	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
+	{
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus));
+	}
+
+	private async Task SaveCardNumberAsync(CardListItem photo)
+	{
+		var cardNumber = GetCardNumberDraft(photo);
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateCardNumberAsync(photo.PhotoId, cardNumber));
+	}
+
+	private async Task SaveLanguageAsync(CardListItem photo, string? language)
+	{
+		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateCardLanguageAsync(photo.PhotoId, language));
+	}
+
+	private static string GetSegmentClass(CardListItem photo, string reviewStatus)
+	{
+		if (!string.Equals(photo.ReviewStatus, reviewStatus, StringComparison.OrdinalIgnoreCase))
+		{
+			return "review-status-segment";
+		}
+
+		return $"review-status-segment review-status-segment-active {GetReviewStatusClass(reviewStatus)}";
+	}
+
+	private static string GetReviewStatusClass(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		ReviewStatuses.Verified => "status-ok",
+		ReviewStatuses.Incorrect => "status-failed",
+		_ => "status-pending"
+	};
+
+	private static string GetReviewStatusLabel(string reviewStatus) => reviewStatus.ToLowerInvariant() switch
+	{
+		ReviewStatuses.Verified => "Bestätigt",
+		ReviewStatuses.Incorrect => "Fehlerhaft",
+		_ => "Nicht geprüft"
+	};
+
+	private static string GetAnalysisStatusLabel(string analysisStatus) => analysisStatus.ToLowerInvariant() switch
+	{
+		AnalysisStatuses.Ok => "Erkannt",
+		AnalysisStatuses.Uncertain => "Unsicher",
+		AnalysisStatuses.Pending => "Kein Sidecar",
+		_ => "Fehler"
+	};
+
+	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
+	{
+		busyPhotoId = photo.PhotoId;
+		var previousIndex = currentIndex;
+
+		try
+		{
+			await action();
+
+			var key = CurrentGroup?.Key;
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
+
+			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
+				? index
+				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
+		}
+		finally
+		{
+			busyPhotoId = null;
+		}
+	}
+
+	private void RequestDeletePhoto(CardListItem photo)
+	{
+		photoPendingDeletion = photo;
+	}
+
+	private void CancelDeletePhoto()
+	{
+		photoPendingDeletion = null;
+	}
+
+	private async Task ConfirmDeletePhotoAsync()
+	{
+		var photo = photoPendingDeletion;
+		if (photo is null)
+		{
+			return;
+		}
+
+		await RunPhotoActionAsync(photo, () => CardCatalogService.DeletePhotoAsync(photo.PhotoId));
+		photoPendingDeletion = null;
+	}
+
+	private async Task PickSeriesAsync(CardListItem photo, string seriesName)
+	{
+		await ReassignSeriesAsync(photo, seriesName);
+	}
+
+	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)
+	{
+		busyPhotoId = photo.PhotoId;
+		var previousIndex = currentIndex;
+
+		try
+		{
+			await CardCatalogService.UpdateSetNameAsync(photo.PhotoId, seriesName);
+
+			var key = CurrentGroup?.Key;
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
+
+			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
+				? index
+				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
+		}
+		finally
+		{
+			busyPhotoId = null;
+		}
+	}
+
+	private async Task ConfirmAllAsync()
+	{
+		var group = CurrentGroup;
+		if (group is null)
+		{
+			return;
+		}
+
+		isConfirmingAll = true;
+		var confirmedKey = group.Key;
+
+		try
+		{
+			foreach (var photo in group.Photos)
+			{
+				await CardCatalogService.UpdateReviewStatusAsync(photo.PhotoId, ReviewStatuses.Verified);
+			}
+
+			groups = await CardCatalogService.GetReviewGroupsAsync();
+			SyncCardNumberDrafts();
+			currentIndex = FindNextFilteredIndexAfter(confirmedKey);
+		}
+		finally
+		{
+			isConfirmingAll = false;
+		}
+	}
+
+	private int FindNextFilteredIndexAfter(string confirmedKey)
+	{
+		var confirmedSeen = false;
+		var matchCountBeforeTarget = 0;
+
+		foreach (var candidate in groups)
+		{
+			var matches = MatchesFilters(candidate, reviewStatusFilter, analysisStatusFilter, searchText);
+
+			if (confirmedSeen && matches)
+			{
+				return matchCountBeforeTarget;
+			}
+
+			if (matches)
+			{
+				matchCountBeforeTarget++;
+			}
+
+			if (string.Equals(candidate.Key, confirmedKey, StringComparison.Ordinal))
+			{
+				confirmedSeen = true;
+			}
+		}
+
+		return matchCountBeforeTarget;
+	}
+
+	private bool TryFindGroupIndex(string key, out int index)
+	{
+		var filtered = FilteredGroups;
+		for (var i = 0; i < filtered.Count; i++)
+		{
+			if (string.Equals(filtered[i].Key, key, StringComparison.Ordinal))
+			{
+				index = i;
+				return true;
+			}
+		}
+
+		index = -1;
+		return false;
+	}
+}

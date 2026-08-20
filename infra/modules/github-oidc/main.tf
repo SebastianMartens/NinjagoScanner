@@ -1,0 +1,129 @@
+# GitHub Actions OIDC federation: lets GitHub Actions workflows in this repo
+# assume AWS IAM roles by presenting a short-lived OIDC token, so CI never
+# stores long-lived AWS access keys as a repo secret.
+#
+# Two roles are created, split by trust condition:
+#   - "plan"   role: assumable from workflow runs triggered either by a pull
+#     request or by a push to the deploy branch — used for `terraform plan`
+#     and other read-only CI checks (the build/test gate).
+#   - "deploy" role: assumable *only* from workflow runs triggered by a push
+#     to the deploy branch (main — see proposal.md: "deploys per-project on
+#     push to main") — used for `terraform apply` and the per-project
+#     deploy workflows.
+# A pull request — including one from a fork — can therefore never assume
+# the role with write access to real infrastructure; the worst it can do is
+# read (via the plan role) what plan/build checks legitimately need to read.
+
+# Fetched dynamically rather than hardcoded: GitHub's OIDC token-signing
+# certificate chain has rotated CAs before (and did again since this module
+# was first written), so a hardcoded thumbprint goes stale — and AWS's
+# `aws_iam_openid_connect_provider` resource validates the value is a
+# well-formed 40-character SHA1 hex digest even though it no longer uses it
+# to verify GitHub's identity specifically. See:
+# https://github.blog/changelog/2023-06-27-github-actions-update-on-oidc-integration-with-aws/
+data "tls_certificate" "github_actions" {
+  count = var.create_oidc_provider ? 1 : 0
+  url   = "https://token.actions.githubusercontent.com"
+}
+
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  count = var.create_oidc_provider ? 1 : 0
+
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+
+  thumbprint_list = [
+    data.tls_certificate.github_actions[0].certificates[
+      length(data.tls_certificate.github_actions[0].certificates) - 1
+    ].sha1_fingerprint,
+  ]
+
+  tags = var.tags
+}
+
+locals {
+  oidc_provider_arn = var.create_oidc_provider ? aws_iam_openid_connect_provider.github_actions[0].arn : var.existing_oidc_provider_arn
+}
+
+data "aws_iam_policy_document" "plan_trust" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [local.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values = [
+        "repo:${var.github_repo}:pull_request",
+        "repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}",
+      ]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "deploy_trust" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [local.oidc_provider_arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repo}:ref:refs/heads/${var.deploy_branch}"]
+    }
+  }
+}
+
+resource "aws_iam_role" "plan" {
+  name                 = var.plan_role_name
+  assume_role_policy   = data.aws_iam_policy_document.plan_trust.json
+  max_session_duration = 3600
+
+  tags = var.tags
+}
+
+resource "aws_iam_role" "deploy" {
+  name                 = var.deploy_role_name
+  assume_role_policy   = data.aws_iam_policy_document.deploy_trust.json
+  max_session_duration = 3600
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "plan" {
+  for_each = { for index, json in var.plan_policy_jsons : tostring(index) => json }
+
+  name   = "${var.plan_role_name}-policy-${each.key}"
+  role   = aws_iam_role.plan.id
+  policy = each.value
+}
+
+resource "aws_iam_role_policy" "deploy" {
+  for_each = { for index, json in var.deploy_policy_jsons : tostring(index) => json }
+
+  name   = "${var.deploy_role_name}-policy-${each.key}"
+  role   = aws_iam_role.deploy.id
+  policy = each.value
+}

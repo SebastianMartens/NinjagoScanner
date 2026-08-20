@@ -1,0 +1,24 @@
+name: Deploy - CatalogService
+
+# Task 10.2: path-filtered build/push/deploy for CatalogService. Only runs when something under
+# its own project directory (or its Dockerfile) changes, mirroring the service's independent
+# runnability — a PictureService-only change never triggers this.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "NinjagoScanner.CatalogService/**"
+
+concurrency:
+  group: deploy-catalog-service-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-ecs-service.yml
+    with:
+      dockerfile-path: NinjagoScanner.CatalogService/Dockerfile
+      ecr-repository-url: ${{ vars.ECR_CATALOG_SERVICE_REPOSITORY_URL }}
+      ecs-service-name: catalog-service
+      container-name: catalog-service
+    secrets: inherit

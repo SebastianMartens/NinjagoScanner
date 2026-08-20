@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and fill in the account-specific
+# values from `terraform output` in infra/bootstrap after its apply.
+
+state_bucket_arn     = "arn:aws:s3:::ninjago-scanner-tfstate-123456789012"
+state_lock_table_arn = "arn:aws:dynamodb:eu-central-1:123456789012:table/ninjago-scanner-tfstate-lock"
+
+# Everything else has a sane default (see variables.tf) — override here only
+# if this environment needs to diverge from it.

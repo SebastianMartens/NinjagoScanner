@@ -20,7 +20,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/NinjagoScanner.Web/NinjagoScanner.Web.csproj",
+                "${workspaceFolder}/NinjagoScanner.Web.Bff/NinjagoScanner.Web.Bff.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -34,7 +34,19 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/NinjagoScanner.Web/NinjagoScanner.Web.csproj"
+                "${workspaceFolder}/NinjagoScanner.Web.Bff/NinjagoScanner.Web.Bff.csproj"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "watch-client",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "run",
+                "--project",
+                "${workspaceFolder}/NinjagoScanner.Web.Client/NinjagoScanner.Web.Client.csproj"
             ],
             "problemMatcher": "$msCompile"
         }

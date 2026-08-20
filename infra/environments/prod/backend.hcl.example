@@ -1,0 +1,14 @@
+# Copy to backend.hcl (gitignored) and fill in the values printed by:
+#   cd ../../bootstrap && terraform output state_backend_config
+#
+# Then: terraform init -backend-config=backend.hcl
+#
+# backend.tf declares an empty `backend "s3" {}` block on purpose — these
+# values are account-specific and only exist after infra/bootstrap has been
+# applied once, so they're supplied at `init` time instead of hardcoded.
+
+bucket         = "ninjago-scanner-tfstate-<ACCOUNT_ID>"
+key            = "ninjago-scanner/prod/terraform.tfstate"
+region         = "eu-central-1"
+dynamodb_table = "ninjago-scanner-tfstate-lock"
+encrypt        = true

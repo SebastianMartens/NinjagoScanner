@@ -15,6 +15,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.2" />
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.103.3" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.100.9" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,7 +27,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NinjagoScanner.PictureService.Tests" />
-    <InternalsVisibleTo Include="NinjagoScanner.Web.Tests" />
+    <InternalsVisibleTo Include="NinjagoScanner.Web.Bff.Tests" />
+    <InternalsVisibleTo Include="NinjagoScanner.CardFotosMigration" />
   </ItemGroup>
 
 </Project>

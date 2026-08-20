@@ -3,48 +3,64 @@ using System.Collections.Concurrent;
 namespace NinjagoScanner.PictureService;
 
 /// <summary>
-/// In-memory, write-through cache for sidecar file contents, keyed by resolved sidecar file path.
-/// Sits in front of <see cref="SidecarStore"/> so callers avoid re-reading unchanged sidecars from
-/// disk on every request; every successful write updates the cache with the value that was just
-/// persisted. Read failures (e.g. corrupt JSON) are never cached, so they are retried on next read.
+/// In-memory, write-through cache for sidecar records, keyed by photo ID. Sits in front of
+/// <see cref="SidecarTable"/> so callers avoid re-reading unchanged records from DynamoDB on
+/// every request; every successful write updates the cache with the value that was just
+/// persisted. Read failures are never cached, so they are retried on next read.
 /// </summary>
 internal sealed class SidecarCache
 {
-    private readonly ConcurrentDictionary<string, SidecarRecord?> entries = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ISidecarStore sidecarTable;
+    private readonly ConcurrentDictionary<string, SidecarRecord?> entries = new(StringComparer.Ordinal);
 
-    public async Task<SidecarRecord?> GetAsync(string sidecarPath, CancellationToken cancellationToken)
+    public SidecarCache(ISidecarStore sidecarTable)
     {
-        var key = NormalizeKey(sidecarPath);
-        if (entries.TryGetValue(key, out var cached))
+        this.sidecarTable = sidecarTable;
+    }
+
+    public async Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken)
+    {
+        if (entries.TryGetValue(photoId, out var cached))
         {
             return cached;
         }
 
-        var record = await SidecarStore.ReadRecordAsync(sidecarPath, cancellationToken);
-        entries[key] = record;
+        var record = await sidecarTable.GetAsync(photoId, cancellationToken);
+        entries[photoId] = record;
         return record;
     }
 
-    public async Task SetAsync(string sidecarPath, SidecarRecord record, CancellationToken cancellationToken)
+    public async Task SetAsync(string photoId, SidecarRecord record, CancellationToken cancellationToken)
     {
-        await SidecarStore.WriteRecordAsync(sidecarPath, record, cancellationToken);
-        entries[NormalizeKey(sidecarPath)] = record;
+        await sidecarTable.PutAsync(photoId, record, cancellationToken);
+        entries[photoId] = record;
     }
 
-    public async Task SetAsync(string sidecarPath, CardAnalysisResult result, CancellationToken cancellationToken)
+    public async Task SetAsync(string photoId, CardAnalysisResult result, CancellationToken cancellationToken)
     {
-        await SidecarStore.WriteAsync(sidecarPath, result, cancellationToken);
-        entries[NormalizeKey(sidecarPath)] = ToSidecarRecord(result);
+        var record = ToSidecarRecord(result);
+        await sidecarTable.PutAsync(photoId, record, cancellationToken);
+        entries[photoId] = record;
     }
 
-    public void Remove(string sidecarPath)
+    public async Task RemoveAsync(string photoId, CancellationToken cancellationToken)
     {
-        entries.TryRemove(NormalizeKey(sidecarPath), out _);
+        await sidecarTable.DeleteAsync(photoId, cancellationToken);
+        entries.TryRemove(photoId, out _);
     }
 
-    private static string NormalizeKey(string sidecarPath)
+    /// <summary>
+    /// Enumerates every sidecar record, populating the cache along the way. Used by ListCards
+    /// and the bulk Scan/MigrateSidecars RPCs.
+    /// </summary>
+    public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        return Path.GetFullPath(sidecarPath);
+        await foreach (var (photoId, record) in sidecarTable.ListAllAsync(cancellationToken))
+        {
+            entries[photoId] = record;
+            yield return (photoId, record);
+        }
     }
 
     private static SidecarRecord ToSidecarRecord(CardAnalysisResult result)
@@ -64,8 +80,6 @@ internal sealed class SidecarCache
             ScannedAtUtc = result.ScannedAtUtc,
             ErrorMessage = result.ErrorMessage,
             SourceFileName = result.SourceFileName,
-            SourceFilePath = result.SourceFilePath,
-            SidecarFilePath = result.SidecarFilePath,
             AiModel = result.AiModel,
             RawModelResponse = result.RawModelResponse
         };

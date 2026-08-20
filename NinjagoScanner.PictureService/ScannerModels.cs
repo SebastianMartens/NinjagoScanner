@@ -28,10 +28,9 @@ internal static class Languages
 
 internal sealed record CardAnalysisResult
 {
+    public required string PhotoId { get; init; }
     public required string AnalysisStatus { get; init; }
     public required string SourceFileName { get; init; }
-    public required string SourceFilePath { get; init; }
-    public required string SidecarFilePath { get; init; }
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }

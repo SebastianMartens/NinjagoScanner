@@ -3,28 +3,30 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NinjagoScanner.PictureService.Protos;
 using System.Globalization;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace NinjagoScanner.PictureService.Services;
 
 public sealed class PictureScannerGrpcService : CardPictureService.CardPictureServiceBase
 {
-    private const int MaxUploadFileNameAttempts = 100;
-
-    private static readonly Regex UnsafeFileNameRegex = new("[^A-Za-z0-9_-]+", RegexOptions.Compiled);
-
     private readonly IConfiguration configuration;
     private readonly ILogger<PictureScannerGrpcService> logger;
     private readonly SidecarCache sidecarCache;
+    private readonly IPhotoStore photoStore;
 
-    internal PictureScannerGrpcService(IConfiguration configuration, ILogger<PictureScannerGrpcService> logger, SidecarCache sidecarCache)
+    internal PictureScannerGrpcService(IConfiguration configuration, ILogger<PictureScannerGrpcService> logger, SidecarCache sidecarCache, IPhotoStore photoStore)
     {
         this.configuration = configuration;
         this.logger = logger;
         this.sidecarCache = sidecarCache;
+        this.photoStore = photoStore;
     }
 
+    /// <summary>
+    /// Bulk backfill: analyzes every photo in S3 that has no sidecar record yet (or all of them,
+    /// with OverwriteExistingSidecars). Individual uploads are normally analyzed one at a time via
+    /// <see cref="AnalyzePhoto"/> right after the browser finishes its direct-to-S3 upload, so this
+    /// is mainly an admin/recovery operation.
+    /// </summary>
     public override async Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
@@ -43,15 +45,6 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             {
                 HasConfigurationError = true,
                 Message = "GEMINI_API_KEY ist nicht gesetzt."
-            };
-        }
-
-        if (!Directory.Exists(config.CardPhotosDirectory))
-        {
-            return new ScanSummary
-            {
-                HasConfigurationError = true,
-                Message = $"Der Ordner '{config.CardPhotosDirectory}' wurde nicht gefunden."
             };
         }
 
@@ -79,18 +72,19 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             };
         }
 
-        var cardImages = Directory
-            .EnumerateFiles(config.CardPhotosDirectory)
-            .Where(path => ScannerConfig.SupportedExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var photoIds = new List<string>();
+        await foreach (var photoId in photoStore.ListPhotoIdsAsync(cancellationToken))
+        {
+            photoIds.Add(photoId);
+        }
+        photoIds.Sort(StringComparer.Ordinal);
 
-        if (cardImages.Count == 0)
+        if (photoIds.Count == 0)
         {
             return new ScanSummary
             {
                 TotalImages = 0,
-                Message = $"Im Ordner '{config.CardPhotosDirectory}' wurden keine Kartenbilder gefunden."
+                Message = "Im Foto-Bucket wurden keine Kartenbilder gefunden."
             };
         }
 
@@ -104,33 +98,35 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var failedCount = 0;
         var uncertainCount = 0;
 
-        for (var index = 0; index < cardImages.Count; index++)
+        for (var index = 0; index < photoIds.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var imagePath = cardImages[index];
-            var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
+            var photoId = photoIds[index];
+            var existing = await sidecarCache.GetAsync(photoId, cancellationToken);
 
-            if (!config.OverwriteExistingSidecars && File.Exists(sidecarPath))
+            if (!config.OverwriteExistingSidecars && existing is not null)
             {
                 skippedCount++;
                 continue;
             }
 
+            var sourceFileName = existing?.SourceFileName ?? photoId;
+
             CardAnalysisResult result;
             try
             {
-                result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, imagePath, sidecarPath, cancellationToken);
+                var imageBytes = await photoStore.GetBytesAsync(photoId, cancellationToken);
+                result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, photoId, sourceFileName, imageBytes, cancellationToken);
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {ImagePath}", imagePath);
+                logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {PhotoId}", photoId);
                 result = new CardAnalysisResult
                 {
+                    PhotoId = photoId,
                     AnalysisStatus = AnalysisStatuses.Failed,
-                    SourceFileName = Path.GetFileName(imagePath),
-                    SourceFilePath = imagePath,
-                    SidecarFilePath = sidecarPath,
+                    SourceFileName = sourceFileName,
                     AiModel = config.Model,
                     ScannedAtUtc = DateTimeOffset.UtcNow,
                     ErrorMessage = $"Unerwarteter Fehler: {exception.Message}",
@@ -138,22 +134,18 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 };
             }
 
-            if (File.Exists(sidecarPath))
+            if (!string.IsNullOrWhiteSpace(existing?.ReviewStatus))
             {
-                var existingReviewStatus = (await sidecarCache.GetAsync(sidecarPath, cancellationToken))?.ReviewStatus;
-                if (!string.IsNullOrWhiteSpace(existingReviewStatus))
-                {
-                    result = result with { ReviewStatus = existingReviewStatus };
-                }
+                result = result with { ReviewStatus = existing.ReviewStatus };
             }
 
-            await sidecarCache.SetAsync(sidecarPath, result, cancellationToken);
+            await sidecarCache.SetAsync(photoId, result, cancellationToken);
 
             logger.LogDebug(
-                "[{Index}/{Total}] {FileName} → Status: {AnalysisStatus} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
+                "[{Index}/{Total}] {PhotoId} → Status: {AnalysisStatus} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
                 index + 1,
-                cardImages.Count,
-                Path.GetFileName(imagePath),
+                photoIds.Count,
+                photoId,
                 result.AnalysisStatus,
                 string.IsNullOrWhiteSpace(result.CardName) ? "(unbekannt)" : result.CardName,
                 result.SetName ?? "-",
@@ -169,7 +161,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 uncertainCount++;
             }
 
-            if (index < cardImages.Count - 1 && config.DelayBetweenRequestsMs > 0)
+            if (index < photoIds.Count - 1 && config.DelayBetweenRequestsMs > 0)
             {
                 await Task.Delay(config.DelayBetweenRequestsMs, cancellationToken);
             }
@@ -177,7 +169,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
         return new ScanSummary
         {
-            TotalImages = cardImages.Count,
+            TotalImages = photoIds.Count,
             Processed = processedCount,
             Skipped = skippedCount,
             Uncertain = uncertainCount,
@@ -186,55 +178,92 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         };
     }
 
+    /// <summary>
+    /// Registers a photo the browser just uploaded directly to S3 (via a pre-authorized URL issued
+    /// by the Web BFF) and runs AI Analysis on it, creating its sidecar record.
+    /// </summary>
+    public override async Task<AnalyzePhotoResponse> AnalyzePhoto(AnalyzePhotoRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+
+        if (string.IsNullOrWhiteSpace(request.PhotoId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
+        }
+
+        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Foto '{request.PhotoId}' wurde im Speicher nicht gefunden."));
+        }
+
+        var appConfiguration = new ConfigurationBuilder()
+            .AddConfiguration(configuration)
+            .AddUserSecrets<PictureScannerGrpcService>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var config = ScannerConfig.Load(appConfiguration, request);
+        var sourceFileName = string.IsNullOrWhiteSpace(request.SourceFileName) ? request.PhotoId : request.SourceFileName;
+
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+        {
+            throw new RpcException(new Status(StatusCode.FailedPrecondition, "GEMINI_API_KEY ist nicht gesetzt."));
+        }
+
+        IReadOnlyList<SeriesInfo> seriesCatalog;
+        try
+        {
+            seriesCatalog = await CatalogGrpcClient.LoadSeriesCatalogAsync(config.CatalogServiceAddress, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Katalog-Service unter {CatalogServiceAddress} nicht erreichbar", config.CatalogServiceAddress);
+            throw new RpcException(new Status(StatusCode.Unavailable, $"Der CatalogService unter '{config.CatalogServiceAddress}' ist nicht erreichbar."));
+        }
+
+        using var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds)
+        };
+
+        CardAnalysisResult result;
+        try
+        {
+            var imageBytes = await photoStore.GetBytesAsync(request.PhotoId, cancellationToken);
+            result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, request.PhotoId, sourceFileName, imageBytes, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {PhotoId}", request.PhotoId);
+            result = new CardAnalysisResult
+            {
+                PhotoId = request.PhotoId,
+                AnalysisStatus = AnalysisStatuses.Failed,
+                SourceFileName = sourceFileName,
+                AiModel = config.Model,
+                ScannedAtUtc = DateTimeOffset.UtcNow,
+                ErrorMessage = $"Unerwarteter Fehler: {exception.Message}",
+                DetectedText = Array.Empty<string>()
+            };
+        }
+
+        await sidecarCache.SetAsync(request.PhotoId, result, cancellationToken);
+
+        return new AnalyzePhotoResponse
+        {
+            Card = ToCardEntry(request.PhotoId, await sidecarCache.GetAsync(request.PhotoId, cancellationToken))
+        };
+    }
+
     public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-
         var response = new ListCardsResponse();
-        if (!Directory.Exists(directory))
+
+        await foreach (var photoId in photoStore.ListPhotoIdsAsync(cancellationToken))
         {
-            return response;
-        }
-
-        var imageFiles = Directory
-            .EnumerateFiles(directory)
-            .Where(path => ScannerConfig.SupportedExtensions.Contains(Path.GetExtension(path)))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase);
-
-        foreach (var imagePath in imageFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var imageFileName = Path.GetFileName(imagePath);
-            var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-            if (!File.Exists(sidecarPath))
-            {
-                response.Cards.Add(new CardEntry
-                {
-                    ImageFileName = imageFileName,
-                    AnalysisStatus = "pending",
-                    ReviewStatus = ReviewStatuses.Unreviewed
-                });
-                continue;
-            }
-
-            try
-            {
-                var sidecar = await sidecarCache.GetAsync(sidecarPath, cancellationToken);
-                response.Cards.Add(ToCardEntry(imageFileName, sidecar));
-            }
-            catch (Exception exception)
-            {
-                response.Cards.Add(new CardEntry
-                {
-                    ImageFileName = imageFileName,
-                    AnalysisStatus = "failed",
-                    ReviewStatus = ReviewStatuses.Unreviewed,
-                    ErrorMessage = $"Sidecar konnte nicht gelesen werden: {exception.Message}"
-                });
-            }
+            var record = await sidecarCache.GetAsync(photoId, cancellationToken);
+            response.Cards.Add(ToCardEntry(photoId, record));
         }
 
         return response;
@@ -243,18 +272,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateSidecarResponse> UpdateSidecar(UpdateSidecarRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        var existing = File.Exists(sidecarPath)
-            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord()
-            : new SidecarRecord
-            {
-                SourceFileName = request.ImageFileName,
-                SourceFilePath = imagePath,
-                SidecarFilePath = sidecarPath
-            };
+        var existing = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         var updated = existing with
         {
@@ -268,13 +286,10 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             ReasoningSummary = NormalizeNullable(request.ReasoningSummary),
             DetectedText = request.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()).ToArray(),
             ErrorMessage = NormalizeNullable(request.ErrorMessage),
-            ReviewStatus = NormalizeNullable(request.ReviewStatus),
-            SourceFileName = existing.SourceFileName ?? request.ImageFileName,
-            SourceFilePath = existing.SourceFilePath ?? imagePath,
-            SidecarFilePath = existing.SidecarFilePath ?? sidecarPath
+            ReviewStatus = NormalizeNullable(request.ReviewStatus)
         };
 
-        await sidecarCache.SetAsync(sidecarPath, updated, cancellationToken);
+        await sidecarCache.SetAsync(request.PhotoId, updated, cancellationToken);
 
         return new UpdateSidecarResponse { Success = true };
     }
@@ -282,17 +297,11 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateSetNameResponse> UpdateSetName(UpdateSetNameRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        var sidecar = File.Exists(sidecarPath)
-            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
-            : new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
 
-        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateSetNameResponse { Success = true };
     }
@@ -300,17 +309,11 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardNumberResponse> UpdateCardNumber(UpdateCardNumberRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        var sidecar = File.Exists(sidecarPath)
-            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
-            : new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { CardNumber = NormalizeNullable(request.CardNumber) };
 
-        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateCardNumberResponse { Success = true };
     }
@@ -318,17 +321,11 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardLanguageResponse> UpdateCardLanguage(UpdateCardLanguageRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        var sidecar = File.Exists(sidecarPath)
-            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
-            : new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { Language = NormalizeNullable(request.Language) };
 
-        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateCardLanguageResponse { Success = true };
     }
@@ -336,71 +333,49 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateReviewStatusResponse> UpdateReviewStatus(UpdateReviewStatusRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        var sidecar = File.Exists(sidecarPath)
-            ? await sidecarCache.GetAsync(sidecarPath, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" }
-            : new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
 
         sidecar = sidecar with { ReviewStatus = NormalizeNullable(request.ReviewStatus) };
 
-        await sidecarCache.SetAsync(sidecarPath, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateReviewStatusResponse { Success = true };
     }
 
+    /// <summary>
+    /// Safety net for sidecar records written in an older shape (missing AnalysisStatus). Every
+    /// record this service writes going forward always has AnalysisStatus set, so this is
+    /// expected to be a no-op except right after the one-time cardFotos/ migration.
+    /// </summary>
     public override async Task<MigrateSidecarsResponse> MigrateSidecars(MigrateSidecarsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-
         var response = new MigrateSidecarsResponse();
-        if (!Directory.Exists(directory))
-        {
-            return response;
-        }
 
-        var imageFiles = Directory
-            .EnumerateFiles(directory)
-            .Where(path => ScannerConfig.SupportedExtensions.Contains(Path.GetExtension(path)));
-
-        foreach (var imagePath in imageFiles)
+        await foreach (var (photoId, record) in sidecarCache.ListAllAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            response.TotalFiles++;
 
-            var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-            if (!File.Exists(sidecarPath))
+            if (!string.IsNullOrWhiteSpace(record.AnalysisStatus))
             {
+                response.AlreadyCurrent++;
                 continue;
             }
 
-            response.TotalFiles++;
-
             try
             {
-                var json = await File.ReadAllTextAsync(sidecarPath, cancellationToken);
-                using var document = JsonDocument.Parse(json);
-                if (HasCurrentAnalysisStatusKey(document.RootElement))
+                var repaired = record with
                 {
-                    response.AlreadyCurrent++;
-                    continue;
-                }
-
-                var record = await sidecarCache.GetAsync(sidecarPath, cancellationToken);
-                if (record is null)
-                {
-                    response.AlreadyCurrent++;
-                    continue;
-                }
-
-                await sidecarCache.SetAsync(sidecarPath, record, cancellationToken);
+                    AnalysisStatus = AnalysisStatuses.Failed,
+                    ErrorMessage = record.ErrorMessage ?? "Sidecar-Datensatz wurde ohne AnalysisStatus migriert."
+                };
+                await sidecarCache.SetAsync(photoId, repaired, cancellationToken);
                 response.Migrated++;
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Sidecar-Migration fuer {SidecarPath} fehlgeschlagen", sidecarPath);
+                logger.LogError(exception, "Sidecar-Migration fuer {PhotoId} fehlgeschlagen", photoId);
                 response.Errors++;
             }
         }
@@ -408,130 +383,27 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return response;
     }
 
-    private static bool HasCurrentAnalysisStatusKey(JsonElement root)
-    {
-        foreach (var property in root.EnumerateObject())
-        {
-            if (string.Equals(property.Name, "AnalysisStatus", StringComparison.OrdinalIgnoreCase)
-                && property.Value.ValueKind == JsonValueKind.String
-                && !string.IsNullOrWhiteSpace(property.Value.GetString()))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public override Task<DeletePhotoResponse> DeletePhoto(DeletePhotoRequest request, ServerCallContext context)
-    {
-        var directory = ResolveDirectory(request.HasCardPhotosDirectory ? request.CardPhotosDirectory : null);
-        var imagePath = Path.Combine(directory, request.ImageFileName);
-
-        if (!File.Exists(imagePath))
-        {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Die Datei '{request.ImageFileName}' wurde nicht gefunden."));
-        }
-
-        var sidecarPath = SidecarStore.GetSidecarPath(imagePath);
-
-        File.Delete(imagePath);
-        if (File.Exists(sidecarPath))
-        {
-            File.Delete(sidecarPath);
-        }
-
-        sidecarCache.Remove(sidecarPath);
-
-        return Task.FromResult(new DeletePhotoResponse { Success = true });
-    }
-
-    public override async Task<UploadPhotoResponse> UploadPhoto(IAsyncStreamReader<UploadPhotoChunk> requestStream, ServerCallContext context)
+    public override async Task<DeletePhotoResponse> DeletePhoto(DeletePhotoRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
 
-        string? originalFileName = null;
-        string? cardPhotosDirectoryOverride = null;
-        using var buffer = new MemoryStream();
-
-        await foreach (var chunk in requestStream.ReadAllAsync(cancellationToken))
+        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
         {
-            switch (chunk.PayloadCase)
-            {
-                case UploadPhotoChunk.PayloadOneofCase.Metadata:
-                    originalFileName = chunk.Metadata.OriginalFileName;
-                    cardPhotosDirectoryOverride = chunk.Metadata.HasCardPhotosDirectory ? chunk.Metadata.CardPhotosDirectory : null;
-                    break;
-                case UploadPhotoChunk.PayloadOneofCase.ChunkData:
-                    var span = chunk.ChunkData.Span;
-                    buffer.Write(span);
-                    break;
-            }
+            throw new RpcException(new Status(StatusCode.NotFound, $"Das Foto '{request.PhotoId}' wurde nicht gefunden."));
         }
 
-        if (string.IsNullOrWhiteSpace(originalFileName))
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Kein Dateiname angegeben."));
-        }
+        await photoStore.DeleteAsync(request.PhotoId, cancellationToken);
+        await sidecarCache.RemoveAsync(request.PhotoId, cancellationToken);
 
-        if (buffer.Length == 0)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Die hochgeladene Datei ist leer."));
-        }
-
-        var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        if (!ScannerConfig.SupportedExtensions.Contains(extension))
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP."));
-        }
-
-        var directory = ResolveDirectory(cardPhotosDirectoryOverride);
-        Directory.CreateDirectory(directory);
-
-        var fileNameStem = BuildUploadFileNameStem(originalFileName);
-        var bytes = buffer.ToArray();
-
-        for (var attempt = 0; attempt < MaxUploadFileNameAttempts; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var candidateName = attempt == 0
-                ? $"{fileNameStem}{extension}"
-                : $"{fileNameStem}-{attempt}{extension}";
-            var destinationPath = Path.Combine(directory, candidateName);
-
-            try
-            {
-                await using var destinationStream = new FileStream(
-                    destinationPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    81920,
-                    useAsync: true);
-                await destinationStream.WriteAsync(bytes, cancellationToken);
-
-                return new UploadPhotoResponse { ImageFileName = candidateName };
-            }
-            catch (IOException) when (File.Exists(destinationPath))
-            {
-                continue;
-            }
-        }
-
-        throw new RpcException(new Status(StatusCode.Internal, "Es konnte kein eindeutiger Dateiname fuer den Upload erstellt werden."));
+        return new DeletePhotoResponse { Success = true };
     }
 
-    private string ResolveDirectory(string? overrideValue)
-    {
-        return ScannerConfig.ResolveCardPhotosDirectory(overrideValue, configuration);
-    }
-
-    private static CardEntry ToCardEntry(string imageFileName, SidecarRecord? sidecar)
+    private static CardEntry ToCardEntry(string photoId, SidecarRecord? sidecar)
     {
         var entry = new CardEntry
         {
-            ImageFileName = imageFileName,
+            PhotoId = photoId,
+            SourceFileName = sidecar?.SourceFileName ?? string.Empty,
             AnalysisStatus = sidecar?.AnalysisStatus ?? "unknown",
             CardName = sidecar?.CardName ?? string.Empty,
             CardNumber = sidecar?.CardNumber ?? string.Empty,
@@ -551,17 +423,5 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     private static string? NormalizeNullable(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static string BuildUploadFileNameStem(string originalName)
-    {
-        var rawName = Path.GetFileNameWithoutExtension(originalName);
-        var sanitizedName = UnsafeFileNameRegex.Replace(rawName.Trim(), "-").Trim('-');
-        if (string.IsNullOrWhiteSpace(sanitizedName))
-        {
-            sanitizedName = "mobile-photo";
-        }
-
-        return $"{DateTime.UtcNow:yyyyMMdd_HHmmss}_{sanitizedName}";
     }
 }

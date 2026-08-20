@@ -1,0 +1,52 @@
+name: Deploy - Web Client (WASM)
+
+# Task 10.5: path-filtered build/deploy for the Blazor WebAssembly client
+# (NinjagoScanner.Web.Client): publish static assets, sync to S3, invalidate CloudFront. Also
+# triggers on NinjagoScanner.Web.Shared changes, since the client project-references it.
+#
+# Requires these repo (or environment) variables, filled in from `terraform output` in
+# infra/environments/prod once task 9's static-site module has been applied:
+#   AWS_REGION, WASM_CLIENT_BUCKET_NAME, CLOUDFRONT_DISTRIBUTION_ID
+# and a repo secret: AWS_DEPLOY_ROLE_ARN
+on:
+  push:
+    branches: [main]
+    paths:
+      - "NinjagoScanner.Web.Client/**"
+      - "NinjagoScanner.Web.Shared/**"
+
+concurrency:
+  group: deploy-web-client-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: dotnet publish NinjagoScanner.Web.Client/NinjagoScanner.Web.Client.csproj -c Release -o publish-output
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Sync static assets to S3
+        run: |
+          aws s3 sync publish-output/wwwroot "s3://${{ vars.WASM_CLIENT_BUCKET_NAME }}" --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"

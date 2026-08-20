@@ -1,0 +1,115 @@
+name: Terraform - infra/
+
+# Task 10.6: `terraform plan` on pull requests that touch infra/ (using the read-only `plan` OIDC
+# role — see infra/modules/github-oidc), `terraform apply` on push to main (using the `deploy`
+# role). Mirrors infra/README.md's "Everyday usage" section, just run by CI instead of by hand.
+#
+# Requires these repo (or environment) variables, filled in once from `terraform output` in
+# infra/bootstrap after its one-time manual apply (see infra/README.md's "Bootstrapping"):
+#   AWS_REGION, TF_STATE_BUCKET_NAME, TF_STATE_LOCK_TABLE_NAME,
+#   TF_STATE_BUCKET_ARN, TF_STATE_LOCK_TABLE_ARN
+# and repo secrets: AWS_PLAN_ROLE_ARN, AWS_DEPLOY_ROLE_ARN
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+
+concurrency:
+  group: terraform-infra-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+defaults:
+  run:
+    working-directory: infra/environments/prod
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Written with `echo` rather than a heredoc: a heredoc's closing delimiter would inherit
+      # this YAML block's indentation as literal leading whitespace and fail to match.
+      - name: Materialize backend + tfvars (gitignored, account-specific — see infra/README.md)
+        run: |
+          {
+            echo 'bucket         = "${{ vars.TF_STATE_BUCKET_NAME }}"'
+            echo 'key            = "ninjago-scanner/prod/terraform.tfstate"'
+            echo 'region         = "${{ vars.AWS_REGION }}"'
+            echo 'dynamodb_table = "${{ vars.TF_STATE_LOCK_TABLE_NAME }}"'
+            echo 'encrypt        = true'
+          } > backend.hcl
+          {
+            echo 'state_bucket_arn     = "${{ vars.TF_STATE_BUCKET_ARN }}"'
+            echo 'state_lock_table_arn = "${{ vars.TF_STATE_LOCK_TABLE_ARN }}"'
+          } > terraform.tfvars
+
+      - run: terraform init -backend-config=backend.hcl
+      - run: terraform fmt -check -recursive
+      - run: terraform validate
+      - run: terraform plan -no-color -out=tfplan
+      - run: terraform show -no-color tfplan > plan-output.txt
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infra/environments/prod/plan-output.txt', 'utf8').slice(0, 60000);
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Terraform plan for \`infra/\`\n\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n\n</details>`
+            });
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Written with `echo` rather than a heredoc: a heredoc's closing delimiter would inherit
+      # this YAML block's indentation as literal leading whitespace and fail to match.
+      - name: Materialize backend + tfvars (gitignored, account-specific — see infra/README.md)
+        run: |
+          {
+            echo 'bucket         = "${{ vars.TF_STATE_BUCKET_NAME }}"'
+            echo 'key            = "ninjago-scanner/prod/terraform.tfstate"'
+            echo 'region         = "${{ vars.AWS_REGION }}"'
+            echo 'dynamodb_table = "${{ vars.TF_STATE_LOCK_TABLE_NAME }}"'
+            echo 'encrypt        = true'
+          } > backend.hcl
+          {
+            echo 'state_bucket_arn     = "${{ vars.TF_STATE_BUCKET_ARN }}"'
+            echo 'state_lock_table_arn = "${{ vars.TF_STATE_LOCK_TABLE_ARN }}"'
+          } > terraform.tfvars
+
+      - run: terraform init -backend-config=backend.hcl
+      - run: terraform apply -auto-approve

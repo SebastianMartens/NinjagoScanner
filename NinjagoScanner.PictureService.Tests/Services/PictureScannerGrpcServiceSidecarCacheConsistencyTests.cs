@@ -10,54 +10,32 @@ namespace NinjagoScanner.PictureService.Tests.Services;
 /// <summary>
 /// Verifies that a value written by one RPC is immediately visible to a subsequent
 /// <see cref="PictureScannerGrpcService.ListCards"/> call served by the same <see cref="SidecarCache"/>
-/// instance. Each test tampers with the sidecar file's on-disk content (without deleting it, since
-/// the "does a sidecar exist" check is intentionally not cached) after writing through the cache, then
-/// asserts ListCards still returns the cached value rather than the tampered-with disk content - the
-/// only way that can happen is if the read is actually served from the cache.
+/// instance. Each test tampers with the record in the underlying store directly (bypassing the
+/// cache) after writing through it, then asserts ListCards still returns the cached value rather
+/// than the tampered-with store content — the only way that can happen is if the read is actually
+/// served from the cache.
 /// </summary>
-public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests : IDisposable
+public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
 {
-    private readonly string cardPhotosDirectory = Path.Combine(
-        Path.GetTempPath(),
-        $"NinjagoScannerPictureServiceSidecarCacheTests_{Guid.NewGuid():N}");
-
-    private readonly SidecarCache sidecarCache = new();
+    private readonly FakeSidecarStore sidecarStore = new();
+    private readonly FakePhotoStore photoStore = new();
+    private readonly SidecarCache sidecarCache;
 
     public PictureScannerGrpcServiceSidecarCacheConsistencyTests()
     {
-        Directory.CreateDirectory(cardPhotosDirectory);
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(cardPhotosDirectory))
-        {
-            Directory.Delete(cardPhotosDirectory, recursive: true);
-        }
+        sidecarCache = new SidecarCache(sidecarStore);
     }
 
     private PictureScannerGrpcService CreateService()
     {
         var configuration = new ConfigurationBuilder().Build();
-        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, sidecarCache);
-    }
-
-    private static void TamperSidecarOnDisk(string sidecarPath, string reviewStatus, string setName)
-    {
-        File.WriteAllText(sidecarPath, $$"""
-        {
-          "AnalysisStatus": "pending",
-          "ReviewStatus": "{{reviewStatus}}",
-          "SetName": "{{setName}}"
-        }
-        """);
+        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, sidecarCache, photoStore);
     }
 
     [Fact]
-    public async Task UpdateReviewStatus_IsVisibleInListCards_EvenWhenDiskContentDivergesAfterward()
+    public async Task UpdateReviewStatus_IsVisibleInListCards_EvenWhenStoreContentDivergesAfterward()
     {
-        var imagePath = Path.Combine(cardPhotosDirectory, "card-1.jpg");
-        await File.WriteAllBytesAsync(imagePath, [0x01]);
+        photoStore.Seed("card-1", [0x01]);
 
         // Two separate service instances, mirroring production where each RPC call gets a new
         // scoped PictureScannerGrpcService but shares the same singleton SidecarCache.
@@ -65,59 +43,39 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests : IDis
         var reader = CreateService();
 
         await writer.UpdateReviewStatus(
-            new UpdateReviewStatusRequest
-            {
-                ImageFileName = "card-1.jpg",
-                CardPhotosDirectory = cardPhotosDirectory,
-                ReviewStatus = "verified"
-            },
+            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified" },
             new FakeServerCallContext());
 
-        // Tamper with the sidecar file directly on disk, bypassing the cache. If ListCards
-        // fell back to a fresh disk read, it would now report "incorrect" instead of "verified".
-        TamperSidecarOnDisk(Path.Combine(cardPhotosDirectory, "card-1.jpg.json"), reviewStatus: "incorrect", setName: string.Empty);
+        // Tamper with the store directly, bypassing the cache. If ListCards fell back to a fresh
+        // store read, it would now report "incorrect" instead of "verified".
+        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "pending", ReviewStatus = "incorrect" });
 
-        var response = await reader.ListCards(
-            new ListCardsRequest { CardPhotosDirectory = cardPhotosDirectory },
-            new FakeServerCallContext());
+        var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
         Assert.Equal("verified", entry.ReviewStatus);
     }
 
     [Fact]
-    public async Task UpdateSetName_ThenUpdateReviewStatus_BothReflectedInListCards_EvenWhenDiskContentDivergesAfterward()
+    public async Task UpdateSetName_ThenUpdateReviewStatus_BothReflectedInListCards_EvenWhenStoreContentDivergesAfterward()
     {
-        var imagePath = Path.Combine(cardPhotosDirectory, "card-2.jpg");
-        await File.WriteAllBytesAsync(imagePath, [0x01]);
+        photoStore.Seed("card-2", [0x01]);
 
         var writer = CreateService();
         var reader = CreateService();
 
         await writer.UpdateSetName(
-            new UpdateSetNameRequest
-            {
-                ImageFileName = "card-2.jpg",
-                CardPhotosDirectory = cardPhotosDirectory,
-                SetName = "Serie 9"
-            },
+            new UpdateSetNameRequest { PhotoId = "card-2", SetName = "Serie 9" },
             new FakeServerCallContext());
 
         await writer.UpdateReviewStatus(
-            new UpdateReviewStatusRequest
-            {
-                ImageFileName = "card-2.jpg",
-                CardPhotosDirectory = cardPhotosDirectory,
-                ReviewStatus = "verified"
-            },
+            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "verified" },
             new FakeServerCallContext());
 
-        // Tamper with the sidecar file both writes updated; only the cache can still answer correctly.
-        TamperSidecarOnDisk(Path.Combine(cardPhotosDirectory, "card-2.jpg.json"), reviewStatus: "incorrect", setName: "Serie 1");
+        // Tamper with the store directly; only the cache can still answer correctly.
+        sidecarStore.Tamper("card-2", new SidecarRecord { AnalysisStatus = "pending", ReviewStatus = "incorrect", SetName = "Serie 1" });
 
-        var response = await reader.ListCards(
-            new ListCardsRequest { CardPhotosDirectory = cardPhotosDirectory },
-            new FakeServerCallContext());
+        var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
         Assert.Equal("Serie 9", entry.SetName);

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NinjagoScanner.PictureService;
@@ -8,91 +7,61 @@ using NinjagoScanner.PictureService.Tests.Fixtures;
 
 namespace NinjagoScanner.PictureService.Tests.Services;
 
-public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests : IDisposable
+public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
 {
-    private readonly string cardPhotosDirectory = Path.Combine(
-        Path.GetTempPath(),
-        $"NinjagoScannerPictureServiceTests_{Guid.NewGuid():N}");
-
-    public PictureScannerGrpcServiceUpdateReviewStatusTests()
-    {
-        Directory.CreateDirectory(cardPhotosDirectory);
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(cardPhotosDirectory))
-        {
-            Directory.Delete(cardPhotosDirectory, recursive: true);
-        }
-    }
-
-    private static PictureScannerGrpcService CreateService(SidecarCache? sidecarCache = null)
+    private static PictureScannerGrpcService CreateService(FakeSidecarStore? store = null, FakePhotoStore? photoStore = null)
     {
         var configuration = new ConfigurationBuilder().Build();
-        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, sidecarCache ?? new SidecarCache());
-    }
-
-    private JsonDocument ReadSidecarJson(string imageFileName)
-    {
-        var sidecarPath = Path.Combine(cardPhotosDirectory, imageFileName + ".json");
-        return JsonDocument.Parse(File.ReadAllText(sidecarPath));
+        return new PictureScannerGrpcService(
+            configuration,
+            NullLogger<PictureScannerGrpcService>.Instance,
+            new SidecarCache(store ?? new FakeSidecarStore()),
+            photoStore ?? new FakePhotoStore());
     }
 
     [Fact]
     public async Task UpdateReviewStatus_CreatesPendingSidecar_WhenNoneExists()
     {
-        var service = CreateService();
+        var store = new FakeSidecarStore();
+        var service = CreateService(store);
 
         await service.UpdateReviewStatus(
-            new UpdateReviewStatusRequest
-            {
-                ImageFileName = "card-1.jpg",
-                CardPhotosDirectory = cardPhotosDirectory,
-                ReviewStatus = "verified"
-            },
+            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified" },
             new FakeServerCallContext());
 
-        using var json = ReadSidecarJson("card-1.jpg");
-        Assert.Equal("pending", json.RootElement.GetProperty("AnalysisStatus").GetString());
-        Assert.Equal("verified", json.RootElement.GetProperty("ReviewStatus").GetString());
+        var record = await store.GetAsync("card-1", CancellationToken.None);
+        Assert.Equal("pending", record!.AnalysisStatus);
+        Assert.Equal("verified", record.ReviewStatus);
     }
 
     [Fact]
     public async Task UpdateReviewStatus_OnlyChangesReviewStatus_OnExistingSidecar()
     {
-        var sidecarPath = Path.Combine(cardPhotosDirectory, "card-2.jpg.json");
-        await File.WriteAllTextAsync(sidecarPath, """
+        var store = new FakeSidecarStore();
+        store.Tamper("card-2", new SidecarRecord
         {
-          "AnalysisStatus": "ok",
-          "CardName": "Kai",
-          "CardNumber": "43",
-          "SetName": "Serie 9",
-          "Rarity": "Common",
-          "Confidence": 0.95,
-          "ReviewStatus": "unreviewed"
-        }
-        """);
+            AnalysisStatus = "ok",
+            CardName = "Kai",
+            CardNumber = "43",
+            SetName = "Serie 9",
+            Rarity = "Common",
+            Confidence = 0.95,
+            ReviewStatus = "unreviewed"
+        });
 
-        var service = CreateService();
+        var service = CreateService(store);
 
         await service.UpdateReviewStatus(
-            new UpdateReviewStatusRequest
-            {
-                ImageFileName = "card-2.jpg",
-                CardPhotosDirectory = cardPhotosDirectory,
-                ReviewStatus = "incorrect"
-            },
+            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "incorrect" },
             new FakeServerCallContext());
 
-        using var json = ReadSidecarJson("card-2.jpg");
-        var root = json.RootElement;
-        Assert.Equal("incorrect", root.GetProperty("ReviewStatus").GetString());
-        Assert.Equal("ok", root.GetProperty("AnalysisStatus").GetString());
-        Assert.Equal("Kai", root.GetProperty("CardName").GetString());
-        Assert.Equal("43", root.GetProperty("CardNumber").GetString());
-        Assert.Equal("Serie 9", root.GetProperty("SetName").GetString());
-        Assert.Equal("Common", root.GetProperty("Rarity").GetString());
-        Assert.Equal(0.95, root.GetProperty("Confidence").GetDouble());
+        var record = await store.GetAsync("card-2", CancellationToken.None);
+        Assert.Equal("incorrect", record!.ReviewStatus);
+        Assert.Equal("ok", record.AnalysisStatus);
+        Assert.Equal("Kai", record.CardName);
+        Assert.Equal("43", record.CardNumber);
+        Assert.Equal("Serie 9", record.SetName);
+        Assert.Equal("Common", record.Rarity);
+        Assert.Equal(0.95, record.Confidence);
     }
 }

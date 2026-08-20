@@ -1,0 +1,134 @@
+@page "/"
+@inject CardCatalogService CardCatalogService
+@inject PictureServiceClient PictureServiceClient
+@inject NavigationManager NavigationManager
+
+<PageTitle>Ninjago Scanner</PageTitle>
+
+<div class="overview-page">
+	<header class="overview-header">
+		<p class="eyebrow">Ninjago Scanner</p>
+		<h1>Übersicht</h1>
+		<p class="lede">Starte hier den Gemini-Scan neuer Kartenfotos.</p>
+		<div class="mt-3 d-flex gap-2 align-items-center flex-wrap">
+			<button class="btn btn-primary" type="button" disabled="@isScanning" @onclick="StartGeminiScanAsync">
+				@(isScanning ? "Gemini-Scan laeuft..." : "Gemini-Suche starten")
+			</button>
+			@if (!string.IsNullOrWhiteSpace(scanStatusMessage))
+			{
+				<span>@scanStatusMessage</span>
+			}
+		</div>
+	</header>
+
+	<section class="catalog-statistics">
+		<div class="series-summary-header">
+			<h2>Katalogstatistik</h2>
+		</div>
+
+		@if (isSummaryLoading)
+		{
+			<p>Lade Katalogstatistik...</p>
+		}
+		else
+		{
+			<div class="collection-stats">
+				<span>@seriesSummary.TotalCatalogCards Karte(n) im Katalog</span>
+				<span>@seriesSummary.OwnedCatalogCards im Besitz</span>
+				<span>@seriesSummary.TotalPhotos Foto(s)</span>
+			</div>
+			<div class="collection-stats">
+				<span>Analyse: @seriesSummary.AnalysisStatusCounts.Ok ok</span>
+				<span>@seriesSummary.AnalysisStatusCounts.Uncertain unsicher</span>
+				<span>@seriesSummary.AnalysisStatusCounts.Failed fehlgeschlagen</span>
+				<span>@seriesSummary.AnalysisStatusCounts.NotAnalyzed noch nicht analysiert</span>
+			</div>
+			<div class="collection-stats">
+				<span>Review: @seriesSummary.ReviewStatusCounts.Unreviewed ungeprueft</span>
+				<span>@seriesSummary.ReviewStatusCounts.Verified bestaetigt</span>
+				<span>@seriesSummary.ReviewStatusCounts.Incorrect fehlerhaft</span>
+			</div>
+		}
+	</section>
+
+	<section class="series-summary">
+		<div class="series-summary-header">
+			<h2>Serienübersicht</h2>
+		</div>
+
+		@if (isSummaryLoading)
+		{
+			<p>Lade Serienübersicht...</p>
+		}
+		else if (seriesSummary.Series.Count == 0)
+		{
+			<p class="table-secondary">Keine Serien im Katalog gefunden.</p>
+		}
+		else
+		{
+			<div class="series-tile-grid">
+				@foreach (var series in seriesSummary.Series)
+				{
+					<div class="series-tile" @onclick="() => GoToSeries(series.SeriesName)">
+						<h3>@series.SeriesName</h3>
+						<div class="series-tile-progress">
+							<div class="series-tile-progress-bar" style="width: @(OwnedPercent(series))%"></div>
+						</div>
+						<div class="series-tile-stats">
+							<span>@series.OwnedCards / @series.TotalCards Karten</span>
+							<span>@series.TotalPhotos Foto(s)</span>
+						</div>
+					</div>
+				}
+			</div>
+
+			@if (seriesSummary.UnknownSeriesPhotoCount > 0)
+			{
+				<p class="series-unknown-note">@seriesSummary.UnknownSeriesPhotoCount Foto(s) ohne erkannte Serie ("unbekannte Serie").</p>
+			}
+		}
+	</section>
+</div>
+
+@code {
+	private bool isScanning;
+	private string? scanStatusMessage;
+
+	private SeriesSummaryResult seriesSummary = new() { Series = Array.Empty<SeriesSummaryItem>() };
+	private bool isSummaryLoading = true;
+
+	protected override async Task OnInitializedAsync()
+	{
+		seriesSummary = await CardCatalogService.GetSeriesSummaryAsync();
+		isSummaryLoading = false;
+	}
+
+	private async Task StartGeminiScanAsync()
+	{
+		isScanning = true;
+		scanStatusMessage = null;
+
+		try
+		{
+			var summary = await PictureServiceClient.ScanAsync();
+
+			scanStatusMessage = summary.HasConfigurationError
+				? summary.Message ?? "Scan konnte nicht gestartet werden."
+				: $"Scan fertig: {summary.Processed} verarbeitet, {summary.Skipped} uebersprungen, {summary.Uncertain} unsicher, {summary.Failed} fehlgeschlagen.";
+		}
+		finally
+		{
+			isScanning = false;
+		}
+	}
+
+	private static int OwnedPercent(SeriesSummaryItem series)
+	{
+		return series.TotalCards > 0 ? (int)Math.Round(100.0 * series.OwnedCards / series.TotalCards) : 0;
+	}
+
+	private void GoToSeries(string seriesName)
+	{
+		NavigationManager.NavigateTo($"/collection?series={Uri.EscapeDataString(seriesName)}");
+	}
+}

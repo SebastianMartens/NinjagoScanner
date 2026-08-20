@@ -6,10 +6,9 @@ namespace NinjagoScanner.PictureService;
 
 internal static class GeminiApiService
 {
-    public static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, ScannerConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string imagePath, string sidecarPath, CancellationToken cancellationToken)
+    public static async Task<CardAnalysisResult> AnalyzeCardAsync(HttpClient httpClient, ScannerConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string photoId, string sourceFileName, byte[] imageBytes, CancellationToken cancellationToken)
     {
-        var imageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-        var requestBody = CreateGeminiRequest(config, seriesCatalog, imagePath, imageBytes);
+        var requestBody = CreateGeminiRequest(config, seriesCatalog, sourceFileName, imageBytes);
         var requestUri = $"https://generativelanguage.googleapis.com/v1beta/models/{config.Model}:generateContent?key={Uri.EscapeDataString(config.ApiKey)}";
 
         for (var attempt = 1; attempt <= config.MaxAttempts; attempt++)
@@ -19,7 +18,7 @@ internal static class GeminiApiService
 
             if (response.IsSuccessStatusCode)
             {
-                return ParseSuccessResponse(imagePath, sidecarPath, config.Model, seriesCatalog, responseText);
+                return ParseSuccessResponse(photoId, sourceFileName, config.Model, seriesCatalog, responseText);
             }
 
             if ((int)response.StatusCode == 429 || response.StatusCode == HttpStatusCode.TooManyRequests || (int)response.StatusCode >= 500)
@@ -32,17 +31,17 @@ internal static class GeminiApiService
             }
 
             return CreateFailureResult(
-                imagePath,
-                sidecarPath,
+                photoId,
+                sourceFileName,
                 config.Model,
                 BuildApiErrorMessage(response.StatusCode, responseText, config.Model),
                 responseText);
         }
 
-        return CreateFailureResult(imagePath, sidecarPath, config.Model, "Unbekannter API-Fehler.");
+        return CreateFailureResult(photoId, sourceFileName, config.Model, "Unbekannter API-Fehler.");
     }
 
-    private static object CreateGeminiRequest(ScannerConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string imagePath, byte[] imageBytes)
+    private static object CreateGeminiRequest(ScannerConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string sourceFileName, byte[] imageBytes)
     {
         var seriesPrompt = SeriesCatalogService.BuildPrompt(seriesCatalog);
         var prompt = """
@@ -89,7 +88,7 @@ internal static class GeminiApiService
                         {
                             inline_data = new
                             {
-                                mime_type = GetMimeType(imagePath),
+                                mime_type = GetMimeType(sourceFileName),
                                 data = Convert.ToBase64String(imageBytes)
                             }
                         }
@@ -104,7 +103,7 @@ internal static class GeminiApiService
         };
     }
 
-    private static CardAnalysisResult ParseSuccessResponse(string imagePath, string sidecarPath, string model, IReadOnlyList<SeriesInfo> seriesCatalog, string responseText)
+    private static CardAnalysisResult ParseSuccessResponse(string photoId, string sourceFileName, string model, IReadOnlyList<SeriesInfo> seriesCatalog, string responseText)
     {
         try
         {
@@ -116,13 +115,13 @@ internal static class GeminiApiService
 
             if (string.IsNullOrWhiteSpace(modelJson))
             {
-                return CreateFailureResult(imagePath, sidecarPath, model, "Gemini hat kein JSON-Ergebnis geliefert.", responseText);
+                return CreateFailureResult(photoId, sourceFileName, model, "Gemini hat kein JSON-Ergebnis geliefert.", responseText);
             }
 
             var payload = JsonSerializer.Deserialize<GeminiCardPayload>(modelJson, ScannerJsonOptions.Default);
             if (payload is null)
             {
-                return CreateFailureResult(imagePath, sidecarPath, model, "Gemini JSON konnte nicht gelesen werden.", modelJson);
+                return CreateFailureResult(photoId, sourceFileName, model, "Gemini JSON konnte nicht gelesen werden.", modelJson);
             }
 
             var normalizedStatus = NormalizeStatus(payload.Status, payload.Confidence);
@@ -146,10 +145,9 @@ internal static class GeminiApiService
 
             return new CardAnalysisResult
             {
+                PhotoId = photoId,
                 AnalysisStatus = finalStatus,
-                SourceFileName = Path.GetFileName(imagePath),
-                SourceFilePath = imagePath,
-                SidecarFilePath = sidecarPath,
+                SourceFileName = sourceFileName,
                 CardName = payload.CardName,
                 CardNumber = payload.CardNumber,
                 SetName = finalSetName,
@@ -165,18 +163,17 @@ internal static class GeminiApiService
         }
         catch (JsonException exception)
         {
-            return CreateFailureResult(imagePath, sidecarPath, model, $"Gemini-Antwort war kein gueltiges JSON: {exception.Message}", responseText);
+            return CreateFailureResult(photoId, sourceFileName, model, $"Gemini-Antwort war kein gueltiges JSON: {exception.Message}", responseText);
         }
     }
 
-    private static CardAnalysisResult CreateFailureResult(string imagePath, string sidecarPath, string model, string errorMessage, string? rawModelResponse = null)
+    private static CardAnalysisResult CreateFailureResult(string photoId, string sourceFileName, string model, string errorMessage, string? rawModelResponse = null)
     {
         return new CardAnalysisResult
         {
+            PhotoId = photoId,
             AnalysisStatus = AnalysisStatuses.Failed,
-            SourceFileName = Path.GetFileName(imagePath),
-            SourceFilePath = imagePath,
-            SidecarFilePath = sidecarPath,
+            SourceFileName = sourceFileName,
             AiModel = model,
             ScannedAtUtc = DateTimeOffset.UtcNow,
             ErrorMessage = errorMessage,
@@ -195,9 +192,9 @@ internal static class GeminiApiService
         return $"Gemini API Fehler ({(int)statusCode} {statusCode})";
     }
 
-    private static string GetMimeType(string imagePath)
+    private static string GetMimeType(string sourceFileName)
     {
-        return Path.GetExtension(imagePath).ToLowerInvariant() switch
+        return Path.GetExtension(sourceFileName).ToLowerInvariant() switch
         {
             ".jpg" => "image/jpeg",
             ".jpeg" => "image/jpeg",

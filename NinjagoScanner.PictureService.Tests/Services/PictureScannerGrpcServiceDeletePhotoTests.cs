@@ -8,114 +8,103 @@ using NinjagoScanner.PictureService.Tests.Fixtures;
 
 namespace NinjagoScanner.PictureService.Tests.Services;
 
-public sealed class PictureScannerGrpcServiceDeletePhotoTests : IDisposable
+public sealed class PictureScannerGrpcServiceDeletePhotoTests
 {
-    private readonly string cardPhotosDirectory = Path.Combine(
-        Path.GetTempPath(),
-        $"NinjagoScannerPictureServiceTests_{Guid.NewGuid():N}");
-
-    public PictureScannerGrpcServiceDeletePhotoTests()
-    {
-        Directory.CreateDirectory(cardPhotosDirectory);
-    }
-
-    public void Dispose()
-    {
-        if (Directory.Exists(cardPhotosDirectory))
-        {
-            Directory.Delete(cardPhotosDirectory, recursive: true);
-        }
-    }
-
-    private static PictureScannerGrpcService CreateService(SidecarCache sidecarCache)
+    private static PictureScannerGrpcService CreateService(FakeSidecarStore sidecarStore, FakePhotoStore photoStore)
     {
         var configuration = new ConfigurationBuilder().Build();
-        return new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, sidecarCache);
+        return new PictureScannerGrpcService(
+            configuration,
+            NullLogger<PictureScannerGrpcService>.Instance,
+            new SidecarCache(sidecarStore),
+            photoStore);
     }
 
     [Fact]
-    public async Task DeletePhoto_RemovesImageAndSidecar_WhenBothExist()
+    public async Task DeletePhoto_RemovesPhotoAndSidecar_WhenBothExist()
     {
-        var imagePath = Path.Combine(cardPhotosDirectory, "card-1.jpg");
-        var sidecarPath = imagePath + ".json";
-        await File.WriteAllBytesAsync(imagePath, [0xFF, 0xD8, 0xFF, 0xD9]);
-        await File.WriteAllTextAsync(sidecarPath, """{ "AnalysisStatus": "ok", "CardName": "Kai" }""");
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var sidecarStore = new FakeSidecarStore();
+        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "ok", CardName = "Kai" });
 
-        var service = CreateService(new SidecarCache());
+        var service = CreateService(sidecarStore, photoStore);
 
         var response = await service.DeletePhoto(
-            new DeletePhotoRequest { ImageFileName = "card-1.jpg", CardPhotosDirectory = cardPhotosDirectory },
+            new DeletePhotoRequest { PhotoId = "card-1" },
             new FakeServerCallContext());
 
         Assert.True(response.Success);
-        Assert.False(File.Exists(imagePath));
-        Assert.False(File.Exists(sidecarPath));
+        Assert.False(await photoStore.ExistsAsync("card-1", CancellationToken.None));
+        Assert.False(sidecarStore.ContainsKey("card-1"));
     }
 
     [Fact]
-    public async Task DeletePhoto_RemovesImage_WhenNoSidecarExists()
+    public async Task DeletePhoto_RemovesPhoto_WhenNoSidecarExists()
     {
-        var imagePath = Path.Combine(cardPhotosDirectory, "card-2.jpg");
-        await File.WriteAllBytesAsync(imagePath, [0xFF, 0xD8, 0xFF, 0xD9]);
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-2", [0xFF, 0xD8, 0xFF, 0xD9]);
 
-        var service = CreateService(new SidecarCache());
+        var service = CreateService(new FakeSidecarStore(), photoStore);
 
         var response = await service.DeletePhoto(
-            new DeletePhotoRequest { ImageFileName = "card-2.jpg", CardPhotosDirectory = cardPhotosDirectory },
+            new DeletePhotoRequest { PhotoId = "card-2" },
             new FakeServerCallContext());
 
         Assert.True(response.Success);
-        Assert.False(File.Exists(imagePath));
+        Assert.False(await photoStore.ExistsAsync("card-2", CancellationToken.None));
     }
 
     [Fact]
-    public async Task DeletePhoto_FailsWithNotFound_WhenImageDoesNotExist()
+    public async Task DeletePhoto_FailsWithNotFound_WhenPhotoDoesNotExist()
     {
-        var service = CreateService(new SidecarCache());
+        var service = CreateService(new FakeSidecarStore(), new FakePhotoStore());
 
         var exception = await Assert.ThrowsAsync<RpcException>(() => service.DeletePhoto(
-            new DeletePhotoRequest { ImageFileName = "missing.jpg", CardPhotosDirectory = cardPhotosDirectory },
+            new DeletePhotoRequest { PhotoId = "missing" },
             new FakeServerCallContext()));
 
         Assert.Equal(StatusCode.NotFound, exception.StatusCode);
     }
 
     [Fact]
-    public async Task DeletePhoto_DoesNotTouchOtherFiles_WhenImageDoesNotExist()
+    public async Task DeletePhoto_DoesNotTouchOtherPhotos_WhenPhotoDoesNotExist()
     {
-        var untouchedImagePath = Path.Combine(cardPhotosDirectory, "keep-me.jpg");
-        await File.WriteAllBytesAsync(untouchedImagePath, [0xFF, 0xD8, 0xFF, 0xD9]);
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("keep-me", [0xFF, 0xD8, 0xFF, 0xD9]);
 
-        var service = CreateService(new SidecarCache());
+        var service = CreateService(new FakeSidecarStore(), photoStore);
 
         await Assert.ThrowsAsync<RpcException>(() => service.DeletePhoto(
-            new DeletePhotoRequest { ImageFileName = "missing.jpg", CardPhotosDirectory = cardPhotosDirectory },
+            new DeletePhotoRequest { PhotoId = "missing" },
             new FakeServerCallContext()));
 
-        Assert.True(File.Exists(untouchedImagePath));
+        Assert.True(await photoStore.ExistsAsync("keep-me", CancellationToken.None));
     }
 
     [Fact]
     public async Task DeletePhoto_EvictsSidecarFromCache()
     {
-        var imagePath = Path.Combine(cardPhotosDirectory, "card-3.jpg");
-        var sidecarPath = imagePath + ".json";
-        await File.WriteAllBytesAsync(imagePath, [0xFF, 0xD8, 0xFF, 0xD9]);
-        await File.WriteAllTextAsync(sidecarPath, """{ "AnalysisStatus": "ok", "CardName": "Nya" }""");
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-3", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var sidecarStore = new FakeSidecarStore();
+        sidecarStore.Tamper("card-3", new SidecarRecord { AnalysisStatus = "ok", CardName = "Nya" });
 
-        var sidecarCache = new SidecarCache();
+        var cache = new SidecarCache(sidecarStore);
         // Prime the cache the same way ListCards would, so a stale cached entry would survive
         // deletion if DeletePhoto forgot to evict it.
-        var cachedBeforeDelete = await sidecarCache.GetAsync(sidecarPath, CancellationToken.None);
+        var cachedBeforeDelete = await cache.GetAsync("card-3", CancellationToken.None);
         Assert.Equal("Nya", cachedBeforeDelete!.CardName);
 
-        var service = CreateService(sidecarCache);
+        var configuration = new ConfigurationBuilder().Build();
+        var service = new PictureScannerGrpcService(configuration, NullLogger<PictureScannerGrpcService>.Instance, cache, photoStore);
         await service.DeletePhoto(
-            new DeletePhotoRequest { ImageFileName = "card-3.jpg", CardPhotosDirectory = cardPhotosDirectory },
+            new DeletePhotoRequest { PhotoId = "card-3" },
             new FakeServerCallContext());
 
-        // The file is gone, so a cache implementation that still serves the old cached record
-        // would diverge from disk; reading it now must fail rather than resurrect stale data.
-        await Assert.ThrowsAnyAsync<Exception>(() => sidecarCache.GetAsync(sidecarPath, CancellationToken.None));
+        // The record is gone from the store; a cache implementation that still serves the old
+        // cached record would return it instead of null.
+        var afterDelete = await cache.GetAsync("card-3", CancellationToken.None);
+        Assert.Null(afterDelete);
     }
 }

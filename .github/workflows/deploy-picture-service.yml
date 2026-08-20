@@ -1,0 +1,23 @@
+name: Deploy - PictureService
+
+# Task 10.3: path-filtered build/push/deploy for PictureService. Only runs when something under
+# its own project directory (or its Dockerfile) changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "NinjagoScanner.PictureService/**"
+
+concurrency:
+  group: deploy-picture-service-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-ecs-service.yml
+    with:
+      dockerfile-path: NinjagoScanner.PictureService/Dockerfile
+      ecr-repository-url: ${{ vars.ECR_PICTURE_SERVICE_REPOSITORY_URL }}
+      ecs-service-name: picture-service
+      container-name: picture-service
+    secrets: inherit

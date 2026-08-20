@@ -1,0 +1,31 @@
+name: CI
+
+# Task 10.1: build + test gate. Runs on every PR (and on pushes to main as a
+# safety net) so a broken build/test never lands. No AWS access needed here.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # -maxcpucount:1 works around a NuGet restore race condition on this
+      # solution (see CLAUDE.md / the VS Code build task for the same flag).
+      - name: Build
+        run: dotnet build NinjagoScanner.slnx -maxcpucount:1 --configuration Release
+
+      - name: Test
+        run: dotnet test NinjagoScanner.slnx -maxcpucount:1 --configuration Release --no-build
