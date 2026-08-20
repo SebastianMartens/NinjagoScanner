@@ -10,6 +10,12 @@
          executable on its own, so the assembly must be named "bootstrap" for the self-contained
          publish to produce the file Lambda actually looks for. -->
     <AssemblyName>bootstrap</AssemblyName>
+    <!-- provided.al2023 is an OS-only minimal image with no libicu (see
+         https://docs.aws.amazon.com/linux/al2023/ug/lambda.html). A self-contained .NET app
+         crashes the whole process (Runtime.ExitError) the moment it touches globalization APIs
+         unless it opts into invariant mode. Safe here: this project only ever does culture-neutral
+         parsing/formatting (CultureInfo.InvariantCulture, ToUpperInvariant, plain-digit ToString()). -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
