@@ -247,6 +247,16 @@ This can indicate an outdated model name. The current default is:
 
 If `dotnet build` in the web project fails with a locked `NinjagoScanner.Web.exe`, an instance of the app is usually still running. Stop the running app and then build again.
 
+### Production infrastructure
+
+The app also runs on AWS (see [infra/](infra/) for the Terraform). To check whether all production services (ECS, the internal load balancer, the BFF Lambda, DynamoDB, S3, CloudFront) are healthy, run:
+
+```powershell
+./infra/scripts/health-check.ps1
+```
+
+Requires the AWS CLI on PATH, configured with credentials for that account.
+
 ### Sensible next extensions
 
 1. Sorting in the table view via column header
