@@ -237,8 +237,10 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_ecs_service" "this" {
-  name            = "${var.project_name}-${var.service_name}"
-  cluster         = var.cluster_id
+  name    = "${var.project_name}-${var.service_name}"
+  cluster = var.cluster_id
+  # Only used to seed the service on its very first creation — see the
+  # lifecycle block below for why Terraform doesn't keep enforcing it.
   task_definition = aws_ecs_task_definition.this.arn
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
@@ -293,4 +295,21 @@ resource "aws_ecs_service" "this" {
   }
 
   tags = var.tags
+
+  # `container_image` is always the placeholder tag (var.catalog_service_image_tag
+  # / picture_service_image_tag default to "latest", an image nothing ever pushes —
+  # see those variables' descriptions), because the real deployed image is owned by
+  # _deploy-ecs-service.yml: it renders a task definition from whatever is *currently
+  # live* on the service, patches in the freshly-built `:${github.sha}` image, and
+  # calls `aws ecs update-service` directly — bypassing Terraform state entirely.
+  # Without ignoring `task_definition` here, a `terraform apply` that runs after (or
+  # concurrently with, per terraform.yml/_deploy-ecs-service.yml's independent path
+  # filters) a CI deploy resets the service back to `aws_ecs_task_definition.this.arn`
+  # — the placeholder `:latest` revision — which fails to pull and drops the service
+  # to zero running tasks. Mirrors modules/bff-lambda's `ignore_changes =
+  # [filename, source_code_hash]`: Terraform bootstraps the resource once, CI owns
+  # what's actually deployed from then on.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
