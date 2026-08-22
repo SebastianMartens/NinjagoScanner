@@ -21,86 +21,109 @@
 		</div>
 	</header>
 
-	<section class="catalog-statistics">
-		<div class="series-summary-header">
-			<h2>Katalogstatistik</h2>
+	@if (!string.IsNullOrWhiteSpace(summaryLoadError))
+	{
+		<div class="empty-state">
+			<h2>Katalogdaten konnten nicht geladen werden</h2>
+			<p class="table-secondary">@summaryLoadError</p>
 		</div>
-
-		@if (isSummaryLoading)
-		{
-			<p>Lade Katalogstatistik...</p>
-		}
-		else
-		{
-			<div class="collection-stats">
-				<span>@seriesSummary.TotalCatalogCards Karte(n) im Katalog</span>
-				<span>@seriesSummary.OwnedCatalogCards im Besitz</span>
-				<span>@seriesSummary.TotalPhotos Foto(s)</span>
-			</div>
-			<div class="collection-stats">
-				<span>Analyse: @seriesSummary.AnalysisStatusCounts.Ok ok</span>
-				<span>@seriesSummary.AnalysisStatusCounts.Uncertain unsicher</span>
-				<span>@seriesSummary.AnalysisStatusCounts.Failed fehlgeschlagen</span>
-				<span>@seriesSummary.AnalysisStatusCounts.NotAnalyzed noch nicht analysiert</span>
-			</div>
-			<div class="collection-stats">
-				<span>Review: @seriesSummary.ReviewStatusCounts.Unreviewed ungeprueft</span>
-				<span>@seriesSummary.ReviewStatusCounts.Verified bestaetigt</span>
-				<span>@seriesSummary.ReviewStatusCounts.Incorrect fehlerhaft</span>
-			</div>
-		}
-	</section>
-
-	<section class="series-summary">
-		<div class="series-summary-header">
-			<h2>Serienübersicht</h2>
-		</div>
-
-		@if (isSummaryLoading)
-		{
-			<p>Lade Serienübersicht...</p>
-		}
-		else if (seriesSummary.Series.Count == 0)
-		{
-			<p class="table-secondary">Keine Serien im Katalog gefunden.</p>
-		}
-		else
-		{
-			<div class="series-tile-grid">
-				@foreach (var series in seriesSummary.Series)
-				{
-					<div class="series-tile" @onclick="() => GoToSeries(series.SeriesName)">
-						<h3>@series.SeriesName</h3>
-						<div class="series-tile-progress">
-							<div class="series-tile-progress-bar" style="width: @(OwnedPercent(series))%"></div>
-						</div>
-						<div class="series-tile-stats">
-							<span>@series.OwnedCards / @series.TotalCards Karten</span>
-							<span>@series.TotalPhotos Foto(s)</span>
-						</div>
-					</div>
-				}
+	}
+	else
+	{
+		<section class="catalog-statistics">
+			<div class="series-summary-header">
+				<h2>Katalogstatistik</h2>
 			</div>
 
-			@if (seriesSummary.UnknownSeriesPhotoCount > 0)
+			@if (isSummaryLoading)
 			{
-				<p class="series-unknown-note">@seriesSummary.UnknownSeriesPhotoCount Foto(s) ohne erkannte Serie ("unbekannte Serie").</p>
+				<p>Lade Katalogstatistik...</p>
 			}
-		}
-	</section>
+			else
+			{
+				<div class="collection-stats">
+					<span>@seriesSummary.TotalCatalogCards Karte(n) im Katalog</span>
+					<span>@seriesSummary.OwnedCatalogCards im Besitz</span>
+					<span>@seriesSummary.TotalPhotos Foto(s)</span>
+				</div>
+				<div class="collection-stats">
+					<span>Analyse: @seriesSummary.AnalysisStatusCounts.Ok ok</span>
+					<span>@seriesSummary.AnalysisStatusCounts.Uncertain unsicher</span>
+					<span>@seriesSummary.AnalysisStatusCounts.Failed fehlgeschlagen</span>
+					<span>@seriesSummary.AnalysisStatusCounts.NotAnalyzed noch nicht analysiert</span>
+				</div>
+				<div class="collection-stats">
+					<span>Review: @seriesSummary.ReviewStatusCounts.Unreviewed ungeprueft</span>
+					<span>@seriesSummary.ReviewStatusCounts.Verified bestaetigt</span>
+					<span>@seriesSummary.ReviewStatusCounts.Incorrect fehlerhaft</span>
+				</div>
+			}
+		</section>
+
+		<section class="series-summary">
+			<div class="series-summary-header">
+				<h2>Serienübersicht</h2>
+			</div>
+
+			@if (isSummaryLoading)
+			{
+				<p>Lade Serienübersicht...</p>
+			}
+			else if (seriesSummary.Series.Count == 0)
+			{
+				<p class="table-secondary">Keine Serien im Katalog gefunden.</p>
+			}
+			else
+			{
+				<div class="series-tile-grid">
+					@foreach (var series in seriesSummary.Series)
+					{
+						<div class="series-tile" @onclick="() => GoToSeries(series.SeriesName)">
+							<h3>@series.SeriesName</h3>
+							<div class="series-tile-progress">
+								<div class="series-tile-progress-bar" style="width: @(OwnedPercent(series))%"></div>
+							</div>
+							<div class="series-tile-stats">
+								<span>@series.OwnedCards / @series.TotalCards Karten</span>
+								<span>@series.TotalPhotos Foto(s)</span>
+							</div>
+						</div>
+					}
+				</div>
+
+				@if (seriesSummary.UnknownSeriesPhotoCount > 0)
+				{
+					<p class="series-unknown-note">@seriesSummary.UnknownSeriesPhotoCount Foto(s) ohne erkannte Serie ("unbekannte Serie").</p>
+				}
+			}
+		</section>
+	}
 </div>
 
 @code {
 	private bool isScanning;
 	private string? scanStatusMessage;
+	private string? summaryLoadError;
 
 	private SeriesSummaryResult seriesSummary = new() { Series = Array.Empty<SeriesSummaryItem>() };
 	private bool isSummaryLoading = true;
 
 	protected override async Task OnInitializedAsync()
 	{
-		seriesSummary = await CardCatalogService.GetSeriesSummaryAsync();
-		isSummaryLoading = false;
+		try
+		{
+			seriesSummary = await CardCatalogService.GetSeriesSummaryAsync();
+			summaryLoadError = null;
+		}
+		catch (HttpRequestException exception)
+		{
+			summaryLoadError = $"BFF/API nicht erreichbar: {exception.Message}";
+			seriesSummary = new SeriesSummaryResult { Series = Array.Empty<SeriesSummaryItem>() };
+		}
+		finally
+		{
+			isSummaryLoading = false;
+		}
 	}
 
 	private async Task StartGeminiScanAsync()
@@ -115,6 +138,10 @@
 			scanStatusMessage = summary.HasConfigurationError
 				? summary.Message ?? "Scan konnte nicht gestartet werden."
 				: $"Scan fertig: {summary.Processed} verarbeitet, {summary.Skipped} uebersprungen, {summary.Uncertain} unsicher, {summary.Failed} fehlgeschlagen.";
+		}
+		catch (HttpRequestException exception)
+		{
+			scanStatusMessage = $"Scan fehlgeschlagen: {exception.Message}";
 		}
 		finally
 		{
