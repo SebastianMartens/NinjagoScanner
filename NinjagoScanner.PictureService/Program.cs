@@ -21,6 +21,14 @@ builder.WebHost.ConfigureKestrel(options =>
     var healthCheckPort = builder.Configuration.GetValue<int?>("Kestrel:HealthCheckPort");
     if (healthCheckPort is int port)
     {
+        // Any explicit Listen call here makes Kestrel abandon its implicit
+        // ASPNETCORE_HTTP_PORTS-based endpoint entirely (it logs "Overriding
+        // address(es) ... Binding to endpoints defined via IConfiguration and/or
+        // UseKestrel() instead"), silently dropping the gRPC port — so once the
+        // health-check port is configured, the main port needs its own explicit
+        // Listen call too.
+        var mainPort = builder.Configuration.GetValue<int?>("ASPNETCORE_HTTP_PORTS") ?? 8080;
+        options.ListenAnyIP(mainPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
         options.ListenAnyIP(port, listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
     }
 });
