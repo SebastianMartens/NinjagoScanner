@@ -1,14 +1,18 @@
 <#
 .SYNOPSIS
-    Health-checks every crucial NinjagoScanner AWS resource and reports a single pass/fail view.
+    Health-checks NinjagoScanner's AWS resources and reports a single pass/fail view.
 
 .DESCRIPTION
-    Covers the full request path described in infra/README.md and infra/modules/*:
-      CloudFront -> API Gateway -> BFF Lambda -> internal NLB -> CatalogService/PictureService (Fargate)
-    plus the storage each service depends on (DynamoDB sidecar table, S3 photo/web-client buckets).
+    As of the aws-compute-teardown change, infra/ is storage-only (see infra/README.md) — there is
+    no ECS/Fargate, internal NLB, BFF Lambda, or web-client S3 bucket to check anymore. This script
+    checks what's still deployed (the DynamoDB sidecar table, the S3 photo bucket) plus a CloudFront
+    distribution lookup and end-to-end HTTP checks against the app's public entry point. Those two
+    are expected to FAIL/skip until compute exists again (see openspec/changes/fly-hosting-migration)
+    — kept here so this script needs minimal changes once a public entry point exists again, whatever
+    form it takes.
 
     Resource names are almost all deterministic (see infra/modules/*/main.tf) except the CloudFront
-    distribution and API Gateway API, which get their AWS-assigned IDs discovered at runtime.
+    distribution, which gets its AWS-assigned ID discovered at runtime.
 
     Requires the AWS CLI (`aws`) on PATH, configured with credentials that can read these services
     (the same account/region infra/environments/prod deploys into).
@@ -95,90 +99,6 @@ try {
 
 if ($accountId) {
 
-    # ---- ECS cluster + services ------------------------------------------
-
-    $clusterName = "$ProjectName-cluster"
-    $catalogServiceName = "$ProjectName-catalog-service"
-    $pictureServiceName = "$ProjectName-picture-service"
-
-    try {
-        $cluster = Invoke-AwsJson @("ecs", "describe-clusters", "--clusters", $clusterName)
-        $c = $cluster.clusters | Select-Object -First 1
-        if ($c -and $c.status -eq "ACTIVE") {
-            Add-Result "ECS cluster" "OK" "$clusterName is ACTIVE ($($c.runningTasksCount) running tasks)"
-        } else {
-            Add-Result "ECS cluster" "FAIL" "$clusterName status: $($c.status)"
-        }
-    } catch {
-        Add-Result "ECS cluster" "FAIL" $_.Exception.Message
-    }
-
-    foreach ($svc in @(
-        @{ Name = "CatalogService"; ServiceName = $catalogServiceName },
-        @{ Name = "PictureService"; ServiceName = $pictureServiceName }
-    )) {
-        try {
-            $desc = Invoke-AwsJson @("ecs", "describe-services", "--cluster", $clusterName, "--services", $svc.ServiceName)
-            $s = $desc.services | Select-Object -First 1
-            if (-not $s -or $s.status -ne "ACTIVE") {
-                Add-Result "ECS service: $($svc.Name)" "FAIL" "Service not found or not ACTIVE"
-                continue
-            }
-            $deployOk = ($s.deployments | Where-Object { $_.status -eq "PRIMARY" } | Select-Object -First 1).rolloutState
-            if ($s.runningCount -eq $s.desiredCount -and $s.runningCount -gt 0) {
-                Add-Result "ECS service: $($svc.Name)" "OK" "running $($s.runningCount)/$($s.desiredCount), rollout $deployOk"
-            } else {
-                Add-Result "ECS service: $($svc.Name)" "FAIL" "running $($s.runningCount)/$($s.desiredCount), rollout $deployOk"
-            }
-        } catch {
-            Add-Result "ECS service: $($svc.Name)" "FAIL" $_.Exception.Message
-        }
-    }
-
-    # ---- internal NLB target group health ---------------------------------
-
-    foreach ($tg in @(
-        @{ Name = "CatalogService"; TgName = "catalog-service-tg" },
-        @{ Name = "PictureService"; TgName = "picture-service-tg" }
-    )) {
-        try {
-            $arnResult = Invoke-AwsJson @("elbv2", "describe-target-groups", "--names", $tg.TgName)
-            $tgArn = ($arnResult.TargetGroups | Select-Object -First 1).TargetGroupArn
-            if (-not $tgArn) {
-                Add-Result "NLB target group: $($tg.Name)" "FAIL" "Target group '$($tg.TgName)' not found"
-                continue
-            }
-            $health = Invoke-AwsJson @("elbv2", "describe-target-health", "--target-group-arn", $tgArn)
-            $states = $health.TargetHealthDescriptions | ForEach-Object { $_.TargetHealth.State }
-            $healthyCount = ($states | Where-Object { $_ -eq "healthy" }).Count
-            $total = $states.Count
-            if ($total -gt 0 -and $healthyCount -eq $total) {
-                Add-Result "NLB target group: $($tg.Name)" "OK" "$healthyCount/$total targets healthy"
-            } elseif ($total -eq 0) {
-                Add-Result "NLB target group: $($tg.Name)" "FAIL" "No targets registered"
-            } else {
-                Add-Result "NLB target group: $($tg.Name)" "FAIL" "$healthyCount/$total targets healthy ($($states -join ', '))"
-            }
-        } catch {
-            Add-Result "NLB target group: $($tg.Name)" "FAIL" $_.Exception.Message
-        }
-    }
-
-    # ---- BFF Lambda ---------------------------------------------------------
-
-    $lambdaName = "$ProjectName-bff"
-    try {
-        $fn = Invoke-AwsJson @("lambda", "get-function", "--function-name", $lambdaName)
-        $cfg = $fn.Configuration
-        if ($cfg.State -eq "Active" -and $cfg.LastUpdateStatus -eq "Successful") {
-            Add-Result "BFF Lambda" "OK" "State=$($cfg.State), LastUpdateStatus=$($cfg.LastUpdateStatus)"
-        } else {
-            Add-Result "BFF Lambda" "WARN" "State=$($cfg.State), LastUpdateStatus=$($cfg.LastUpdateStatus)"
-        }
-    } catch {
-        Add-Result "BFF Lambda" "FAIL" $_.Exception.Message
-    }
-
     # ---- DynamoDB sidecar table ----------------------------------------------
 
     $tableName = "$ProjectName-sidecars"
@@ -197,8 +117,7 @@ if ($accountId) {
     # ---- S3 buckets -----------------------------------------------------------
 
     foreach ($bucket in @(
-        @{ Name = "Photos bucket"; Bucket = "$ProjectName-photos-$accountId" },
-        @{ Name = "Web client bucket"; Bucket = "$ProjectName-web-client-$accountId" }
+        @{ Name = "Photos bucket"; Bucket = "$ProjectName-photos-$accountId" }
     )) {
         try {
             & aws s3api head-bucket --bucket $bucket.Bucket --region $AwsRegion 2>&1 | Out-Null
