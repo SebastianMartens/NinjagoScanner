@@ -1,0 +1,151 @@
+<mxfile host="app.diagrams.net" modified="2026-08-22T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+  <diagram id="ninjago-architecture" name="Architecture">
+    <mxGraphModel dx="1800" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===================== Boundary boxes ===================== -->
+
+        <mxCell id="box_aws" value="AWS Cloud (eu-central-1)" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#232F3E;fillColor=none;strokeColor=#232F3E;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="230" y="20" width="1420" height="720" as="geometry" />
+        </mxCell>
+
+        <mxCell id="box_vpc" value="Amazon VPC — private subnets (public subnet holds only the NAT Gateway)" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#8C4FFF;fillColor=#F4EEFB;strokeColor=#8C4FFF;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="60" width="760" height="660" as="geometry" />
+        </mxCell>
+
+        <mxCell id="box_ecs" value="Amazon ECS — Fargate Cluster (Service Connect mesh)" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#D86613;fillColor=#FDF2E9;strokeColor=#D86613;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="200" width="460" height="400" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== External actors ===================== -->
+
+        <mxCell id="n_browser" value="Browser&#10;(end user)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="280" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_gemini" value="Google Gemini API&#10;(external, not AWS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1730" y="580" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== Edge / CDN tier ===================== -->
+
+        <mxCell id="n_s3web" value="Amazon S3&#10;Web Client bucket (static WASM assets)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F5E9;strokeColor=#7AA116;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="100" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_cloudfront" value="Amazon CloudFront&#10;(single distribution, 2 origins)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4EEFB;strokeColor=#8C4FFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="280" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_apigw" value="Amazon API Gateway&#10;HTTP API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4EEFB;strokeColor=#8C4FFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="280" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== Compute / networking inside VPC ===================== -->
+
+        <mxCell id="n_lambda" value="AWS Lambda&#10;Web BFF (.NET 10, arm64, VPC-attached)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDF2E9;strokeColor=#D86613;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="710" y="280" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_nlb" value="Network Load Balancer&#10;(internal, TCP passthrough)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4EEFB;strokeColor=#8C4FFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="710" y="430" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_nat" value="NAT Gateway&#10;(public subnet — internet egress)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4EEFB;strokeColor=#8C4FFF;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="710" y="580" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_catalog" value="CatalogService&#10;Fargate task · gRPC :8080 · health HTTP :8082" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D86613;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="970" y="260" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_picture" value="PictureService&#10;Fargate task · gRPC :8080 · health HTTP :8082" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D86613;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="970" y="440" width="220" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== Regional AWS services outside the VPC ===================== -->
+
+        <mxCell id="n_s3photos" value="Amazon S3&#10;Photos bucket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F5E9;strokeColor=#7AA116;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_dynamodb" value="Amazon DynamoDB&#10;Sidecar table (on-demand)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF0FC;strokeColor=#4D72F3;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="260" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_secrets" value="AWS Secrets Manager&#10;Gemini API key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBEAEC;strokeColor=#DD344C;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_ecr" value="Amazon ECR&#10;container images" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDF2E9;strokeColor=#D86613;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="500" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== Edges ===================== -->
+
+        <mxCell id="e1" value="HTTPS :443" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;" edge="1" parent="1" source="n_browser" target="n_cloudfront">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" value="HTTPS · OAC&#10;(default behavior, static assets)" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;" edge="1" parent="1" source="n_cloudfront" target="n_s3web">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" value="HTTPS :443&#10;/api/* (custom origin)" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;" edge="1" parent="1" source="n_cloudfront" target="n_apigw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" value="AWS_PROXY invoke&#10;(payload format 2.0)" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;" edge="1" parent="1" source="n_apigw" target="n_lambda">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" value="gRPC / HTTP2 (cleartext)&#10;TCP :8080 (Catalog) · :8081 (Picture)" style="html=1;fontSize=11;endArrow=block;strokeColor=#D86613;" edge="1" parent="1" source="n_lambda" target="n_nlb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e6" value="TCP :8080 → target 8080&#10;gRPC/HTTP2 · health HTTP :8082" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;" edge="1" parent="1" source="n_nlb" target="n_catalog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" value="TCP :8081 → target 8080&#10;gRPC/HTTP2 · health HTTP :8082" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;" edge="1" parent="1" source="n_nlb" target="n_picture">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8" value="gRPC / HTTP2&#10;ECS Service Connect (Cloud Map)" style="html=1;fontSize=11;endArrow=block;strokeColor=#D86613;" edge="1" parent="1" source="n_picture" target="n_catalog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" value="PUT / GET via presigned URL&#10;HTTPS :443 (URL issued by BFF)" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;" edge="1" parent="1" source="n_browser" target="n_s3photos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e10" value="HTTPS :443&#10;via S3 Gateway VPC Endpoint" style="html=1;fontSize=11;endArrow=block;strokeColor=#7AA116;" edge="1" parent="1" source="n_picture" target="n_s3photos">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e11" value="HTTPS :443&#10;via DynamoDB Gateway VPC Endpoint" style="html=1;fontSize=11;endArrow=block;strokeColor=#4D72F3;" edge="1" parent="1" source="n_picture" target="n_dynamodb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e12" value="internet egress" style="html=1;fontSize=11;endArrow=block;strokeColor=#8C4FFF;dashed=1;" edge="1" parent="1" source="box_ecs" target="n_nat">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e13" value="HTTPS :443&#10;GetSecretValue (task startup)" style="html=1;fontSize=11;endArrow=block;strokeColor=#DD344C;dashed=1;" edge="1" parent="1" source="n_nat" target="n_secrets">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e14" value="HTTPS :443&#10;image pull (deploy-time)" style="html=1;fontSize=11;endArrow=block;strokeColor=#D86613;dashed=1;" edge="1" parent="1" source="n_nat" target="n_ecr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e15" value="HTTPS :443&#10;AI analysis calls" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;dashed=1;" edge="1" parent="1" source="n_nat" target="n_gemini">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

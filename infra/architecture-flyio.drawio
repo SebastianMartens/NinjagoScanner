@@ -1,0 +1,95 @@
+<mxfile host="65bd71144e">
+    <diagram id="ninjago-architecture-flyio" name="Architecture (Fly.io proposal)">
+        <mxGraphModel dx="1239" dy="540" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="box_fly" value="Fly.io — region: fra (Frankfurt)" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#6E56CF;fillColor=none;strokeColor=#6E56CF;dashed=1;dashPattern=8 4;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="20" width="720" height="700" as="geometry"/>
+                </mxCell>
+                <mxCell id="box_flynet" value="Fly private network (6PN — WireGuard mesh, *.internal DNS, no public exposure)" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#6E56CF;fillColor=#F0EBFC;strokeColor=#6E56CF;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="320" width="660" height="320" as="geometry"/>
+                </mxCell>
+                <mxCell id="box_aws" value="AWS (eu-central-1) — storage only, no VPC / no compute" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#232F3E;fillColor=none;strokeColor=#232F3E;dashed=1;dashPattern=8 4;" parent="1" vertex="1">
+                    <mxGeometry x="1060" y="320" width="360" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_browser" value="Browser&#xa;(end user)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="140" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_github" value="GitHub Actions&#xa;build + test on PR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="600" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_gemini" value="Google Gemini API&#xa;(external)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1080" y="620" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_web" value="web&#xa;Fly app: ASP.NET Core&#xa;hosts Blazor WASM static assets + BFF API&#xa;(NinjagoScanner.Web.Client + .Bff, one deployable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E56CF;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="120" width="280" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_catalog" value="catalog-service&#xa;Fly app · gRPC :8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E56CF;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="360" width="220" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_picture" value="picture-service&#xa;Fly app · gRPC :8080" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#6E56CF;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="480" width="220" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_s3photos" value="Amazon S3&#xa;Photos bucket (versioned, SSE-S3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E9F5E9;strokeColor=#7AA116;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1090" y="360" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_dynamodb" value="Amazon DynamoDB&#xa;Sidecar table (on-demand, 3 GSIs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF0FC;strokeColor=#4D72F3;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="1090" y="480" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="HTTPS :443&#xa;Fly anycast edge, automatic TLS" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;" parent="1" source="n_browser" target="n_web" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="PUT / GET via presigned URL&#xa;HTTPS :443 (URL issued by web/Bff)" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;" parent="1" source="n_browser" target="n_s3photos" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="gRPC / HTTP2&#xa;catalog-service.internal:8080 (6PN)" style="html=1;fontSize=11;endArrow=block;strokeColor=#6E56CF;" parent="1" source="n_web" target="n_catalog" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" value="gRPC / HTTP2&#xa;picture-service.internal:8080 (6PN)" style="html=1;fontSize=11;endArrow=block;strokeColor=#6E56CF;" parent="1" source="n_web" target="n_picture" edge="1">
+                    <mxGeometry x="-0.0362" y="63" relative="1" as="geometry">
+                        <mxPoint y="-1" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e5" value="gRPC / HTTP2&#xa;catalog-service.internal:8080 (6PN)" style="html=1;fontSize=11;endArrow=block;strokeColor=#6E56CF;" parent="1" source="n_picture" target="n_catalog" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" value="HTTPS :443&#xa;AWS SDK, IAM user credentials" style="html=1;fontSize=11;endArrow=block;strokeColor=#7AA116;" parent="1" source="n_picture" target="n_s3photos" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" value="HTTPS :443&#xa;AWS SDK, IAM user credentials" style="html=1;fontSize=11;endArrow=block;strokeColor=#4D72F3;" parent="1" source="n_picture" target="n_dynamodb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" value="HTTPS :443&#xa;AWS SDK, IAM user credentials&#xa;(presign only, no network call)" style="html=1;fontSize=11;endArrow=block;strokeColor=#7AA116;dashed=1;" parent="1" source="n_web" target="n_s3photos" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" value="HTTPS :443&#xa;AI analysis calls" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;dashed=1;" parent="1" source="n_secrets" target="n_gemini" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" value="injected as env vars at boot" style="html=1;fontSize=10;endArrow=block;strokeColor=#6E56CF;dashed=1;" parent="1" source="n_secrets" target="n_picture" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" value="injected as env vars at boot" style="html=1;fontSize=10;endArrow=block;strokeColor=#6E56CF;dashed=1;" parent="1" source="n_secrets" target="n_web" edge="1">
+                    <mxGeometry x="-0.2483" y="-22" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e12" value="flyctl deploy&#xa;(3 apps, path-filtered, push to main)" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;" parent="1" source="n_github" target="box_fly" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="n_note" value="Removed vs. current AWS plan: VPC, NAT Gateway, internal NLB, ECS/Fargate, Service Connect, Lambda BFF, API Gateway, CloudFront, S3 static-site bucket, Secrets Manager, ECR, GitHub OIDC roles, all Terraform for the above.&#xa;Kept: S3 photos bucket, DynamoDB sidecar table + GSIs, presigned-URL upload flow, gRPC contracts between the 3 services, CatalogService/PictureService code unchanged.&#xa;Changed: ECS task-role → IAM user access keys (as Fly secrets); Service Connect/internal NLB → Fly 6PN private networking; Secrets Manager → Fly Secrets.&#xa;Open design choice sketched here: Web.Client (WASM) + Web.Bff recombined into one Fly app, since Fly runs always-on machines (not Lambda) — the split existed only to satisfy Lambda&#39;s stateless constraint." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8DC;strokeColor=#B8860B;fontSize=11;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="740" width="1160" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="html=1;fontSize=11;endArrow=block;strokeColor=#666666;dashed=1;" edge="1" parent="1" source="n_picture" target="n_secrets">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="540" y="535" as="sourcePoint"/>
+                        <mxPoint x="1080" y="634" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n_secrets" value="Fly Secrets (per app, encrypted)&#xa;Gemini API key · AWS IAM access key/secret" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0EBFC;strokeColor=#6E56CF;fontSize=11;fontStyle=1;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="630" y="560" width="290" height="60" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
