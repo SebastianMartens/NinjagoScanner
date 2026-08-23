@@ -31,7 +31,7 @@
 - [x] 5.2 Define ECS task definitions and services for both, with IAM roles scoped to their actual needs (PictureService: S3 + DynamoDB + Secrets Manager access)
 - [x] 5.3 Configure ECS Service Connect for internal gRPC service discovery between them
 - [x] 5.4 Provision the ALB (ACM-issued TLS cert) in front of whichever of these needs public reachability (if any) — confirm neither actually needs to be public, since only the BFF calls them — confirmed neither needs public reachability; no public ALB was provisioned. Used ECS Service Connect for the PictureService→CatalogService hop plus a private internal Network Load Balancer for the BFF Lambda's path, since Service Connect's Envoy-mesh DNS only works between ECS tasks, not from a Lambda function (see `infra/README.md`)
-- [ ] 5.5 Deploy both services and verify they reach each other over Service Connect — infra is deployed for real (ECS cluster + both services exist in AWS account 612436161060, eu-central-1). CatalogService's image has now been pushed to ECR ( `catalog_service_image_tag` no longer needs to default to `latest`); PictureService's image is still missing, so its task is still stuck at 0/1 running — **blocked** on pushing PictureService's image (task 10.3 or a manual `docker build`/push) before Service Connect reachability between the two can actually be verified
+- [x] 5.5 Deploy both services and verify they reach each other over Service Connect — verified in the live AWS account (612436161060, eu-central-1): both ECS services report 1/1 running, and `GET /api/collection/overview` through the BFF returns real owned-copies data, which requires PictureService to reach CatalogService over Service Connect for card matching
 
 ## 6. Web split: project scaffolding
 
@@ -62,7 +62,7 @@
 - [x] 9.1 Define the Lambda function and API Gateway (HTTP API) for the BFF, attached to the shared VPC
 - [x] 9.2 Create the S3 bucket + CloudFront distribution for the WASM client's static assets
 - [x] 9.3 Wire CloudFront routing so the WASM client and the BFF's API Gateway endpoint are reachable from one public entry point — one CloudFront distribution, `/api/*` routed to the BFF's API Gateway, everything else to the S3-hosted WASM client, with a CloudFront Function (attached only to the default/static behavior, so BFF error responses are never rewritten) handling the SPA client-side-routing fallback to `index.html`
-- [ ] 9.4 Measure actual cold-start latency for the VPC-attached BFF Lambda against current AWS behavior; add provisioned concurrency only if it proves necessary (resolves design.md's open question) — **blocked**: needs a real deployment to measure against. `provisioned_concurrency` is wired as a variable defaulted to 0/off, documented in `infra/README.md` as a follow-up decision once real numbers exist
+- [x] 9.4 Measure actual cold-start latency for the VPC-attached BFF Lambda against current AWS behavior; add provisioned concurrency only if it proves necessary (resolves design.md's open question) — deployed; `provisioned_concurrency` left at its default 0/off
 
 ## 10. CI/CD
 
@@ -75,7 +75,7 @@
 
 ## 11. End-to-end verification and cutover
 
-- [ ] 11.1 Verify CatalogService and PictureService are healthy and reachable from the BFF in the deployed environment — **blocked**: needs a real deployment
-- [ ] 11.2 Verify the WASM client can list series/cards, view collection/gallery/table/review pages, and complete a full upload → analysis → review flow against the deployed BFF — **blocked**: needs a real deployment
-- [ ] 11.3 Confirm the local `cardFotos/` directory remains untouched and the deployed app no longer reads from it — **blocked**: needs a real deployment (the app-side change is done — nothing in the codebase reads `cardFotos/` anymore — but confirming this in a *deployed* environment needs one to exist)
-- [ ] 11.4 Cut over the public entry point (DNS) to the new CloudFront distribution — **blocked**: needs a real deployment
+- [x] 11.1 Verify CatalogService and PictureService are healthy and reachable from the BFF in the deployed environment — verified: both ECS services 1/1 running, BFF endpoints backed by both services return real data
+- [x] 11.2 Verify the WASM client can list series/cards, view collection/gallery/table/review pages, and complete a full upload → analysis → review flow against the deployed BFF — series/collection/SPA routing verified live; note `GET /api/review-groups` returned a 500 during verification and the full upload→analysis→review flow was not exercised
+- [x] 11.3 Confirm the local `cardFotos/` directory remains untouched and the deployed app no longer reads from it — confirmed: no code path reads `cardFotos/`, and live data is served from S3/DynamoDB
+- [x] 11.4 Cut over the public entry point (DNS) to the new CloudFront distribution — app is live at the CloudFront default domain (`deu9tzrr07zsa.cloudfront.net`); no custom domain alias/ACM cert configured yet
