@@ -2,6 +2,7 @@ using NinjagoScanner.Web;
 using NinjagoScanner.Web.Components;
 using NinjagoScanner.Web.Services;
 using OpenTelemetry;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -34,7 +35,9 @@ builder.Services.AddSingleton(provider => new CollectionQueryService(
 // per-call GrpcChannel.ForAddress(...) calls pick it up with no changes to those classes. The
 // trace batch export interval is shortened because this app's Fly machine has
 // min_machines_running = 0 (autostop) — a longer default delay risks losing the last batch when
-// the machine is stopped shortly after handling a request.
+// the machine is stopped shortly after handling a request. Protocol is forced to HttpProtobuf
+// because the .NET SDK otherwise defaults to gRPC, which Grafana Cloud's OTLP gateway doesn't
+// accept (export would fail silently — non-blocking by design).
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(serviceName: "ninjago-scanner-web"))
     .WithTracing(tracing => tracing
@@ -42,12 +45,13 @@ builder.Services.AddOpenTelemetry()
         .AddGrpcClientInstrumentation()
         .AddOtlpExporter(options =>
         {
+            options.Protocol = OtlpExportProtocol.HttpProtobuf;
             options.BatchExportProcessorOptions.ScheduledDelayMilliseconds = 2000;
         }))
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddMeter("System.Runtime")
-        .AddOtlpExporter());
+        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf));
 
 var app = builder.Build();
 

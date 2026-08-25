@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NinjagoScanner.CatalogService.Catalog;
 using NinjagoScanner.CatalogService.Services;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -13,16 +14,18 @@ builder.Services.AddSingleton<CatalogRepository>();
 
 // OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
 // automatically by AddOtlpExporter() from the standard OTel environment variables — see
-// openspec/changes/add-opentelemetry-observability/design.md.
+// openspec/changes/add-opentelemetry-observability/design.md. Protocol is forced to
+// HttpProtobuf because the .NET SDK otherwise defaults to gRPC, which Grafana Cloud's OTLP
+// gateway doesn't accept (export would fail silently — non-blocking by design).
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource.AddService(serviceName: "ninjago-scanner-catalog-service"))
     .WithTracing(tracing => tracing
         .AddAspNetCoreInstrumentation()
-        .AddOtlpExporter())
+        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf))
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddMeter("System.Runtime")
-        .AddOtlpExporter());
+        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf));
 
 builder.WebHost.ConfigureKestrel(options =>
 {
