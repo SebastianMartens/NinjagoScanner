@@ -10,29 +10,29 @@ The `/upload` page SHALL present a file input restricted to image files and hint
 - **WHEN** a user opens `/upload` on a mobile device and taps the file field
 - **THEN** the browser is hinted to offer the rear ("environment") camera alongside the regular file picker, and only image files can be selected
 
-### Requirement: Direct-to-storage upload
-The system SHALL let the browser upload a photo directly to the storage backend using a short-lived, pre-authorized upload URL obtained from the BFF, rather than transmitting the photo bytes through the BFF itself.
+### Requirement: Upload streams through the app server
+The system SHALL let the browser upload a photo by streaming its bytes to `NinjagoScanner.Web`, which forwards them to PictureService for storage, rather than the browser uploading directly to the storage backend.
 
-#### Scenario: Successful direct upload
+#### Scenario: Successful upload
 - **WHEN** the user selects a supported photo and confirms upload
-- **THEN** the client obtains a pre-authorized upload URL from the BFF and uploads the photo bytes directly to storage without those bytes passing through the BFF
+- **THEN** the browser streams the photo bytes to the Web app, which streams them onward to PictureService, and the photo becomes available without the browser ever addressing the storage backend directly
 
 ### Requirement: File type and size validation before upload
-The system SHALL reject photos that are not one of the supported image types (JPG, PNG, BMP, WEBP) or that exceed the configured maximum upload size, before issuing an upload URL.
+The system SHALL reject photos that are not one of the supported image types (JPG, PNG, BMP, WEBP) or that exceed the configured maximum upload size, before the upload stream to PictureService begins.
 
 #### Scenario: Oversized file rejected
 - **WHEN** the user selects a photo larger than the configured maximum upload size
-- **THEN** the BFF does not issue an upload URL, and the client displays an error instead of uploading
+- **THEN** the Web app does not start streaming the file to PictureService, and the client displays an error instead of uploading
 
 #### Scenario: Unsupported file type rejected
 - **WHEN** the user selects a file whose type is not one of the supported image types
-- **THEN** the BFF does not issue an upload URL, and the client displays an error instead of uploading
+- **THEN** the Web app does not start streaming the file to PictureService, and the client displays an error instead of uploading
 
 ### Requirement: Analysis starts only after upload confirmation
-The system SHALL trigger photo analysis only after the browser confirms the direct upload to storage has completed.
+The system SHALL trigger photo analysis only after the streamed upload to PictureService has completed successfully.
 
-#### Scenario: Analysis starts after upload confirmation
-- **WHEN** the browser finishes uploading a photo directly to storage and notifies the BFF
+#### Scenario: Analysis starts after upload completes
+- **WHEN** the Web app finishes streaming a photo's bytes to PictureService and PictureService confirms the upload succeeded
 - **THEN** PictureService begins analyzing that photo
 
 ### Requirement: Upload progress disables re-submission

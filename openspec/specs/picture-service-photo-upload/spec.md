@@ -7,7 +7,7 @@ Defines the client-streaming `UploadPhoto` RPC used to add a new card photo (e.g
 ## Requirements
 
 ### Requirement: Upload is a metadata-then-bytes stream
-`UploadPhoto` SHALL accept a client stream whose first message carries upload metadata (original file name and an optional card photos directory override) and whose subsequent messages carry the raw file bytes, which are concatenated in order.
+`UploadPhoto` SHALL accept a client stream whose first message carries upload metadata (original file name) and whose subsequent messages carry the raw file bytes, which are concatenated in order.
 
 #### Scenario: Well-formed upload stream
 - **WHEN** a client sends one metadata message followed by one or more byte-chunk messages
@@ -28,28 +28,16 @@ Defines the client-streaming `UploadPhoto` RPC used to add a new card photo (e.g
 - **WHEN** the original file name's extension is not jpg, jpeg, png, bmp, or webp
 - **THEN** the call fails with `InvalidArgument`
 
-### Requirement: Uploaded file is saved under a sanitized, collision-safe name
-`UploadPhoto` SHALL derive the stored file name by stripping characters other than letters, digits, `_`, and `-` from the original file name's stem (falling back to `mobile-photo` if nothing remains), prefixing it with a UTC timestamp, and appending a numeric suffix if the resulting name already exists in the target directory, retrying up to 100 candidate names before failing.
+### Requirement: Uploaded photo is assigned a generated identifier and stored durably
+`UploadPhoto` SHALL assign the uploaded photo a generated identifier (not derived from the original file name) and persist its bytes in the durable object store under that identifier, consistent with `picture-service-photo-storage`'s stable-identity requirement.
 
-#### Scenario: File name with unsafe characters
-- **WHEN** the original file name contains characters outside letters, digits, `_`, and `-`
-- **THEN** those characters are replaced/stripped in the stored file name, which is still prefixed with a UTC timestamp
+#### Scenario: Two uploads share an original file name
+- **WHEN** two photos are uploaded via `UploadPhoto` whose original file names are identical
+- **THEN** both are assigned distinct generated identifiers and are both stored and retrievable independently
 
-#### Scenario: File name with no usable characters
-- **WHEN** the original file name's stem contains no letters, digits, `_`, or `-` characters
-- **THEN** the stored file name uses `mobile-photo` as its sanitized stem
+### Requirement: Upload triggers analysis on completion
+`UploadPhoto` SHALL trigger AI analysis of the uploaded photo once its byte stream has been fully received and stored, without requiring a separate call to start analysis.
 
-#### Scenario: Name collision
-- **WHEN** the sanitized, timestamp-prefixed candidate file name already exists in the target directory
-- **THEN** the server retries with a numeric suffix appended, up to 100 attempts, before giving up
-
-#### Scenario: All candidate names exhausted
-- **WHEN** all 100 candidate names for an upload already exist in the target directory
-- **THEN** the call fails with an `Internal` error
-
-### Requirement: Upload target directory is created if missing
-`UploadPhoto` SHALL create the resolved card photos directory (including the optional per-request override) if it does not already exist, before writing the uploaded file.
-
-#### Scenario: Directory does not exist yet
-- **WHEN** the resolved target directory for the upload does not exist on disk
-- **THEN** the directory is created before the file is written, and the upload succeeds
+#### Scenario: Analysis begins after a successful upload
+- **WHEN** `UploadPhoto`'s client stream completes and the photo has been stored successfully
+- **THEN** PictureService begins AI analysis of that photo before returning a response to the caller
