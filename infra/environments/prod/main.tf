@@ -22,6 +22,15 @@ module "sidecar_table" {
   tags                        = local.common_tags
 }
 
+module "picture_service_iam_user" {
+  source = "../../modules/iam-user"
+
+  project_name      = var.project_name
+  photo_bucket_arn  = module.photo_storage.bucket_arn
+  sidecar_table_arn = module.sidecar_table.table_arn
+  tags              = local.common_tags
+}
+
 module "github_oidc" {
   source = "../../modules/github-oidc"
 

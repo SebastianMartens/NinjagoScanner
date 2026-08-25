@@ -37,6 +37,11 @@ locals {
   oidc_provider_arn  = "arn:aws:iam::${local.account_id}:oidc-provider/token.actions.githubusercontent.com"
   self_iam_role_arns = [local.plan_role_arn, local.deploy_role_arn]
 
+  # Same deterministic-ARN reasoning as the role ARNs above, applied to
+  # modules/iam-user's PictureService user (name/path both fixed, no
+  # AWS-assigned suffix) — see the ManagePictureServiceIamUser statement.
+  picture_service_iam_user_arn = "arn:aws:iam::${local.account_id}:user/${var.project_name}/${var.project_name}-picture-service"
+
   # The deploy role's own permission documents (modules/github-oidc's
   # deploy_policy_jsons) are attached as customer-managed policies, not
   # inline ones — see that variable's description for why. Their names are
@@ -102,6 +107,21 @@ data "aws_iam_policy_document" "manage_resources_core" {
       "dynamodb:DescribeTimeToLive",
     ]
     resources = [module.sidecar_table.table_arn, "${module.sidecar_table.table_arn}/index/*"]
+  }
+
+  # modules/iam-user's PictureService user — a separate identity from the
+  # deploy/plan roles above (see self_managed_iam), scoped to exactly the
+  # resource this stack's own iam-user module creates.
+  statement {
+    sid    = "ManagePictureServiceIamUser"
+    effect = "Allow"
+    actions = [
+      "iam:CreateUser", "iam:DeleteUser", "iam:GetUser",
+      "iam:TagUser", "iam:UntagUser",
+      "iam:PutUserPolicy", "iam:DeleteUserPolicy", "iam:GetUserPolicy", "iam:ListUserPolicies",
+      "iam:CreateAccessKey", "iam:DeleteAccessKey", "iam:ListAccessKeys", "iam:UpdateAccessKey",
+    ]
+    resources = [local.picture_service_iam_user_arn]
   }
 }
 
@@ -193,6 +213,15 @@ data "aws_iam_policy_document" "plan_only" {
       module.sidecar_table.table_arn,
       "${module.sidecar_table.table_arn}/index/*",
     ]
+  }
+
+  statement {
+    sid    = "PictureServiceIamUserRead"
+    effect = "Allow"
+    actions = [
+      "iam:GetUser", "iam:GetUserPolicy", "iam:ListUserPolicies", "iam:ListAccessKeys",
+    ]
+    resources = [local.picture_service_iam_user_arn]
   }
 
   statement {

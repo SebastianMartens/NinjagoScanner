@@ -3,13 +3,14 @@
 AWS infrastructure for NinjagoScanner. As of the `aws-compute-teardown`
 OpenSpec change (see `openspec/changes/aws-compute-teardown/{proposal,design,tasks}.md`),
 this stack is storage-only: the Terraform state backend, the S3 photo
-bucket, the DynamoDB sidecar table, and the GitHub Actions OIDC roles that
-manage them. It previously also ran the app's compute (VPC, ECS Fargate,
-an internal NLB, a Web BFF Lambda, and a CloudFront-fronted WASM client —
-the `cloud-hosting-migration` change) but that was torn down: it never
-carried real production traffic, and compute is moving to Fly.io in a
-follow-up change instead. See `aws-compute-teardown`'s proposal for the
-full "why."
+bucket, the DynamoDB sidecar table, the IAM user PictureService uses to
+reach them, and the GitHub Actions OIDC roles that manage all of it. It
+previously also ran the app's compute (VPC, ECS Fargate, an internal NLB, a
+Web BFF Lambda, and a CloudFront-fronted WASM client — the
+`cloud-hosting-migration` change) but that was torn down: it never carried
+real production traffic. Compute now runs on Fly.io instead (the
+`fly-hosting-migration` change) — see "What's not here yet" below for how
+that's configured, since it isn't Terraform-managed.
 
 ## Layout
 
@@ -33,10 +34,12 @@ infra/
                                   CORS (for direct browser upload), lifecycle
                                   rules.
     sidecar-table/                 DynamoDB table for sidecar records + GSIs.
+    iam-user/                        IAM user + scoped policy PictureService
+                                       authenticates to AWS with on Fly.io.
 ```
 
-`environments/prod/main.tf` composes `photo-storage`, `sidecar-table`, and
-`github-oidc` into one deployable stack. `environments/prod/iam-policies.tf`
+`environments/prod/main.tf` composes `photo-storage`, `sidecar-table`,
+`iam-user`, and `github-oidc` into one deployable stack. `environments/prod/iam-policies.tf`
 builds the IAM policy documents attached to the two GitHub Actions roles,
 since only the root module knows every resource ARN those policies need to
 reference.
@@ -136,6 +139,19 @@ terraform apply
   stale multipart uploads after 7 days and expire noncurrent object versions
   after 30 days — bounding storage growth from the versioning safety net
   without touching the current (actively viewed) version of any photo.
+- **PictureService's own IAM user (`modules/iam-user`)**: a static IAM user
+  with an inline policy scoped to exactly the S3/DynamoDB actions
+  PictureService's code calls — `s3:GetObject`/`PutObject`/`DeleteObject` on
+  the photo bucket's `photos/*` prefix, `s3:ListBucket` on the bucket
+  (restricted to that prefix via a condition), and
+  `dynamodb:GetItem`/`PutItem`/`DeleteItem`/`Scan` on the sidecar table. Fly
+  Machines have no AWS-native way to assume an IAM role the way an ECS task
+  did, so this is a static access key/secret instead of auto-rotated STS
+  credentials — a real security posture downgrade, accepted as a pragmatic
+  trade-off for a personal-scale app (see
+  `openspec/changes/fly-hosting-migration/design.md` Decision 4). No other
+  service gets an IAM user; PictureService remains the only service that
+  ever holds AWS credentials.
 - **Self-managing IAM role.** The `deploy` role's policy grants it rights to
   manage its own role/policy and the OIDC provider (scoped tightly to those
   exact resource names — see `iam-policies.tf`'s `SelfManagedIamRoles` /
@@ -145,14 +161,42 @@ terraform apply
   bootstrapping wrinkle described above (first apply must be run by a
   human).
 
-## What's not here yet
+## Setting PictureService's AWS credentials as a Fly secret
+
+`modules/iam-user`'s access key is the one piece of this stack's output
+that has to leave Terraform and land in Fly rather than in another AWS
+resource. After `terraform apply`:
+
+```powershell
+cd infra/environments/prod
+terraform output picture_service_access_key_id
+terraform output -raw picture_service_secret_access_key
+flyctl secrets set --config ../../../NinjagoScanner.PictureService/fly.toml `
+  AWS_ACCESS_KEY_ID=<value from the first output> `
+  AWS_SECRET_ACCESS_KEY=<value from the second output>
+```
+
+Also set PictureService's Gemini credentials and the bucket/table names the
+same way (`Gemini__ApiKey`, `Gemini__Model`, `Storage__PhotosBucketName` —
+from `terraform output photo_bucket_name` —, `Storage__SidecarTableName` —
+from `terraform output sidecar_table_name`), matching how the Gemini key is
+already handled: never committed, set once as a secret on the running app.
+
+## AWS compute (what's not here) vs. Fly.io compute (what's not Terraform)
 
 AWS compute is **deliberately** not part of this stack, and won't be added
 back here — `aws-compute-teardown` removed the VPC/ECS Fargate/internal
 NLB/BFF Lambda/CloudFront setup that `cloud-hosting-migration` had stood up,
 since it never carried real traffic and was actively billing for no
-benefit. Compute is moving to Fly.io instead; see
-`openspec/changes/fly-hosting-migration` (or its successor) for that work
-and whatever IaC approach it settles on — this `infra/` directory is
-expected to stay storage-only (S3 + DynamoDB + the Terraform/CI plumbing
-around them) going forward.
+benefit. This `infra/` directory stays storage-only (S3 + DynamoDB + the
+IAM user above + the Terraform/CI plumbing around them) going forward.
+
+Compute now runs on Fly.io instead (`fly-hosting-migration`), but Fly
+resources are **not** managed by this Terraform config — `fly.toml` per
+project (`NinjagoScanner.Web/fly.toml`, `NinjagoScanner.CatalogService/fly.toml`,
+`NinjagoScanner.PictureService/fly.toml`) plus `flyctl` is Fly's own
+first-party config-as-code, and is what this repo uses instead (see
+`openspec/changes/fly-hosting-migration/design.md` Decision 5 for why the
+unofficial Terraform Fly provider was rejected). See each project's
+`fly.toml` for its own configuration detail rather than looking for it
+here.

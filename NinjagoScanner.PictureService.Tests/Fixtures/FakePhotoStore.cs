@@ -13,6 +13,17 @@ internal sealed class FakePhotoStore : IPhotoStore
 
     public void Seed(string photoId, byte[] bytes) => objects[photoId] = bytes;
 
+    public Task PutBytesAsync(string photoId, byte[] bytes, CancellationToken cancellationToken)
+    {
+        objects[photoId] = bytes;
+        return Task.CompletedTask;
+    }
+
+    public Task<string> CreateDownloadUrlAsync(string photoId, CancellationToken cancellationToken)
+    {
+        return Task.FromResult($"https://fake-bucket.example/{photoId}");
+    }
+
     public Task<byte[]> GetBytesAsync(string photoId, CancellationToken cancellationToken)
     {
         return objects.TryGetValue(photoId, out var bytes)

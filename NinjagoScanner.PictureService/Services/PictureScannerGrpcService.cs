@@ -179,22 +179,48 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     }
 
     /// <summary>
-    /// Registers a photo the browser just uploaded directly to S3 (via a pre-authorized URL issued
-    /// by the Web BFF) and runs AI Analysis on it, creating its sidecar record.
+    /// Client-streaming upload: reads the metadata message and every following byte-chunk message
+    /// from the caller (the Web app, forwarding bytes it received from the browser), stores the
+    /// reconstructed file under a generated photo ID, and runs AI Analysis on it before returning.
     /// </summary>
-    public override async Task<AnalyzePhotoResponse> AnalyzePhoto(AnalyzePhotoRequest request, ServerCallContext context)
+    public override async Task<UploadPhotoResponse> UploadPhoto(IAsyncStreamReader<UploadPhotoRequest> requestStream, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
 
-        if (string.IsNullOrWhiteSpace(request.PhotoId))
+        if (!await requestStream.MoveNext(cancellationToken)
+            || requestStream.Current.PayloadCase != UploadPhotoRequest.PayloadOneofCase.Metadata)
         {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Der Upload-Stream muss mit einer Metadaten-Nachricht beginnen."));
         }
 
-        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
+        var metadata = requestStream.Current.Metadata;
+        var sourceFileName = string.IsNullOrWhiteSpace(metadata.SourceFileName) ? "upload" : metadata.SourceFileName;
+
+        var extension = Path.GetExtension(sourceFileName).ToLowerInvariant();
+        if (!ScannerConfig.SupportedExtensions.Contains(extension))
         {
-            throw new RpcException(new Status(StatusCode.NotFound, $"Foto '{request.PhotoId}' wurde im Speicher nicht gefunden."));
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP."));
         }
+
+        using var buffer = new MemoryStream();
+        while (await requestStream.MoveNext(cancellationToken))
+        {
+            if (requestStream.Current.PayloadCase != UploadPhotoRequest.PayloadOneofCase.Chunk)
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Nach der Metadaten-Nachricht werden nur Byte-Chunks erwartet."));
+            }
+
+            buffer.Write(requestStream.Current.Chunk.Span);
+        }
+
+        if (buffer.Length == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Die hochgeladene Datei ist leer."));
+        }
+
+        var photoId = Guid.NewGuid().ToString("n");
+        var imageBytes = buffer.ToArray();
+        await photoStore.PutBytesAsync(photoId, imageBytes, cancellationToken);
 
         var appConfiguration = new ConfigurationBuilder()
             .AddConfiguration(configuration)
@@ -202,8 +228,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             .AddEnvironmentVariables()
             .Build();
 
-        var config = ScannerConfig.Load(appConfiguration, request);
-        var sourceFileName = string.IsNullOrWhiteSpace(request.SourceFileName) ? request.PhotoId : request.SourceFileName;
+        var config = ScannerConfig.Load(appConfiguration, metadata);
 
         if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
@@ -229,15 +254,14 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         CardAnalysisResult result;
         try
         {
-            var imageBytes = await photoStore.GetBytesAsync(request.PhotoId, cancellationToken);
-            result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, request.PhotoId, sourceFileName, imageBytes, cancellationToken);
+            result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, photoId, sourceFileName, imageBytes, cancellationToken);
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {PhotoId}", request.PhotoId);
+            logger.LogError(exception, "Unerwarteter Fehler bei der Analyse von {PhotoId}", photoId);
             result = new CardAnalysisResult
             {
-                PhotoId = request.PhotoId,
+                PhotoId = photoId,
                 AnalysisStatus = AnalysisStatuses.Failed,
                 SourceFileName = sourceFileName,
                 AiModel = config.Model,
@@ -247,12 +271,34 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             };
         }
 
-        await sidecarCache.SetAsync(request.PhotoId, result, cancellationToken);
+        await sidecarCache.SetAsync(photoId, result, cancellationToken);
 
-        return new AnalyzePhotoResponse
+        return new UploadPhotoResponse
         {
-            Card = ToCardEntry(request.PhotoId, await sidecarCache.GetAsync(request.PhotoId, cancellationToken))
+            Card = ToCardEntry(photoId, await sidecarCache.GetAsync(photoId, cancellationToken))
         };
+    }
+
+    /// <summary>
+    /// Issues a short-lived pre-signed S3 GET URL for a stored photo, so the browser can fetch
+    /// image bytes directly from S3 without this service (or its caller) proxying them.
+    /// </summary>
+    public override async Task<GetPhotoDownloadUrlResponse> GetPhotoDownloadUrl(GetPhotoDownloadUrlRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+
+        if (string.IsNullOrWhiteSpace(request.PhotoId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
+        }
+
+        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, $"Foto '{request.PhotoId}' wurde im Speicher nicht gefunden."));
+        }
+
+        var downloadUrl = await photoStore.CreateDownloadUrlAsync(request.PhotoId, cancellationToken);
+        return new GetPhotoDownloadUrlResponse { DownloadUrl = downloadUrl };
     }
 
     public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)

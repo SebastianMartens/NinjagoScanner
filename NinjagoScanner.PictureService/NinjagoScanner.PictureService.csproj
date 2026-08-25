@@ -27,7 +27,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NinjagoScanner.PictureService.Tests" />
-    <InternalsVisibleTo Include="NinjagoScanner.Web.Bff.Tests" />
+    <InternalsVisibleTo Include="NinjagoScanner.Web.Tests" />
     <InternalsVisibleTo Include="NinjagoScanner.CardFotosMigration" />
   </ItemGroup>
 

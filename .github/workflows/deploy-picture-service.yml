@@ -1,0 +1,35 @@
+name: Deploy - NinjagoScanner.PictureService
+
+# Task 5.1: deploy NinjagoScanner.PictureService to Fly.io on every push to main that touches it.
+# Uses fly.toml's repo-root-relative Dockerfile path (see NinjagoScanner.PictureService/fly.toml's
+# header comment) - `.` is passed explicitly as the build context so it doesn't default to the
+# fly.toml's own directory.
+#
+# Requires a repo (or environment) secret: FLY_API_TOKEN (a Fly.io deploy token scoped to this
+# app - see infra/README.md). PictureService's Gemini and AWS credentials are set as Fly secrets
+# directly (`flyctl secrets set`), not through this workflow - see infra/README.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "NinjagoScanner.PictureService/**"
+      - ".github/workflows/deploy-picture-service.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-picture-service-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --config NinjagoScanner.PictureService/fly.toml .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

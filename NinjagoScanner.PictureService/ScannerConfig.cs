@@ -38,18 +38,18 @@ internal sealed class ScannerConfig
         };
     }
 
-    public static ScannerConfig Load(IConfiguration configuration, AnalyzePhotoRequest request)
+    public static ScannerConfig Load(IConfiguration configuration, UploadPhotoMetadata metadata)
     {
         return new ScannerConfig
         {
-            ApiKey = (request.HasApiKey ? request.ApiKey : null) ?? configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
-            Model = (request.HasModel ? request.Model : null) ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-3.1-flash-lite",
-            CatalogServiceAddress = (request.HasCatalogServiceAddress ? request.CatalogServiceAddress : null) ?? configuration["CatalogService:Address"] ?? configuration["CATALOG_SERVICE_ADDRESS"] ?? "http://localhost:5073",
+            ApiKey = (metadata.HasApiKey ? metadata.ApiKey : null) ?? configuration["Gemini:ApiKey"] ?? configuration["GEMINI_API_KEY"] ?? string.Empty,
+            Model = (metadata.HasModel ? metadata.Model : null) ?? configuration["Gemini:Model"] ?? configuration["GEMINI_MODEL"] ?? "gemini-3.1-flash-lite",
+            CatalogServiceAddress = (metadata.HasCatalogServiceAddress ? metadata.CatalogServiceAddress : null) ?? configuration["CatalogService:Address"] ?? configuration["CATALOG_SERVICE_ADDRESS"] ?? "http://localhost:5073",
             OverwriteExistingSidecars = true,
             DelayBetweenRequestsMs = 0,
-            RetryDelayMs = request.HasRetryDelayMs ? request.RetryDelayMs : TryParseInt(configuration["Scanner:RetryDelayMs"] ?? configuration["RETRY_DELAY_MS"], 3000),
-            MaxAttempts = Math.Max(1, request.HasMaxAttempts ? request.MaxAttempts : TryParseInt(configuration["Scanner:MaxAttempts"] ?? configuration["MAX_ATTEMPTS"], 3)),
-            TimeoutSeconds = Math.Max(10, request.HasTimeoutSeconds ? request.TimeoutSeconds : TryParseInt(configuration["Scanner:HttpTimeoutSeconds"] ?? configuration["HTTP_TIMEOUT_SECONDS"], 90))
+            RetryDelayMs = metadata.HasRetryDelayMs ? metadata.RetryDelayMs : TryParseInt(configuration["Scanner:RetryDelayMs"] ?? configuration["RETRY_DELAY_MS"], 3000),
+            MaxAttempts = Math.Max(1, metadata.HasMaxAttempts ? metadata.MaxAttempts : TryParseInt(configuration["Scanner:MaxAttempts"] ?? configuration["MAX_ATTEMPTS"], 3)),
+            TimeoutSeconds = Math.Max(10, metadata.HasTimeoutSeconds ? metadata.TimeoutSeconds : TryParseInt(configuration["Scanner:HttpTimeoutSeconds"] ?? configuration["HTTP_TIMEOUT_SECONDS"], 90))
         };
     }
 
