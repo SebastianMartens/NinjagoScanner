@@ -17,8 +17,11 @@ var catalogServiceAddress = WebConfig.ResolveCatalogServiceAddress(builder.Confi
 var pictureServiceAddress = WebConfig.ResolvePictureServiceAddress(builder.Configuration);
 var maxUploadBytes = WebConfig.ResolveMaxUploadBytes(builder.Configuration);
 
-builder.Services.AddSingleton(_ => new CardCatalogService(catalogServiceAddress, pictureServiceAddress, maxUploadBytes));
-builder.Services.AddSingleton(_ => new PictureServiceClient(pictureServiceAddress, catalogServiceAddress));
+builder.Services.AddSingleton(_ => new CatalogServiceClient(catalogServiceAddress));
+builder.Services.AddSingleton(_ => new PictureServiceClient(pictureServiceAddress, catalogServiceAddress, maxUploadBytes));
+builder.Services.AddSingleton(provider => new CollectionQueryService(
+    provider.GetRequiredService<CatalogServiceClient>(),
+    provider.GetRequiredService<PictureServiceClient>()));
 
 var app = builder.Build();
 

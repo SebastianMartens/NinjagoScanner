@@ -1,6 +1,6 @@
 @page "/upload"
 @rendermode InteractiveServer
-@inject CardCatalogService CardCatalogService
+@inject PictureServiceClient PictureServiceClient
 
 <PageTitle>Foto-Upload</PageTitle>
 
@@ -66,7 +66,7 @@
 
     protected override void OnInitialized()
     {
-        maxUploadBytes = CardCatalogService.MaxUploadBytes;
+        maxUploadBytes = PictureServiceClient.MaxUploadBytes;
     }
 
     private void OnFileChanged(InputFileChangeEventArgs eventArgs)
@@ -95,7 +95,7 @@
             // through browser-to-storage; PictureService assigns the photo ID and triggers
             // AI Analysis once the stream completes.
             await using var stream = selectedFile.OpenReadStream(maxUploadBytes);
-            var card = await CardCatalogService.UploadPhotoAsync(selectedFile.Name, selectedFile.Size, stream);
+            var card = await PictureServiceClient.UploadPhotoAsync(selectedFile.Name, selectedFile.Size, stream);
 
             successMessage = $"Upload erfolgreich: {card.SourceFileName} (Status: {card.AnalysisStatus}).";
             selectedFile = null;

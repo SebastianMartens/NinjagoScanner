@@ -3,13 +3,13 @@ using NinjagoScanner.Web.Tests.Fixtures;
 
 namespace NinjagoScanner.Web.Tests.Services;
 
-public sealed class CardCatalogServiceAnalysisStatusCountsTests : IAsyncLifetime
+public sealed class CollectionQueryServiceAnalysisStatusCountsTests : IAsyncLifetime
 {
     private readonly CatalogServiceTestHost catalogHost = new();
     private readonly PictureServiceTestHost pictureHost = new();
-    private CardCatalogService cardCatalogService = null!;
+    private CollectionQueryService collectionQueryService = null!;
 
-    static CardCatalogServiceAnalysisStatusCountsTests()
+    static CollectionQueryServiceAnalysisStatusCountsTests()
     {
         // The test hosts serve gRPC over cleartext (non-TLS) HTTP/2, same as the real
         // services in this app's default local configuration.
@@ -40,10 +40,12 @@ public sealed class CardCatalogServiceAnalysisStatusCountsTests : IAsyncLifetime
         // No sidecar record at all: photo was uploaded but never scanned by Gemini.
         pictureHost.WritePhoto("not-analyzed-photo", sidecarJson: null);
 
-        cardCatalogService = new CardCatalogService(
-            catalogServiceAddress: catalogHost.Address,
+        var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
+        var pictureServiceClient = new PictureServiceClient(
             pictureServiceAddress: pictureHost.Address,
+            catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);
+        collectionQueryService = new CollectionQueryService(catalogServiceClient, pictureServiceClient);
     }
 
     public async Task DisposeAsync()
@@ -70,7 +72,7 @@ public sealed class CardCatalogServiceAnalysisStatusCountsTests : IAsyncLifetime
     [Fact]
     public async Task GetSeriesSummaryAsync_PhotoWithoutSidecar_IsCountedAsNotAnalyzed()
     {
-        var summary = await cardCatalogService.GetSeriesSummaryAsync();
+        var summary = await collectionQueryService.GetSeriesSummaryAsync();
 
         Assert.Equal(1, summary.AnalysisStatusCounts.Ok);
         Assert.Equal(1, summary.AnalysisStatusCounts.Uncertain);
@@ -81,7 +83,7 @@ public sealed class CardCatalogServiceAnalysisStatusCountsTests : IAsyncLifetime
     [Fact]
     public async Task GetSeriesSummaryAsync_AnalysisStatusCounts_SumToTotalPhotos()
     {
-        var summary = await cardCatalogService.GetSeriesSummaryAsync();
+        var summary = await collectionQueryService.GetSeriesSummaryAsync();
 
         var sum = summary.AnalysisStatusCounts.Ok
             + summary.AnalysisStatusCounts.Uncertain

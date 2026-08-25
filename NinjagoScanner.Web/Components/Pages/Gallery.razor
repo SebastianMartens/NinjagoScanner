@@ -1,6 +1,8 @@
 @page "/gallery"
 @rendermode InteractiveServer
-@inject CardCatalogService CardCatalogService
+@inject CatalogServiceClient CatalogServiceClient
+@inject PictureServiceClient PictureServiceClient
+@inject CollectionQueryService CollectionQueryService
 
 <PageTitle>Galerie</PageTitle>
 
@@ -168,7 +170,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        availableSeries = (await CardCatalogService.GetKnownSeriesAsync()).ToList();
+        availableSeries = (await CatalogServiceClient.GetKnownSeriesAsync()).ToList();
 
         var initialSeries = availableSeries.FirstOrDefault(series =>
             string.Equals(series, SeriesQueryParameter, StringComparison.OrdinalIgnoreCase));
@@ -237,7 +239,7 @@
 
         seriesCards = string.IsNullOrWhiteSpace(selectedSeries)
             ? []
-            : (await CardCatalogService.GetGalleryCardsAsync(selectedSeries)).ToList();
+            : (await CollectionQueryService.GetGalleryCardsAsync(selectedSeries)).ToList();
 
         if (!string.IsNullOrWhiteSpace(selectedCategory)
             && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
@@ -285,7 +287,7 @@
 
         try
         {
-            await CardCatalogService.UpdateReviewStatusAsync(card.PhotoId, ReviewStatuses.Incorrect);
+            await PictureServiceClient.UpdateReviewStatusAsync(card.PhotoId, ReviewStatuses.Incorrect);
             await ReloadSeriesCardsAsync();
         }
         finally
@@ -300,7 +302,7 @@
 
         seriesCards = string.IsNullOrWhiteSpace(selectedSeries)
             ? []
-            : (await CardCatalogService.GetGalleryCardsAsync(selectedSeries)).ToList();
+            : (await CollectionQueryService.GetGalleryCardsAsync(selectedSeries)).ToList();
 
         lightboxCard = openLightboxPhotoId is null
             ? null

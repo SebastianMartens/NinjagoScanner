@@ -1,6 +1,8 @@
 @page "/review"
 @rendermode InteractiveServer
-@inject CardCatalogService CardCatalogService
+@inject CatalogServiceClient CatalogServiceClient
+@inject PictureServiceClient PictureServiceClient
+@inject CollectionQueryService CollectionQueryService
 
 <PageTitle>Karten-Review</PageTitle>
 
@@ -267,8 +269,8 @@
 
 	protected override async Task OnInitializedAsync()
 	{
-		knownSeries = await CardCatalogService.GetKnownSeriesAsync();
-		groups = await CardCatalogService.GetReviewGroupsAsync();
+		knownSeries = await CatalogServiceClient.GetKnownSeriesAsync();
+		groups = await CollectionQueryService.GetReviewGroupsAsync();
 		SyncCardNumberDrafts();
 		currentIndex = 0;
 		isLoading = false;
@@ -362,18 +364,18 @@
 
 	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
 	{
-		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus));
+		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus));
 	}
 
 	private async Task SaveCardNumberAsync(CardListItem photo)
 	{
 		var cardNumber = GetCardNumberDraft(photo);
-		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateCardNumberAsync(photo.PhotoId, cardNumber));
+		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateCardNumberAsync(photo.PhotoId, cardNumber));
 	}
 
 	private async Task SaveLanguageAsync(CardListItem photo, string? language)
 	{
-		await RunPhotoActionAsync(photo, () => CardCatalogService.UpdateCardLanguageAsync(photo.PhotoId, language));
+		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateCardLanguageAsync(photo.PhotoId, language));
 	}
 
 	private static string GetSegmentClass(CardListItem photo, string reviewStatus)
@@ -418,7 +420,7 @@
 			await action();
 
 			var key = CurrentGroup?.Key;
-			groups = await CardCatalogService.GetReviewGroupsAsync();
+			groups = await CollectionQueryService.GetReviewGroupsAsync();
 			SyncCardNumberDrafts();
 
 			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
@@ -449,7 +451,7 @@
 			return;
 		}
 
-		await RunPhotoActionAsync(photo, () => CardCatalogService.DeletePhotoAsync(photo.PhotoId));
+		await RunPhotoActionAsync(photo, () => PictureServiceClient.DeletePhotoAsync(photo.PhotoId));
 		photoPendingDeletion = null;
 	}
 
@@ -465,10 +467,10 @@
 
 		try
 		{
-			await CardCatalogService.UpdateSetNameAsync(photo.PhotoId, seriesName);
+			await PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName);
 
 			var key = CurrentGroup?.Key;
-			groups = await CardCatalogService.GetReviewGroupsAsync();
+			groups = await CollectionQueryService.GetReviewGroupsAsync();
 			SyncCardNumberDrafts();
 
 			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
@@ -496,10 +498,10 @@
 		{
 			foreach (var photo in group.Photos)
 			{
-				await CardCatalogService.UpdateReviewStatusAsync(photo.PhotoId, ReviewStatuses.Verified);
+				await PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, ReviewStatuses.Verified);
 			}
 
-			groups = await CardCatalogService.GetReviewGroupsAsync();
+			groups = await CollectionQueryService.GetReviewGroupsAsync();
 			SyncCardNumberDrafts();
 			currentIndex = FindNextFilteredIndexAfter(confirmedKey);
 		}

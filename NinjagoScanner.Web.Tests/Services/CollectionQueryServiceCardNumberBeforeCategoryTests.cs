@@ -3,13 +3,13 @@ using NinjagoScanner.Web.Tests.Fixtures;
 
 namespace NinjagoScanner.Web.Tests.Services;
 
-public sealed class CardCatalogServiceCardNumberBeforeCategoryTests : IAsyncLifetime
+public sealed class CollectionQueryServiceCardNumberBeforeCategoryTests : IAsyncLifetime
 {
     private readonly CatalogServiceTestHost catalogHost = new();
     private readonly PictureServiceTestHost pictureHost = new();
-    private CardCatalogService cardCatalogService = null!;
+    private CollectionQueryService collectionQueryService = null!;
 
-    static CardCatalogServiceCardNumberBeforeCategoryTests()
+    static CollectionQueryServiceCardNumberBeforeCategoryTests()
     {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
     }
@@ -38,10 +38,12 @@ public sealed class CardCatalogServiceCardNumberBeforeCategoryTests : IAsyncLife
         await catalogHost.StartAsync();
         await pictureHost.StartAsync();
 
-        cardCatalogService = new CardCatalogService(
-            catalogServiceAddress: catalogHost.Address,
+        var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
+        var pictureServiceClient = new PictureServiceClient(
             pictureServiceAddress: pictureHost.Address,
+            catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);
+        collectionQueryService = new CollectionQueryService(catalogServiceClient, pictureServiceClient);
     }
 
     public async Task DisposeAsync()
@@ -53,7 +55,7 @@ public sealed class CardCatalogServiceCardNumberBeforeCategoryTests : IAsyncLife
     [Fact]
     public async Task GetCollectionOverviewAsync_OrdersByCardNumber_NotByCategory()
     {
-        var overview = await cardCatalogService.GetCollectionOverviewAsync();
+        var overview = await collectionQueryService.GetCollectionOverviewAsync();
 
         var cardNumbers = overview.Cards.Select(card => card.CardNumber).ToArray();
 
@@ -63,7 +65,7 @@ public sealed class CardCatalogServiceCardNumberBeforeCategoryTests : IAsyncLife
     [Fact]
     public async Task GetGalleryCardsAsync_OrdersByCardNumber_NotByCategory()
     {
-        var cards = await cardCatalogService.GetGalleryCardsAsync("Serie 1");
+        var cards = await collectionQueryService.GetGalleryCardsAsync("Serie 1");
 
         var cardNumbers = cards.Select(card => card.CardNumber).ToArray();
 

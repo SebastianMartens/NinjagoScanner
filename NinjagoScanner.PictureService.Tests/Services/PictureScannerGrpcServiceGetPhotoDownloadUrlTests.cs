@@ -57,4 +57,49 @@ public sealed class PictureScannerGrpcServiceGetPhotoDownloadUrlTests
 
         Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
     }
+
+    [Fact]
+    public async Task GetPhotoDownloadUrls_ReturnsUrlForEveryExistingPhoto()
+    {
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        photoStore.Seed("card-2", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var service = CreateService(photoStore);
+
+        var request = new GetPhotoDownloadUrlsRequest();
+        request.PhotoIds.AddRange(["card-1", "card-2"]);
+
+        var response = await service.GetPhotoDownloadUrls(request, new FakeServerCallContext());
+
+        Assert.Equal(2, response.DownloadUrlsByPhotoId.Count);
+        Assert.False(string.IsNullOrWhiteSpace(response.DownloadUrlsByPhotoId["card-1"]));
+        Assert.False(string.IsNullOrWhiteSpace(response.DownloadUrlsByPhotoId["card-2"]));
+    }
+
+    [Fact]
+    public async Task GetPhotoDownloadUrls_ReturnsEmptyResponse_WhenRequestListIsEmpty()
+    {
+        var service = CreateService(new FakePhotoStore());
+
+        var response = await service.GetPhotoDownloadUrls(new GetPhotoDownloadUrlsRequest(), new FakeServerCallContext());
+
+        Assert.Empty(response.DownloadUrlsByPhotoId);
+    }
+
+    [Fact]
+    public async Task GetPhotoDownloadUrls_OmitsMissingPhoto_ButReturnsTheRest()
+    {
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var service = CreateService(photoStore);
+
+        var request = new GetPhotoDownloadUrlsRequest();
+        request.PhotoIds.AddRange(["card-1", "missing"]);
+
+        var response = await service.GetPhotoDownloadUrls(request, new FakeServerCallContext());
+
+        Assert.Single(response.DownloadUrlsByPhotoId);
+        Assert.True(response.DownloadUrlsByPhotoId.ContainsKey("card-1"));
+        Assert.False(response.DownloadUrlsByPhotoId.ContainsKey("missing"));
+    }
 }

@@ -3,13 +3,13 @@ using NinjagoScanner.Web.Tests.Fixtures;
 
 namespace NinjagoScanner.Web.Tests.Services;
 
-public sealed class CardCatalogServiceReviewGroupsTests : IAsyncLifetime
+public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
 {
     private readonly CatalogServiceTestHost catalogHost = new();
     private readonly PictureServiceTestHost pictureHost = new();
-    private CardCatalogService cardCatalogService = null!;
+    private CollectionQueryService collectionQueryService = null!;
 
-    static CardCatalogServiceReviewGroupsTests()
+    static CollectionQueryServiceReviewGroupsTests()
     {
         // The test hosts serve gRPC over cleartext (non-TLS) HTTP/2, same as the real
         // services in this app's default local configuration.
@@ -58,10 +58,12 @@ public sealed class CardCatalogServiceReviewGroupsTests : IAsyncLifetime
         // A card in a series with a higher SortOrder, to verify group ordering.
         pictureHost.WritePhoto("photo-7", Sidecar(setName: "Serie 10", cardNumber: "1"));
 
-        cardCatalogService = new CardCatalogService(
-            catalogServiceAddress: catalogHost.Address,
+        var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
+        var pictureServiceClient = new PictureServiceClient(
             pictureServiceAddress: pictureHost.Address,
+            catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);
+        collectionQueryService = new CollectionQueryService(catalogServiceClient, pictureServiceClient);
     }
 
     public async Task DisposeAsync()
@@ -88,7 +90,7 @@ public sealed class CardCatalogServiceReviewGroupsTests : IAsyncLifetime
     [Fact]
     public async Task GetReviewGroupsAsync_GroupsByNormalizedCatalogIdentity_AndAttachesCardName()
     {
-        var groups = await cardCatalogService.GetReviewGroupsAsync();
+        var groups = await collectionQueryService.GetReviewGroupsAsync();
 
         Assert.Equal(4, groups.Count);
 
@@ -124,13 +126,13 @@ public sealed class CardCatalogServiceReviewGroupsTests : IAsyncLifetime
     }
 }
 
-public sealed class CardCatalogServiceReviewGroupsCardNumberOrderingTests : IAsyncLifetime
+public sealed class CollectionQueryServiceReviewGroupsCardNumberOrderingTests : IAsyncLifetime
 {
     private readonly CatalogServiceTestHost catalogHost = new();
     private readonly PictureServiceTestHost pictureHost = new();
-    private CardCatalogService cardCatalogService = null!;
+    private CollectionQueryService collectionQueryService = null!;
 
-    static CardCatalogServiceReviewGroupsCardNumberOrderingTests()
+    static CollectionQueryServiceReviewGroupsCardNumberOrderingTests()
     {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
     }
@@ -163,10 +165,12 @@ public sealed class CardCatalogServiceReviewGroupsCardNumberOrderingTests : IAsy
         pictureHost.WritePhoto("photo-le1", Sidecar(setName: "Serie 2", cardNumber: "LE1"));
         pictureHost.WritePhoto("photo-2", Sidecar(setName: "Serie 2", cardNumber: "2"));
 
-        cardCatalogService = new CardCatalogService(
-            catalogServiceAddress: catalogHost.Address,
+        var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
+        var pictureServiceClient = new PictureServiceClient(
             pictureServiceAddress: pictureHost.Address,
+            catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);
+        collectionQueryService = new CollectionQueryService(catalogServiceClient, pictureServiceClient);
     }
 
     public async Task DisposeAsync()
@@ -193,7 +197,7 @@ public sealed class CardCatalogServiceReviewGroupsCardNumberOrderingTests : IAsy
     [Fact]
     public async Task GetReviewGroupsAsync_OrdersGroups_NumericFirstByValue_ThenAlphanumericByPrefix()
     {
-        var groups = await cardCatalogService.GetReviewGroupsAsync();
+        var groups = await collectionQueryService.GetReviewGroupsAsync();
 
         var cardNumbers = groups.Select(group => group.CardNumber).ToArray();
 

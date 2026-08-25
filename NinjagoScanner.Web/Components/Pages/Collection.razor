@@ -1,6 +1,7 @@
 @page "/collection"
 @rendermode InteractiveServer
-@inject CardCatalogService CardCatalogService
+@inject PictureServiceClient PictureServiceClient
+@inject CollectionQueryService CollectionQueryService
 @inject IJSRuntime JS
 
 <PageTitle>Sammlungsübersicht</PageTitle>
@@ -305,7 +306,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        overview = await CardCatalogService.GetCollectionOverviewAsync();
+        overview = await CollectionQueryService.GetCollectionOverviewAsync();
         allCards = overview.Cards.ToList();
         availableSeries = allCards
             .Select(card => (card.Series, card.SortOrder))
@@ -453,7 +454,7 @@
 
         try
         {
-            selectedDetails = await CardCatalogService.GetCollectionCardDetailsAsync(card.Series, card.CardNumber);
+            selectedDetails = await CollectionQueryService.GetCollectionCardDetailsAsync(card.Series, card.CardNumber);
             selectedPhotoId = selectedDetails?.Photos.FirstOrDefault()?.PhotoId;
             sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, card);
         }
@@ -505,7 +506,7 @@
                 ReviewStatus = sidecarDraft.ReviewStatus
             };
 
-            await CardCatalogService.UpdateCardSidecarAsync(SelectedPhoto.PhotoId, update);
+            await PictureServiceClient.UpdateCardSidecarAsync(SelectedPhoto.PhotoId, update);
             await ReloadOverviewAsync();
             await SelectCardAsync(selectedCard);
             sidecarMessage = "Sidecar gespeichert.";
@@ -522,7 +523,7 @@
 
     private async Task ReloadOverviewAsync()
     {
-        overview = await CardCatalogService.GetCollectionOverviewAsync();
+        overview = await CollectionQueryService.GetCollectionOverviewAsync();
         allCards = overview.Cards.ToList();
         availableSeries = allCards
             .Select(card => (card.Series, card.SortOrder))

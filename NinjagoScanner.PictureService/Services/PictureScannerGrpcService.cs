@@ -301,6 +301,30 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return new GetPhotoDownloadUrlResponse { DownloadUrl = downloadUrl };
     }
 
+    /// <summary>
+    /// Batched form of <see cref="GetPhotoDownloadUrl"/>: resolves many photo IDs in one round
+    /// trip. Photo IDs with no stored photo bytes are omitted from the response instead of
+    /// failing the whole request, since a photo can be deleted between a caller listing it and
+    /// requesting its download URL.
+    /// </summary>
+    public override async Task<GetPhotoDownloadUrlsResponse> GetPhotoDownloadUrls(GetPhotoDownloadUrlsRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+        var response = new GetPhotoDownloadUrlsResponse();
+
+        foreach (var photoId in request.PhotoIds)
+        {
+            if (string.IsNullOrWhiteSpace(photoId) || !await photoStore.ExistsAsync(photoId, cancellationToken))
+            {
+                continue;
+            }
+
+            response.DownloadUrlsByPhotoId[photoId] = await photoStore.CreateDownloadUrlAsync(photoId, cancellationToken);
+        }
+
+        return response;
+    }
+
     public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;

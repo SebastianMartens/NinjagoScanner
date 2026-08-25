@@ -13,6 +13,7 @@ service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
   rpc UploadPhoto (stream UploadPhotoRequest) returns (UploadPhotoResponse);
   rpc GetPhotoDownloadUrl (GetPhotoDownloadUrlRequest) returns (GetPhotoDownloadUrlResponse);
+  rpc GetPhotoDownloadUrls (GetPhotoDownloadUrlsRequest) returns (GetPhotoDownloadUrlsResponse);
   rpc ListCards (ListCardsRequest) returns (ListCardsResponse);
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
   rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
@@ -102,6 +103,16 @@ message GetPhotoDownloadUrlRequest {
 
 message GetPhotoDownloadUrlResponse {
   string download_url = 1;
+}
+
+// Batched form of GetPhotoDownloadUrl: resolves many photo IDs in one round trip. Photo IDs with
+// no stored photo bytes are omitted from the response rather than failing the whole request.
+message GetPhotoDownloadUrlsRequest {
+  repeated string photo_ids = 1;
+}
+
+message GetPhotoDownloadUrlsResponse {
+  map<string, string> download_urls_by_photo_id = 1;
 }
 
 message UpdateSidecarRequest {
