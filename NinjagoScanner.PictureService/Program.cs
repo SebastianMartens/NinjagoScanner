@@ -3,10 +3,29 @@ using Amazon.S3;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NinjagoScanner.PictureService;
 using NinjagoScanner.PictureService.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
+
+// OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
+// automatically by AddOtlpExporter() from the standard OTel environment variables — see
+// openspec/changes/add-opentelemetry-observability/design.md. HttpClient instrumentation covers
+// the AWS SDK's S3/DynamoDB calls, which go through HttpClient under the hood.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName: "ninjago-scanner-picture-service"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter())
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddMeter("System.Runtime")
+        .AddOtlpExporter());
 
 builder.WebHost.ConfigureKestrel(options =>
 {

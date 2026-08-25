@@ -1,12 +1,28 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NinjagoScanner.CatalogService.Catalog;
 using NinjagoScanner.CatalogService.Services;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddGrpc();
 builder.Services.AddSingleton<CatalogRepository>();
+
+// OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
+// automatically by AddOtlpExporter() from the standard OTel environment variables — see
+// openspec/changes/add-opentelemetry-observability/design.md.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName: "ninjago-scanner-catalog-service"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddOtlpExporter())
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddMeter("System.Runtime")
+        .AddOtlpExporter());
 
 builder.WebHost.ConfigureKestrel(options =>
 {

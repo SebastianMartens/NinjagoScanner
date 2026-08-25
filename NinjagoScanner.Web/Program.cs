@@ -1,6 +1,10 @@
 using NinjagoScanner.Web;
 using NinjagoScanner.Web.Components;
 using NinjagoScanner.Web.Services;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 // CatalogService/PictureService are only reachable over plain HTTP on Fly's private network (no
 // TLS between internal services — see infra/README.md). Grpc.Net.Client requires HTTP/2, and
@@ -22,6 +26,28 @@ builder.Services.AddSingleton(_ => new PictureServiceClient(pictureServiceAddres
 builder.Services.AddSingleton(provider => new CollectionQueryService(
     provider.GetRequiredService<CatalogServiceClient>(),
     provider.GetRequiredService<PictureServiceClient>()));
+
+// OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
+// automatically by AddOtlpExporter() from the standard OTel environment variables — see
+// openspec/changes/add-opentelemetry-observability/design.md. gRPC client instrumentation hooks
+// into SocketsHttpHandler/HttpClient diagnostics, so CatalogServiceClient/PictureServiceClient's
+// per-call GrpcChannel.ForAddress(...) calls pick it up with no changes to those classes. The
+// trace batch export interval is shortened because this app's Fly machine has
+// min_machines_running = 0 (autostop) — a longer default delay risks losing the last batch when
+// the machine is stopped shortly after handling a request.
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName: "ninjago-scanner-web"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddGrpcClientInstrumentation()
+        .AddOtlpExporter(options =>
+        {
+            options.BatchExportProcessorOptions.ScheduledDelayMilliseconds = 2000;
+        }))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddMeter("System.Runtime")
+        .AddOtlpExporter());
 
 var app = builder.Build();
 
