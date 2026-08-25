@@ -36,7 +36,7 @@
 
 ## 5. CI/CD
 
-- [x] 5.1 Add `.github/workflows/deploy-web.yml`, `deploy-catalog-service.yml`, `deploy-picture-service.yml` — path-filtered on push to `main`, using `flyctl deploy --config <project>/fly.toml` (via `superfly/flyctl-actions` or a plain `flyctl` install step) and a `FLY_API_TOKEN` repo/environment secret. Not run — needs a real `FLY_API_TOKEN` and Fly apps to exist first (see 4.3/4.4).
+- [x] 5.1 Add `.github/workflows/deploy-web.yml`, `deploy-catalog-service.yml`, `deploy-picture-service.yml` — path-filtered on push to `main`, using `flyctl deploy --config <project>/fly.toml` (via `superfly/flyctl-actions` or a plain `flyctl` install step) and a `FLY_API_TOKEN` repo/environment secret. **Verified**: created a `personal`-org-scoped `flyctl tokens create org` deploy token, set as the `production` GitHub environment's `FLY_API_TOKEN` secret; manually ran `deploy-catalog-service.yml` via `workflow_dispatch` from `replace_AWS_with_flyio` — `flyctl releases` confirms a new `v2` release completed and passed health checks. `deploy-web.yml`/`deploy-picture-service.yml` share the same structure and secret, not individually run but the mechanism is confirmed working.
 - [x] 5.2 Confirm `.github/workflows/ci.yml` builds/tests the new `NinjagoScanner.Web` project and no longer references the retired `Web.Client`/`Web.Bff`/`Web.Shared` projects. `ci.yml` builds/tests `NinjagoScanner.slnx` generically (no per-project references), and the slnx now lists `NinjagoScanner.Web`/`NinjagoScanner.Web.Tests` instead of the retired projects — confirmed via `grep` that no other workflow references the retired project names.
 
 ## 6. Documentation
