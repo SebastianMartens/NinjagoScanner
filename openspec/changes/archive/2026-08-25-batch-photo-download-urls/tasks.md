@@ -23,4 +23,4 @@
 
 ## 5. Deployment
 
-- [ ] 5.1 Deploy PictureService (with the new RPC) before deploying Web (with the new caller), per design.md's Migration Plan, so Web never calls an RPC that doesn't exist yet on PictureService.
+- [x] 5.1 Deploy PictureService (with the new RPC) before deploying Web (with the new caller), per design.md's Migration Plan, so Web never calls an RPC that doesn't exist yet on PictureService.
