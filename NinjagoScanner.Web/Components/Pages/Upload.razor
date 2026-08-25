@@ -1,0 +1,131 @@
+@page "/upload"
+@rendermode InteractiveServer
+@inject PictureServiceClient PictureServiceClient
+
+<PageTitle>Foto-Upload</PageTitle>
+
+<div class="upload-page">
+    <header class="upload-header">
+        <div>
+            <p class="eyebrow">Ninjago Scanner</p>
+            <h1>Foto direkt vom Handy hochladen</h1>
+            <p class="lede">
+                Waehle auf Android direkt die Kamera oder eine vorhandene Aufnahme.
+                Das Bild wird hochgeladen und automatisch analysiert.
+            </p>
+        </div>
+    </header>
+
+    <section class="upload-card">
+        <label class="upload-field">
+            <span>Foto</span>
+            <InputFile OnChange="OnFileChanged" @attributes="captureAttributes" accept="image/*" />
+        </label>
+
+        @if (selectedFile is not null)
+        {
+            <p class="upload-selection">
+                Ausgewaehlt: <strong>@selectedFile.Name</strong> (@FormatFileSize(selectedFile.Size))
+            </p>
+        }
+
+        <p class="upload-limit">
+            Maximale Dateigroesse: @FormatFileSize(maxUploadBytes)
+        </p>
+
+        <div class="upload-actions">
+            <button class="btn btn-primary" type="button" @onclick="UploadSelectedFileAsync" disabled="@(isUploading || selectedFile is null)">
+                @(isUploading ? "Upload laeuft..." : "Foto hochladen")
+            </button>
+            <a class="btn btn-outline-secondary" href="/">Zur Kartenansicht</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <p class="upload-success">@successMessage</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <p class="upload-error">@errorMessage</p>
+        }
+    </section>
+</div>
+
+@code {
+    private readonly Dictionary<string, object> captureAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["capture"] = "environment"
+    };
+
+    private IBrowserFile? selectedFile;
+    private bool isUploading;
+    private string? successMessage;
+    private string? errorMessage;
+    private long maxUploadBytes;
+
+    protected override void OnInitialized()
+    {
+        maxUploadBytes = PictureServiceClient.MaxUploadBytes;
+    }
+
+    private void OnFileChanged(InputFileChangeEventArgs eventArgs)
+    {
+        selectedFile = eventArgs.FileCount > 0 ? eventArgs.File : null;
+        successMessage = null;
+        errorMessage = null;
+    }
+
+    private async Task UploadSelectedFileAsync()
+    {
+        if (selectedFile is null)
+        {
+            errorMessage = "Bitte zuerst ein Foto auswaehlen.";
+            successMessage = null;
+            return;
+        }
+
+        isUploading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            // Streams the photo bytes straight to PictureService over gRPC - they never pass
+            // through browser-to-storage; PictureService assigns the photo ID and triggers
+            // AI Analysis once the stream completes.
+            await using var stream = selectedFile.OpenReadStream(maxUploadBytes);
+            var card = await PictureServiceClient.UploadPhotoAsync(selectedFile.Name, selectedFile.Size, stream);
+
+            successMessage = $"Upload erfolgreich: {card.SourceFileName} (Status: {card.AnalysisStatus}).";
+            selectedFile = null;
+        }
+        catch (InvalidOperationException exception)
+        {
+            errorMessage = exception.Message;
+        }
+        catch (Exception exception)
+        {
+            errorMessage = $"Upload fehlgeschlagen: {exception.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes >= 1024 * 1024)
+        {
+            return $"{bytes / (1024d * 1024d):0.##} MB";
+        }
+
+        if (bytes >= 1024)
+        {
+            return $"{bytes / 1024d:0.##} KB";
+        }
+
+        return $"{bytes} B";
+    }
+}

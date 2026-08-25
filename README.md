@@ -249,13 +249,13 @@ If `dotnet build` in the web project fails with a locked `NinjagoScanner.Web.exe
 
 ### Production infrastructure
 
-The app also runs on AWS (see [infra/](infra/) for the Terraform). To check whether all production services (ECS, the internal load balancer, the BFF Lambda, DynamoDB, S3, CloudFront) are healthy, run:
+The app's storage (DynamoDB sidecar table, S3 photo bucket) lives on AWS (see [infra/](infra/) for the Terraform) — compute does not, as of the `aws-compute-teardown` change. To check the AWS resources that still exist, run:
 
 ```powershell
 ./infra/scripts/health-check.ps1
 ```
 
-Requires the AWS CLI on PATH, configured with credentials for that account.
+Requires the AWS CLI on PATH, configured with credentials for that account. Its CloudFront/HTTP end-to-end checks will fail until compute exists again (see `openspec/changes/fly-hosting-migration`).
 
 ### Sensible next extensions
 

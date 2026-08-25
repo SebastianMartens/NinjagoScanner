@@ -1,0 +1,30 @@
+# Deploy from the repository root - the build context (`.`) must be repo root to match the
+# Dockerfile's COPY paths, but `dockerfile` above is resolved relative to this fly.toml's own
+# directory (flyctl quirk), not the build context:
+#   flyctl deploy --config NinjagoScanner.Web/fly.toml .
+#
+# The only one of the three apps with a public Fly IP - see design.md's "only NinjagoScanner.Web
+# gets a public Fly IP" decision. CatalogService/PictureService stay reachable only over Fly's
+# private network (6PN / *.internal DNS).
+
+app = "ninjago-scanner-web"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CATALOG_SERVICE_ADDRESS = "http://ninjago-scanner-catalog-service.internal:8080"
+  PICTURE_SERVICE_ADDRESS = "http://ninjago-scanner-picture-service.internal:8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

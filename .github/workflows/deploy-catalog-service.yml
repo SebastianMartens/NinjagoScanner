@@ -1,14 +1,19 @@
-name: Deploy - CatalogService
+name: Deploy - NinjagoScanner.CatalogService
 
-# Task 10.2: path-filtered build/push/deploy for CatalogService. Only runs when something under
-# its own project directory (or its Dockerfile) changes, mirroring the service's independent
-# runnability — a PictureService-only change never triggers this.
+# Task 5.1: deploy NinjagoScanner.CatalogService to Fly.io on every push to main that touches it.
+# Uses fly.toml's repo-root-relative Dockerfile path (see NinjagoScanner.CatalogService/fly.toml's
+# header comment) - `.` is passed explicitly as the build context so it doesn't default to the
+# fly.toml's own directory.
+#
+# Requires a repo (or environment) secret: FLY_API_TOKEN (a Fly.io deploy token scoped to this
+# app - see infra/README.md).
 on:
   push:
     branches: [main]
     paths:
       - "NinjagoScanner.CatalogService/**"
-  workflow_dispatch: {}
+      - ".github/workflows/deploy-catalog-service.yml"
+  workflow_dispatch:
 
 concurrency:
   group: deploy-catalog-service-${{ github.ref }}
@@ -16,17 +21,14 @@ concurrency:
 
 jobs:
   deploy:
-    # A caller workflow's permissions cap what a called reusable workflow may
-    # request — without this, _deploy-ecs-service.yml's `id-token: write`
-    # (needed for the AWS OIDC role assumption) gets silently downgraded to
-    # `id-token: none` and the run fails at the permission-check stage.
-    permissions:
-      id-token: write
-      contents: read
-    uses: ./.github/workflows/_deploy-ecs-service.yml
-    with:
-      dockerfile-path: NinjagoScanner.CatalogService/Dockerfile
-      ecr-repository-url: ${{ vars.ECR_CATALOG_SERVICE_REPOSITORY_URL }}
-      ecs-service-name: ninjago-scanner-catalog-service
-      container-name: catalog-service
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --config NinjagoScanner.CatalogService/fly.toml .
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

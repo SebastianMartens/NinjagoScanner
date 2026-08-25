@@ -6,3 +6,7 @@
 .github/
 openspec/
 cardFotos/
+infra/
+.venv/
+.claude/
+CardInfos_Unsorted/

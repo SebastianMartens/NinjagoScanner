@@ -1,0 +1,47 @@
+# Deploy from the repository root - the build context (`.`) must be repo root to match the
+# Dockerfile's COPY paths, but `dockerfile` above is resolved relative to this fly.toml's own
+# directory (flyctl quirk), not the build context:
+#   flyctl deploy --config NinjagoScanner.PictureService/fly.toml .
+#
+# Internal-only: no [http_service]/[[services]] block, so this app gets no public Fly IP - it's
+# reachable only from other apps in the same Fly org over the private network (6PN), by
+# "ninjago-scanner-picture-service.internal:8080". See design.md's "only NinjagoScanner.Web gets a
+# public Fly IP" decision.
+#
+# Health checks run against a separate HTTP/1.1-only port (8082) rather than the gRPC port (8080)
+# - Kestrel can't serve HTTP/1.1 and cleartext HTTP/2 on the same port (see Program.cs), the same
+# constraint that drove the ECS-era health-check-port split this carries forward. This is flagged
+# in tasks.md (4.7) as something to confirm against a real Fly deploy - Fly's own machine-check
+# behavior for a TCP/HTTP2-only main port hasn't been verified from this environment.
+#
+# Secrets (set via `flyctl secrets set`, not here): Gemini__ApiKey, Gemini__Model, and the
+# PictureService IAM user's AWS access key/secret (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY -
+# see infra/modules/iam-user and infra/README.md). Storage__PhotosBucketName and
+# Storage__SidecarTableName can be plain env vars below once the bucket/table names are known
+# from `terraform output` - not secrets, but not hardcoded here since they're account-specific.
+
+app = "ninjago-scanner-picture-service"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  Kestrel__HealthCheckPort = "8082"
+  CatalogService__Address = "http://ninjago-scanner-catalog-service.internal:8080"
+  AWS__Region = "eu-central-1"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    port = 8082
+    type = "http"
+    interval = "15s"
+    timeout = "4s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/"
