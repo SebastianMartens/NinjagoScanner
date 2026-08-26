@@ -10,8 +10,13 @@ COPY NinjagoScanner.Web/NinjagoScanner.Web.csproj NinjagoScanner.Web/
 RUN dotnet restore NinjagoScanner.Web/NinjagoScanner.Web.csproj
 
 COPY NinjagoScanner.Web/ NinjagoScanner.Web/
+# No --no-restore: a restore done with only the .csproj present (the cache-friendly step above)
+# silently drops the ASP.NET Core shared framework's Blazor JS assets (_framework/blazor.web.js,
+# blazor.server.js) from the publish output, causing production 404s on those files even though
+# the build succeeds with no warnings. Restoring again here (packages are already downloaded, so
+# it's fast) fixes it.
 RUN dotnet publish NinjagoScanner.Web/NinjagoScanner.Web.csproj \
-    -c Release -o /app --no-restore
+    -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

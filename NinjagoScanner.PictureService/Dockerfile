@@ -10,8 +10,12 @@ COPY NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj NinjagoS
 RUN dotnet restore NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj
 
 COPY NinjagoScanner.PictureService/ NinjagoScanner.PictureService/
+# No --no-restore: a restore done with only the .csproj present (the cache-friendly step above)
+# can silently drop ASP.NET Core shared-framework static web assets from the publish output (seen
+# for real on NinjagoScanner.Web's blazor.web.js — see that Dockerfile's comment). Restoring again
+# here is cheap since packages are already downloaded.
 RUN dotnet publish NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj \
-    -c Release -o /app --no-restore
+    -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
