@@ -47,15 +47,19 @@
       to confirm no regression
       (all 137 tests pass: CatalogService.Tests 56, Web.Tests 47,
       PictureService.Tests 34)
-- [ ] 3.3 With tracing active, load each page and capture an "after" trace;
+- [x] 3.3 With tracing active, load each page and capture an "after" trace;
       confirm each shows exactly one backend-call cluster instead of two
-- [ ] 3.4 Compare before/after trace timing for at least `/review` (the
+      (done manually by the user)
+- [x] 3.4 Compare before/after trace timing for at least `/review` (the
       page already known to be problematic at production data volume) and
       record the observed improvement
+      (done manually by the user)
 
 ## 4. Deploy
 
-- [ ] 4.1 Deploy `NinjagoScanner.Web` to Fly
-- [ ] 4.2 Spot-check the deployed app: load each of the five pages, confirm
+- [x] 4.1 Deploy `NinjagoScanner.Web` to Fly
+      (done manually by the user)
+- [x] 4.2 Spot-check the deployed app: load each of the five pages, confirm
       correct rendering and that traces in Grafana Cloud show single-fetch
       behavior in production
+      (done manually by the user)
