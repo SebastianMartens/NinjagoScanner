@@ -1,6 +1,6 @@
 ## 1. Prerequisite check
 
-- [ ] 1.1 Confirm `add-opentelemetry-observability` is deployed to all
+- [x] 1.1 Confirm `add-opentelemetry-observability` is deployed to all
       three Fly apps and producing traces before starting this change
 - [ ] 1.2 Capture (or locate, if already captured as part of that change's
       task 5.4) a "before" trace for a page that fires multiple backend
@@ -9,20 +9,20 @@
 
 ## 2. Apply the fix
 
-- [ ] 2.1 In `CatalogServiceClient`, construct one `GrpcChannel` for
+- [x] 2.1 In `CatalogServiceClient`, construct one `GrpcChannel` for
       `catalogServiceAddress` in the constructor, store it as a field, and
       replace every method's local `GrpcChannel.ForAddress(...)` with that
       field
-- [ ] 2.2 Configure the channel's `SocketsHttpHandler` with a bounded
+- [x] 2.2 Configure the channel's `SocketsHttpHandler` with a bounded
       `PooledConnectionLifetime` (e.g. 5 minutes) so it re-resolves DNS
       periodically instead of holding one connection indefinitely
-- [ ] 2.3 In `PictureServiceClient`, construct one `GrpcChannel` for
+- [x] 2.3 In `PictureServiceClient`, construct one `GrpcChannel` for
       `pictureServiceAddress` in the constructor, store it as a field, and
       replace every method's local `GrpcChannel.ForAddress(...)` with that
       field
-- [ ] 2.4 Configure the same bounded `PooledConnectionLifetime` on
+- [x] 2.4 Configure the same bounded `PooledConnectionLifetime` on
       `PictureServiceClient`'s channel
-- [ ] 2.5 Remove now-unused `using var channel = ...` / `using var call =
+- [x] 2.5 Remove now-unused `using var channel = ...` / `using var call =
       ...` disposal patterns that assumed a per-call channel, keeping
       per-call disposal only where it's about the RPC call itself (e.g.
       the client-streaming `UploadPhoto` call), not the channel
@@ -32,7 +32,7 @@
 - [ ] 3.1 Build and run all three services locally; exercise scan, list,
       download-URL, and update flows through `NinjagoScanner.Web`,
       confirming identical behavior to before the change
-- [ ] 3.2 Run the existing test suite (`dotnet test NinjagoScanner.slnx`),
+- [x] 3.2 Run the existing test suite (`dotnet test NinjagoScanner.slnx`),
       including `PictureServiceClientGetCardsAsyncTests` and related client
       tests, to confirm no regression
 - [ ] 3.3 With tracing active, load a page that fires multiple backend

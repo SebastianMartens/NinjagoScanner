@@ -10,13 +10,25 @@ namespace NinjagoScanner.Web.Services;
 /// sidecars, or PictureService; see CollectionQueryService for anything that combines catalog
 /// data with scanned photo data.
 /// </summary>
-internal sealed class CatalogServiceClient(string catalogServiceAddress)
+internal sealed class CatalogServiceClient
 {
     private static readonly Regex NumberOnlyRegex = new("^\\d+$", RegexOptions.Compiled);
 
+    private readonly GrpcChannel channel;
+
+    public CatalogServiceClient(string catalogServiceAddress)
+    {
+        channel = GrpcChannel.ForAddress(catalogServiceAddress, new GrpcChannelOptions
+        {
+            HttpHandler = new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            }
+        });
+    }
+
     public async Task<IReadOnlyList<string>> GetKnownSeriesAsync(CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
         var client = new CardCatalog.CardCatalogClient(channel);
         var response = await client.ListSeriesAsync(
             new ListSeriesRequest { IncludeKnownCardNames = false },
@@ -31,7 +43,6 @@ internal sealed class CatalogServiceClient(string catalogServiceAddress)
 
     public async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)>> ListCatalogCardsAsync(CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
         var client = new CardCatalog.CardCatalogClient(channel);
         var response = await client.ListAllCardsAsync(new Empty(), cancellationToken: cancellationToken);
 
@@ -56,7 +67,6 @@ internal sealed class CatalogServiceClient(string catalogServiceAddress)
 
     public async Task<SeriesMetadata> GetSeriesMetadataAsync(string series, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(catalogServiceAddress);
         var client = new CardCatalog.CardCatalogClient(channel);
         var response = await client.GetSeriesMetadataAsync(
             new GetSeriesMetadataRequest { SeriesName = series },

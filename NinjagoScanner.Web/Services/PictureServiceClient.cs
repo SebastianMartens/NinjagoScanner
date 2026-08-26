@@ -11,8 +11,25 @@ namespace NinjagoScanner.Web.Services;
 /// Never touches catalog data; see CollectionQueryService for anything that combines this data
 /// with the catalog.
 /// </summary>
-internal sealed class PictureServiceClient(string pictureServiceAddress, string catalogServiceAddress, long maxUploadBytes)
+internal sealed class PictureServiceClient
 {
+    private readonly string catalogServiceAddress;
+    private readonly long maxUploadBytes;
+    private readonly GrpcChannel channel;
+
+    public PictureServiceClient(string pictureServiceAddress, string catalogServiceAddress, long maxUploadBytes)
+    {
+        this.catalogServiceAddress = catalogServiceAddress;
+        this.maxUploadBytes = maxUploadBytes;
+        channel = GrpcChannel.ForAddress(pictureServiceAddress, new GrpcChannelOptions
+        {
+            HttpHandler = new SocketsHttpHandler
+            {
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            }
+        });
+    }
+
     public long MaxUploadBytes => maxUploadBytes;
 
     private void EnsureUploadIsValid(string fileName, long fileSizeBytes)
@@ -36,7 +53,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task<ScanSummaryDto> ScanAsync(CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         var response = await client.ScanAsync(
@@ -68,7 +84,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
     {
         EnsureUploadIsValid(sourceFileName, fileSizeBytes);
 
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
         using var call = client.UploadPhoto(cancellationToken: cancellationToken);
 
@@ -102,7 +117,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task<IReadOnlyList<CardEntry>> ListCardEntriesAsync(CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
         var response = await client.ListCardsAsync(new ListCardsRequest(), cancellationToken: cancellationToken);
 
@@ -111,7 +125,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task<string> GetDownloadUrlAsync(string photoId, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
         var response = await client.GetPhotoDownloadUrlAsync(
             new GetPhotoDownloadUrlRequest { PhotoId = photoId },
@@ -134,7 +147,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
             return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         var request = new GetPhotoDownloadUrlsRequest();
@@ -150,7 +162,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
         CollectionCardSidecarUpdate update,
         CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         var request = new UpdateSidecarRequest
@@ -174,7 +185,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task UpdateReviewStatusAsync(string photoId, string reviewStatus, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         await client.UpdateReviewStatusAsync(
@@ -184,7 +194,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task DeletePhotoAsync(string photoId, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         await client.DeletePhotoAsync(new DeletePhotoRequest { PhotoId = photoId }, cancellationToken: cancellationToken);
@@ -192,7 +201,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task UpdateSetNameAsync(string photoId, string? setName, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         await client.UpdateSetNameAsync(
@@ -202,7 +210,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task UpdateCardNumberAsync(string photoId, string? cardNumber, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         await client.UpdateCardNumberAsync(
@@ -212,7 +219,6 @@ internal sealed class PictureServiceClient(string pictureServiceAddress, string 
 
     public async Task UpdateCardLanguageAsync(string photoId, string? language, CancellationToken cancellationToken = default)
     {
-        using var channel = GrpcChannel.ForAddress(pictureServiceAddress);
         var client = new CardPictureService.CardPictureServiceClient(channel);
 
         await client.UpdateCardLanguageAsync(
