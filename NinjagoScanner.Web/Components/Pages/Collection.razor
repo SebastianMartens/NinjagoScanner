@@ -1,5 +1,5 @@
 @page "/collection"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
 @inject IJSRuntime JS

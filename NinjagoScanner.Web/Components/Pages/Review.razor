@@ -1,5 +1,5 @@
 @page "/review"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject CatalogServiceClient CatalogServiceClient
 @inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
