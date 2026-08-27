@@ -6,20 +6,13 @@ Lets PictureService resolve one photo ID, or many at once, to short-lived pre-si
 
 ## Requirements
 
-### Requirement: Batched resolution of photo download URLs
-PictureService SHALL expose a way to resolve a list of photo IDs to their pre-signed download URLs in a single request-response round trip, in addition to the existing single-photo `GetPhotoDownloadUrl`. The response SHALL include a download URL for every requested photo ID that currently has stored photo bytes.
+### Requirement: Resolution of a single photo's download URL
+PictureService SHALL expose a way to resolve one photo ID to its short-lived pre-signed download URL, returning an error if no photo is stored under that ID. This is PictureService's only remaining direct way to resolve a download URL outside of `ListCards` (see `picture-service-card-listing`), used when a caller has a single photo ID in hand without having just listed it — such as immediately after uploading a new photo.
 
-#### Scenario: Resolving many photos in one request
-- **WHEN** a caller requests download URLs for a list of photo IDs that all currently exist
-- **THEN** a single response is returned containing one pre-signed download URL per requested photo ID
+#### Scenario: Resolving an existing photo's download URL
+- **WHEN** a caller requests the download URL for a photo ID that currently has stored photo bytes
+- **THEN** a pre-signed download URL for that photo is returned
 
-#### Scenario: Requesting an empty list
-- **WHEN** a caller requests download URLs for an empty list of photo IDs
-- **THEN** a response with no download URLs is returned, without error
-
-### Requirement: Unknown photo IDs do not fail the whole batch
-If a batch request includes a photo ID that has no stored photo bytes (for example because the photo was deleted after the caller listed it), PictureService SHALL still return download URLs for every other requested photo ID that does exist, rather than failing the entire request.
-
-#### Scenario: One photo ID in the batch no longer exists
-- **WHEN** a caller requests download URLs for a list of photo IDs where one ID has no stored photo bytes and the rest do
-- **THEN** the response contains download URLs for every photo ID that exists, and no download URL for the missing one, and the call does not fail
+#### Scenario: Requesting a download URL for a photo that does not exist
+- **WHEN** a caller requests the download URL for a photo ID that has no stored photo bytes
+- **THEN** the request fails with a not-found error instead of returning a URL

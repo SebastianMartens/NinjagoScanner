@@ -80,8 +80,13 @@
 			<span class="review-group-count">@group.Photos.Count Foto(s)</span>
 		</div>
 
+		@if (HasHiddenPhotos(group))
+		{
+			<p class="review-group-more-message">Diese Gruppe hat mehr als @MaxDisplayedPhotosPerGroup Fotos. Es werden nur die ersten @MaxDisplayedPhotosPerGroup angezeigt.</p>
+		}
+
 		<div class="review-photo-grid">
-			@foreach (var photo in group.Photos)
+			@foreach (var photo in DisplayedPhotos(group))
 			{
 				var isBusy = IsBusy(photo);
 
@@ -204,6 +209,7 @@
 
 @code {
 	private const string AllFilterValue = "all";
+	internal const int MaxDisplayedPhotosPerGroup = 18;
 
 	private static readonly Dictionary<string, (string ImageFile, string Caption)> SeriesLogos = new(StringComparer.Ordinal)
 	{
@@ -300,6 +306,18 @@
 	private string GetCardNumberDraft(CardListItem photo)
 	{
 		return cardNumberDrafts.TryGetValue(photo.PhotoId, out var draft) ? draft : photo.CardNumber ?? string.Empty;
+	}
+
+	internal static IReadOnlyList<CardListItem> DisplayedPhotos(CardReviewGroup group)
+	{
+		return group.Photos.Count <= MaxDisplayedPhotosPerGroup
+			? group.Photos
+			: group.Photos.Take(MaxDisplayedPhotosPerGroup).ToArray();
+	}
+
+	internal static bool HasHiddenPhotos(CardReviewGroup group)
+	{
+		return group.Photos.Count > MaxDisplayedPhotosPerGroup;
 	}
 
 	internal static string GroupTitle(CardReviewGroup group)
@@ -516,7 +534,7 @@
 
 		try
 		{
-			foreach (var photo in group.Photos)
+			foreach (var photo in DisplayedPhotos(group))
 			{
 				await PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, ReviewStatuses.Verified);
 			}
