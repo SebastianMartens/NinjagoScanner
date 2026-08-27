@@ -2,7 +2,7 @@
 
 - [x] 1.1 Confirm `add-opentelemetry-observability` is deployed to all
       three Fly apps and producing traces before starting this change
-- [ ] 1.2 Capture (or locate, if already captured as part of that change's
+- [x] 1.2 Capture (or locate, if already captured as part of that change's
       task 5.4) a "before" trace for a page that fires multiple backend
       calls (e.g. `/review`) showing repeated connection-setup cost per
       call
@@ -29,23 +29,23 @@
 
 ## 3. Verify
 
-- [ ] 3.1 Build and run all three services locally; exercise scan, list,
+- [x] 3.1 Build and run all three services locally; exercise scan, list,
       download-URL, and update flows through `NinjagoScanner.Web`,
       confirming identical behavior to before the change
 - [x] 3.2 Run the existing test suite (`dotnet test NinjagoScanner.slnx`),
       including `PictureServiceClientGetCardsAsyncTests` and related client
       tests, to confirm no regression
-- [ ] 3.3 With tracing active, load a page that fires multiple backend
+- [x] 3.3 With tracing active, load a page that fires multiple backend
       calls and capture an "after" trace; confirm repeated connection-setup
       spans are gone
-- [ ] 3.4 Manually verify resilience: restart the target service locally
+- [x] 3.4 Manually verify resilience: restart the target service locally
       (or redeploy it on Fly) while the Web app is running, then confirm a
       subsequent call succeeds within the configured
       `PooledConnectionLifetime` window rather than failing indefinitely
 
 ## 4. Deploy
 
-- [ ] 4.1 Deploy `NinjagoScanner.Web` to Fly
-- [ ] 4.2 Spot-check the deployed app: exercise the main flows, confirm
+- [x] 4.1 Deploy `NinjagoScanner.Web` to Fly
+- [x] 4.2 Spot-check the deployed app: exercise the main flows, confirm
       traces in Grafana Cloud show single, reused connections per service
       instead of per-call setup
