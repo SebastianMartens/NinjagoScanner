@@ -302,38 +302,24 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     }
 
     /// <summary>
-    /// Batched form of <see cref="GetPhotoDownloadUrl"/>: resolves many photo IDs in one round
-    /// trip. Photo IDs with no stored photo bytes are omitted from the response instead of
-    /// failing the whole request, since a photo can be deleted between a caller listing it and
-    /// requesting its download URL.
+    /// Lists every photo, each with a ready-to-use download URL. Existence is established by the
+    /// S3 listing itself (no separate per-photo check), and <see cref="SidecarCache.WarmFromStoreAsync"/>
+    /// bulk-fills sidecar data with a paginated DynamoDB scan up front, so only photos with no
+    /// sidecar at all (e.g. just uploaded, not yet analyzed) fall through to an individual read -
+    /// response time no longer grows linearly with photo count in the common case.
     /// </summary>
-    public override async Task<GetPhotoDownloadUrlsResponse> GetPhotoDownloadUrls(GetPhotoDownloadUrlsRequest request, ServerCallContext context)
-    {
-        var cancellationToken = context.CancellationToken;
-        var response = new GetPhotoDownloadUrlsResponse();
-
-        foreach (var photoId in request.PhotoIds)
-        {
-            if (string.IsNullOrWhiteSpace(photoId) || !await photoStore.ExistsAsync(photoId, cancellationToken))
-            {
-                continue;
-            }
-
-            response.DownloadUrlsByPhotoId[photoId] = await photoStore.CreateDownloadUrlAsync(photoId, cancellationToken);
-        }
-
-        return response;
-    }
-
     public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
         var response = new ListCardsResponse();
 
+        await sidecarCache.WarmFromStoreAsync(cancellationToken);
+
         await foreach (var photoId in photoStore.ListPhotoIdsAsync(cancellationToken))
         {
             var record = await sidecarCache.GetAsync(photoId, cancellationToken);
-            response.Cards.Add(ToCardEntry(photoId, record));
+            var downloadUrl = await photoStore.CreateDownloadUrlAsync(photoId, cancellationToken);
+            response.Cards.Add(ToCardEntry(photoId, record, downloadUrl));
         }
 
         return response;
@@ -468,7 +454,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return new DeletePhotoResponse { Success = true };
     }
 
-    private static CardEntry ToCardEntry(string photoId, SidecarRecord? sidecar)
+    private static CardEntry ToCardEntry(string photoId, SidecarRecord? sidecar, string downloadUrl = "")
     {
         var entry = new CardEntry
         {
@@ -484,7 +470,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
             ScannedAtUtc = sidecar?.ScannedAtUtc?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
             ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
-            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
+            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed,
+            DownloadUrl = downloadUrl
         };
         entry.DetectedText.AddRange(sidecar?.DetectedText ?? Array.Empty<string>());
         return entry;

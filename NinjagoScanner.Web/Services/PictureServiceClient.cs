@@ -106,13 +106,14 @@ internal sealed class PictureServiceClient
         var response = await call;
 
         var downloadUrl = await GetDownloadUrlAsync(response.Card.PhotoId, cancellationToken);
-        return ToCardListItem(response.Card, new Dictionary<string, string>(StringComparer.Ordinal) { [response.Card.PhotoId] = downloadUrl });
+        response.Card.DownloadUrl = downloadUrl;
+        return ToCardListItem(response.Card);
     }
 
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
         var entries = await ListCardEntriesAsync(cancellationToken);
-        return await ToCardListItemsAsync(entries, cancellationToken);
+        return entries.Select(ToCardListItem).ToArray();
     }
 
     public async Task<IReadOnlyList<CardEntry>> ListCardEntriesAsync(CancellationToken cancellationToken = default)
@@ -131,30 +132,6 @@ internal sealed class PictureServiceClient
             cancellationToken: cancellationToken);
 
         return response.DownloadUrl;
-    }
-
-    /// <summary>
-    /// Resolves many photo IDs to their download URLs in one round trip via the batched
-    /// GetPhotoDownloadUrls RPC. Photo IDs with no stored photo bytes are simply absent from the
-    /// returned lookup.
-    /// </summary>
-    public async Task<IReadOnlyDictionary<string, string>> GetDownloadUrlsAsync(
-        IReadOnlyCollection<string> photoIds,
-        CancellationToken cancellationToken = default)
-    {
-        if (photoIds.Count == 0)
-        {
-            return new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        var client = new CardPictureService.CardPictureServiceClient(channel);
-
-        var request = new GetPhotoDownloadUrlsRequest();
-        request.PhotoIds.AddRange(photoIds);
-
-        var response = await client.GetPhotoDownloadUrlsAsync(request, cancellationToken: cancellationToken);
-
-        return response.DownloadUrlsByPhotoId;
     }
 
     public async Task UpdateCardSidecarAsync(
@@ -226,15 +203,13 @@ internal sealed class PictureServiceClient
             cancellationToken: cancellationToken);
     }
 
-    private static CardListItem ToCardListItem(CardEntry entry, IReadOnlyDictionary<string, string> downloadUrlsByPhotoId)
+    private static CardListItem ToCardListItem(CardEntry entry)
     {
-        downloadUrlsByPhotoId.TryGetValue(entry.PhotoId, out var imageUrl);
-
         return new CardListItem
         {
             PhotoId = entry.PhotoId,
             SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
-            ImageUrl = imageUrl ?? string.Empty,
+            ImageUrl = entry.DownloadUrl,
             AnalysisStatus = entry.AnalysisStatus,
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),
@@ -248,14 +223,6 @@ internal sealed class PictureServiceClient
             ErrorMessage = NormalizeNullable(entry.ErrorMessage),
             ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
         };
-    }
-
-    private async Task<IReadOnlyList<CardListItem>> ToCardListItemsAsync(IReadOnlyList<CardEntry> entries, CancellationToken cancellationToken)
-    {
-        var photoIds = entries.Select(entry => entry.PhotoId).ToArray();
-        var downloadUrlsByPhotoId = await GetDownloadUrlsAsync(photoIds, cancellationToken);
-
-        return entries.Select(entry => ToCardListItem(entry, downloadUrlsByPhotoId)).ToArray();
     }
 
     private static DateTimeOffset? ParseScannedAtUtc(string value)

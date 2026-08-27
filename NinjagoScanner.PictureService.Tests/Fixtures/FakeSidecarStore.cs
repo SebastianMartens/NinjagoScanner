@@ -14,8 +14,16 @@ internal sealed class FakeSidecarStore : ISidecarStore
     private readonly ConcurrentDictionary<string, SidecarRecord> records = new(StringComparer.Ordinal);
     private readonly HashSet<string> failOnceKeys = new(StringComparer.Ordinal);
 
+    /// <summary>Number of times <see cref="GetAsync"/> has been called, for asserting bulk-vs-per-photo read patterns.</summary>
+    public int GetAsyncCallCount { get; private set; }
+
+    /// <summary>Number of times <see cref="ListAllAsync"/> has been enumerated, for asserting bulk-vs-per-photo read patterns.</summary>
+    public int ListAllAsyncCallCount { get; private set; }
+
     public Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken)
     {
+        GetAsyncCallCount++;
+
         if (failOnceKeys.Remove(photoId))
         {
             throw new InvalidOperationException($"Simulated read failure for '{photoId}'.");
@@ -39,6 +47,8 @@ internal sealed class FakeSidecarStore : ISidecarStore
     public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        ListAllAsyncCallCount++;
+
         foreach (var pair in records)
         {
             yield return (pair.Key, pair.Value);

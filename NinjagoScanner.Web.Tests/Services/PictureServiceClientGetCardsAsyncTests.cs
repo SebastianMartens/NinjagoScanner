@@ -5,8 +5,8 @@ namespace NinjagoScanner.Web.Tests.Services;
 
 /// <summary>
 /// Covers <see cref="PictureServiceClient.GetCardsAsync"/> resolving every photo's download URL
-/// through the batched GetPhotoDownloadUrls RPC (see PictureServiceClient.GetDownloadUrlsAsync)
-/// instead of one GetPhotoDownloadUrl call per photo.
+/// straight from the single ListCards call (PictureService includes it on every CardEntry),
+/// without any separate download-URL request.
 /// </summary>
 public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
 {
@@ -53,7 +53,7 @@ public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetCardsAsync_ResolvesEveryPhotosImageUrl_ViaOneBatchedCall()
+    public async Task GetCardsAsync_ResolvesEveryPhotosImageUrl_FromListCardsDirectly()
     {
         var cards = await pictureServiceClient.GetCardsAsync();
 

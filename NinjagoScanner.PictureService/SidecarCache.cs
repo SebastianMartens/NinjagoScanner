@@ -50,8 +50,9 @@ internal sealed class SidecarCache
     }
 
     /// <summary>
-    /// Enumerates every sidecar record, populating the cache along the way. Used by ListCards
-    /// and the bulk Scan/MigrateSidecars RPCs.
+    /// Enumerates every sidecar record, populating the cache along the way. Used by the bulk
+    /// Scan/MigrateSidecars RPCs, where the store is authoritative and should overwrite whatever
+    /// is cached.
     /// </summary>
     public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
@@ -60,6 +61,22 @@ internal sealed class SidecarCache
         {
             entries[photoId] = record;
             yield return (photoId, record);
+        }
+    }
+
+    /// <summary>
+    /// Bulk-fills any not-yet-cached sidecar record from the store in a bounded, small number of
+    /// requests (a paginated scan), instead of leaving every uncached photo to be read one at a
+    /// time. Unlike <see cref="ListAllAsync"/>, an already-cached entry is left as-is rather than
+    /// overwritten, so a value just written through this cache (see <see cref="SetAsync"/>) stays
+    /// visible even if the store has since diverged out-of-band - used by ListCards, which reads
+    /// through <see cref="GetAsync"/> afterward and must keep that read-your-own-writes guarantee.
+    /// </summary>
+    public async Task WarmFromStoreAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var (photoId, record) in sidecarTable.ListAllAsync(cancellationToken))
+        {
+            entries.TryAdd(photoId, record);
         }
     }
 

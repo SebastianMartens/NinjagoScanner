@@ -7,13 +7,13 @@ package pictureservice;
 // Photo bytes live in S3 (bucket configured at the service level, not per-request) and sidecar
 // records live in DynamoDB, keyed by a generated photo_id. Callers stream photo bytes to this
 // service via UploadPhoto, which assigns the generated photo_id, stores the bytes, and triggers
-// AI Analysis. Photo display uses GetPhotoDownloadUrl to obtain a short-lived pre-signed S3 URL
-// rather than having this service (or the caller) proxy image bytes.
+// AI Analysis. ListCards includes a ready-to-use download_url on every entry; GetPhotoDownloadUrl
+// exists only for resolving a single photo_id a caller has in hand without a ListCards result
+// (e.g. right after UploadPhoto).
 service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
   rpc UploadPhoto (stream UploadPhotoRequest) returns (UploadPhotoResponse);
   rpc GetPhotoDownloadUrl (GetPhotoDownloadUrlRequest) returns (GetPhotoDownloadUrlResponse);
-  rpc GetPhotoDownloadUrls (GetPhotoDownloadUrlsRequest) returns (GetPhotoDownloadUrlsResponse);
   rpc ListCards (ListCardsRequest) returns (ListCardsResponse);
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
   rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
@@ -64,6 +64,7 @@ message CardEntry {
   string error_message = 11;
   string review_status = 12;
   string language = 13;
+  string download_url = 15;
 }
 
 message ListCardsRequest {
@@ -103,16 +104,6 @@ message GetPhotoDownloadUrlRequest {
 
 message GetPhotoDownloadUrlResponse {
   string download_url = 1;
-}
-
-// Batched form of GetPhotoDownloadUrl: resolves many photo IDs in one round trip. Photo IDs with
-// no stored photo bytes are omitted from the response rather than failing the whole request.
-message GetPhotoDownloadUrlsRequest {
-  repeated string photo_ids = 1;
-}
-
-message GetPhotoDownloadUrlsResponse {
-  map<string, string> download_urls_by_photo_id = 1;
 }
 
 message UpdateSidecarRequest {

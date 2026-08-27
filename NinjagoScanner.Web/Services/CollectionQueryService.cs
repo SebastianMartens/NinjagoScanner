@@ -89,7 +89,7 @@ internal sealed class CollectionQueryService(
                 CardNumber = card.CardNumber,
                 CardName = card.CardName,
                 PhotoId = matchedPhoto?.PhotoId,
-                ImageUrl = matchedPhoto is null ? null : await pictureServiceClient.GetDownloadUrlAsync(matchedPhoto.PhotoId, cancellationToken),
+                ImageUrl = matchedPhoto?.DownloadUrl,
                 PhotoCount = photoCount,
                 Rarity = matchedPhoto?.Rarity,
                 ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus)
@@ -173,7 +173,7 @@ internal sealed class CollectionQueryService(
 
         var metadata = await catalogServiceClient.GetSeriesMetadataAsync(series, cancellationToken);
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
-        var photos = await BuildCardPhotosAsync(photoEntries, series, cardNumber, cancellationToken);
+        var photos = BuildCardPhotos(photoEntries, series, cardNumber);
 
         return new CollectionCardDetails
         {
@@ -297,11 +297,10 @@ internal sealed class CollectionQueryService(
         };
     }
 
-    private async Task<IReadOnlyList<CollectionCardPhotoItem>> BuildCardPhotosAsync(
+    private static IReadOnlyList<CollectionCardPhotoItem> BuildCardPhotos(
         IReadOnlyList<CardEntry> entries,
         string series,
-        string cardNumber,
-        CancellationToken cancellationToken)
+        string cardNumber)
     {
         var ownershipKey = BuildOwnershipKey(series, cardNumber);
         if (string.IsNullOrWhiteSpace(ownershipKey))
@@ -321,7 +320,7 @@ internal sealed class CollectionQueryService(
             {
                 PhotoId = entry.PhotoId,
                 SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
-                ImageUrl = await pictureServiceClient.GetDownloadUrlAsync(entry.PhotoId, cancellationToken),
+                ImageUrl = entry.DownloadUrl,
                 Sidecar = ToCollectionSidecar(entry)
             });
         }
