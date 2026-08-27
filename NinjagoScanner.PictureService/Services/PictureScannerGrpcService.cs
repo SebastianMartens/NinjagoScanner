@@ -325,6 +325,24 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         return response;
     }
 
+    /// <summary>
+    /// Resolves the sidecar fields not needed to render a list/grid row (see <see cref="ToCardEntry"/>)
+    /// for a single photo_id, for callers showing one card's full details on demand rather than
+    /// carrying them on every ListCards entry.
+    /// </summary>
+    public override async Task<GetCardDetailsResponse> GetCardDetails(GetCardDetailsRequest request, ServerCallContext context)
+    {
+        var cancellationToken = context.CancellationToken;
+
+        if (string.IsNullOrWhiteSpace(request.PhotoId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
+        }
+
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken);
+        return new GetCardDetailsResponse { Details = ToCardDetails(request.PhotoId, sidecar) };
+    }
+
     public override async Task<UpdateSidecarResponse> UpdateSidecar(UpdateSidecarRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
@@ -456,7 +474,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
     private static CardEntry ToCardEntry(string photoId, SidecarRecord? sidecar, string downloadUrl = "")
     {
-        var entry = new CardEntry
+        return new CardEntry
         {
             PhotoId = photoId,
             SourceFileName = sidecar?.SourceFileName ?? string.Empty,
@@ -466,15 +484,23 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             SetName = sidecar?.SetName ?? string.Empty,
             Rarity = sidecar?.Rarity ?? string.Empty,
             Language = sidecar?.Language ?? Languages.Default,
-            Confidence = sidecar?.Confidence ?? 0,
-            ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
-            ScannedAtUtc = sidecar?.ScannedAtUtc?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
-            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
             ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed,
             DownloadUrl = downloadUrl
         };
-        entry.DetectedText.AddRange(sidecar?.DetectedText ?? Array.Empty<string>());
-        return entry;
+    }
+
+    private static CardDetails ToCardDetails(string photoId, SidecarRecord? sidecar)
+    {
+        var details = new CardDetails
+        {
+            PhotoId = photoId,
+            Confidence = sidecar?.Confidence ?? 0,
+            ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
+            ScannedAtUtc = sidecar?.ScannedAtUtc?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
+            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty
+        };
+        details.DetectedText.AddRange(sidecar?.DetectedText ?? Array.Empty<string>());
+        return details;
     }
 
     private static string? NormalizeNullable(string? value)

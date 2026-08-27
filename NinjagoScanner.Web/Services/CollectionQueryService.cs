@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using NinjagoScanner.PictureService.Protos;
 using NinjagoScanner.Web.Models;
@@ -173,7 +172,7 @@ internal sealed class CollectionQueryService(
 
         var metadata = await catalogServiceClient.GetSeriesMetadataAsync(series, cancellationToken);
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
-        var photos = BuildCardPhotos(photoEntries, series, cardNumber);
+        var photos = await BuildCardPhotosAsync(photoEntries, series, cardNumber, cancellationToken);
 
         return new CollectionCardDetails
         {
@@ -278,7 +277,7 @@ internal sealed class CollectionQueryService(
         };
     }
 
-    private static CollectionCardSidecarData ToCollectionSidecar(CardEntry entry)
+    private static CollectionCardSidecarData ToCollectionSidecar(CardEntry entry, CardDetailsItem details)
     {
         return new CollectionCardSidecarData
         {
@@ -288,19 +287,20 @@ internal sealed class CollectionQueryService(
             SetName = NormalizeNullable(entry.SetName),
             Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
-            Confidence = entry.Confidence,
-            ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
-            DetectedText = entry.DetectedText.ToArray(),
-            ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
-            ErrorMessage = NormalizeNullable(entry.ErrorMessage),
+            Confidence = details.Confidence,
+            ReasoningSummary = details.ReasoningSummary,
+            DetectedText = details.DetectedText,
+            ScannedAtUtc = details.ScannedAtUtc,
+            ErrorMessage = details.ErrorMessage,
             ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
         };
     }
 
-    private static IReadOnlyList<CollectionCardPhotoItem> BuildCardPhotos(
+    private async Task<IReadOnlyList<CollectionCardPhotoItem>> BuildCardPhotosAsync(
         IReadOnlyList<CardEntry> entries,
         string series,
-        string cardNumber)
+        string cardNumber,
+        CancellationToken cancellationToken)
     {
         var ownershipKey = BuildOwnershipKey(series, cardNumber);
         if (string.IsNullOrWhiteSpace(ownershipKey))
@@ -316,12 +316,13 @@ internal sealed class CollectionQueryService(
         var result = new List<CollectionCardPhotoItem>(matches.Length);
         foreach (var entry in matches)
         {
+            var details = await pictureServiceClient.GetCardDetailsAsync(entry.PhotoId, cancellationToken);
             result.Add(new CollectionCardPhotoItem
             {
                 PhotoId = entry.PhotoId,
                 SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
                 ImageUrl = entry.DownloadUrl,
-                Sidecar = ToCollectionSidecar(entry)
+                Sidecar = ToCollectionSidecar(entry, details)
             });
         }
 
@@ -352,14 +353,6 @@ internal sealed class CollectionQueryService(
         }
 
         return ownership;
-    }
-
-    private static DateTimeOffset? ParseScannedAtUtc(string value)
-    {
-        return !string.IsNullOrWhiteSpace(value)
-            && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
-                ? parsed
-                : null;
     }
 
     private static string BuildOwnershipKey(string? series, string? cardNumber)

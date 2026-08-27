@@ -9,12 +9,15 @@ package pictureservice;
 // service via UploadPhoto, which assigns the generated photo_id, stores the bytes, and triggers
 // AI Analysis. ListCards includes a ready-to-use download_url on every entry; GetPhotoDownloadUrl
 // exists only for resolving a single photo_id a caller has in hand without a ListCards result
-// (e.g. right after UploadPhoto).
+// (e.g. right after UploadPhoto). CardEntry only carries the fields every list/grid view needs
+// for every row; GetCardDetails resolves the rest for one photo_id at a time, for callers showing
+// a single card's full details (an expanded review tile, the collection detail pane).
 service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
   rpc UploadPhoto (stream UploadPhotoRequest) returns (UploadPhotoResponse);
   rpc GetPhotoDownloadUrl (GetPhotoDownloadUrlRequest) returns (GetPhotoDownloadUrlResponse);
   rpc ListCards (ListCardsRequest) returns (ListCardsResponse);
+  rpc GetCardDetails (GetCardDetailsRequest) returns (GetCardDetailsResponse);
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
   rpc UpdateSetName (UpdateSetNameRequest) returns (UpdateSetNameResponse);
   rpc UpdateCardNumber (UpdateCardNumberRequest) returns (UpdateCardNumberResponse);
@@ -48,7 +51,8 @@ message ScanSummary {
   string message = 7;
 }
 
-// Full sidecar contents for a single card photo, keyed by its generated photo_id.
+// Sidecar fields needed to render a card in a list/grid view - every row needs these, so they
+// stay in the bulk ListCards response. See CardDetails for the rest.
 message CardEntry {
   string photo_id = 1;
   string source_file_name = 14;
@@ -57,11 +61,6 @@ message CardEntry {
   string card_number = 4;
   string set_name = 5;
   string rarity = 6;
-  double confidence = 7;
-  string reasoning_summary = 8;
-  repeated string detected_text = 9;
-  string scanned_at_utc = 10;
-  string error_message = 11;
   string review_status = 12;
   string language = 13;
   string download_url = 15;
@@ -72,6 +71,25 @@ message ListCardsRequest {
 
 message ListCardsResponse {
   repeated CardEntry cards = 1;
+}
+
+// Sidecar fields only shown for a single selected/expanded card, resolved on demand via
+// GetCardDetails rather than carried on every ListCards entry.
+message CardDetails {
+  string photo_id = 1;
+  double confidence = 2;
+  string reasoning_summary = 3;
+  repeated string detected_text = 4;
+  string scanned_at_utc = 5;
+  string error_message = 6;
+}
+
+message GetCardDetailsRequest {
+  string photo_id = 1;
+}
+
+message GetCardDetailsResponse {
+  CardDetails details = 1;
 }
 
 // Client-streaming upload: the first message on the stream carries metadata, every subsequent

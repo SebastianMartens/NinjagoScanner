@@ -16,10 +16,19 @@ public sealed class CardListItem
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
     public string? Language { get; init; }
+    public required string ReviewStatus { get; init; }
+}
+
+/// <summary>
+/// The sidecar fields not carried on <see cref="CardListItem"/>, resolved on demand via
+/// <see cref="NinjagoScanner.Web.Services.PictureServiceClient.GetCardDetailsAsync"/> for a single photo shown in an
+/// expanded/selected detail view.
+/// </summary>
+public sealed class CardDetailsItem
+{
     public double Confidence { get; init; }
     public string? ReasoningSummary { get; init; }
     public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
     public DateTimeOffset? ScannedAtUtc { get; init; }
     public string? ErrorMessage { get; init; }
-    public required string ReviewStatus { get; init; }
 }

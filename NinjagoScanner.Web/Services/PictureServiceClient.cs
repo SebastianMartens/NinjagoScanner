@@ -26,7 +26,14 @@ internal sealed class PictureServiceClient
             HttpHandler = new SocketsHttpHandler
             {
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5)
-            }
+            },
+            // ListCards now embeds a presigned S3 download_url (a few hundred bytes) on every
+            // entry (see inline-photo-download-urls), so the response grows with the photo count
+            // instead of staying flat - past a few thousand photos it exceeds the client's
+            // default 4 MB receive limit and ListCards fails with RESOURCE_EXHAUSTED. The server
+            // already sends without a size limit (MaxSendMessageSize defaults to unlimited), so
+            // removing the limit here just matches that.
+            MaxReceiveMessageSize = null
         });
     }
 
@@ -134,6 +141,21 @@ internal sealed class PictureServiceClient
         return response.DownloadUrl;
     }
 
+    /// <summary>
+    /// Resolves the sidecar fields not carried on <see cref="CardListItem"/> (confidence,
+    /// reasoning, detected text, scanned-at timestamp, error message) for a single photo, for
+    /// callers showing one card's full details on demand rather than every ListCards row.
+    /// </summary>
+    public async Task<CardDetailsItem> GetCardDetailsAsync(string photoId, CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var response = await client.GetCardDetailsAsync(
+            new GetCardDetailsRequest { PhotoId = photoId },
+            cancellationToken: cancellationToken);
+
+        return ToCardDetailsItem(response.Details);
+    }
+
     public async Task UpdateCardSidecarAsync(
         string photoId,
         CollectionCardSidecarUpdate update,
@@ -216,12 +238,19 @@ internal sealed class PictureServiceClient
             SetName = NormalizeNullable(entry.SetName),
             Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
-            Confidence = entry.Confidence,
-            ReasoningSummary = NormalizeNullable(entry.ReasoningSummary),
-            DetectedText = entry.DetectedText.ToArray(),
-            ScannedAtUtc = ParseScannedAtUtc(entry.ScannedAtUtc),
-            ErrorMessage = NormalizeNullable(entry.ErrorMessage),
             ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
+        };
+    }
+
+    private static CardDetailsItem ToCardDetailsItem(CardDetails details)
+    {
+        return new CardDetailsItem
+        {
+            Confidence = details.Confidence,
+            ReasoningSummary = NormalizeNullable(details.ReasoningSummary),
+            DetectedText = details.DetectedText.ToArray(),
+            ScannedAtUtc = ParseScannedAtUtc(details.ScannedAtUtc),
+            ErrorMessage = NormalizeNullable(details.ErrorMessage)
         };
     }
 

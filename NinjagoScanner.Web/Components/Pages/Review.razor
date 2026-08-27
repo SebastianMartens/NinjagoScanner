@@ -146,22 +146,30 @@
 						{
 							<div class="review-details">
 								<span>Seltenheit: @(photo.Rarity ?? "-")</span>
-								<span>Confidence: @photo.Confidence.ToString("0.00")</span>
-								@if (!string.IsNullOrWhiteSpace(photo.ReasoningSummary))
+								@{ var details = GetDetails(photo); }
+								@if (details is null)
 								{
-									<span>Begruendung: @photo.ReasoningSummary</span>
+									<span>Lade Details...</span>
 								}
-								@if (photo.DetectedText.Count > 0)
+								else
 								{
-									<span>Erkannter Text: @string.Join(", ", photo.DetectedText)</span>
-								}
-								@if (!string.IsNullOrWhiteSpace(photo.ErrorMessage))
-								{
-									<span>Fehler: @photo.ErrorMessage</span>
-								}
-								@if (photo.ScannedAtUtc is not null)
-								{
-									<span>Gescannt: @photo.ScannedAtUtc.Value.LocalDateTime</span>
+									<span>Confidence: @details.Confidence.ToString("0.00")</span>
+									@if (!string.IsNullOrWhiteSpace(details.ReasoningSummary))
+									{
+										<span>Begruendung: @details.ReasoningSummary</span>
+									}
+									@if (details.DetectedText.Count > 0)
+									{
+										<span>Erkannter Text: @string.Join(", ", details.DetectedText)</span>
+									}
+									@if (!string.IsNullOrWhiteSpace(details.ErrorMessage))
+									{
+										<span>Fehler: @details.ErrorMessage</span>
+									}
+									@if (details.ScannedAtUtc is not null)
+									{
+										<span>Gescannt: @details.ScannedAtUtc.Value.LocalDateTime</span>
+									}
 								}
 							</div>
 						}
@@ -229,6 +237,7 @@
 	private CardListItem? photoPendingDeletion;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, CardDetailsItem> photoDetails = new(StringComparer.Ordinal);
 
 	private IReadOnlyList<CardReviewGroup> FilteredGroups =>
 		groups.Where(group => MatchesFilters(group, reviewStatusFilter, analysisStatusFilter, searchText)).ToArray();
@@ -315,11 +324,22 @@
 		return expandedPhotos.Contains(photo.PhotoId);
 	}
 
-	private void ToggleDetails(CardListItem photo)
+	private CardDetailsItem? GetDetails(CardListItem photo)
+	{
+		return photoDetails.TryGetValue(photo.PhotoId, out var details) ? details : null;
+	}
+
+	private async Task ToggleDetails(CardListItem photo)
 	{
 		if (!expandedPhotos.Add(photo.PhotoId))
 		{
 			expandedPhotos.Remove(photo.PhotoId);
+			return;
+		}
+
+		if (!photoDetails.ContainsKey(photo.PhotoId))
+		{
+			photoDetails[photo.PhotoId] = await PictureServiceClient.GetCardDetailsAsync(photo.PhotoId);
 		}
 	}
 
