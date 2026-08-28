@@ -24,4 +24,4 @@
 
 - [x] 4.1 `dotnet build NinjagoScanner.slnx`
 - [x] 4.2 `dotnet test NinjagoScanner.slnx`
-- [ ] 4.3 Manually verify via `run`: trigger a scan against a photo directory, confirm a simulated/observed transport failure stops the batch and the Overview message reflects it, then re-run the scan and confirm the previously-failed photo(s) are retried.
+- [x] 4.3 Manually verify via `run`: trigger a scan against a photo directory, confirm a simulated/observed transport failure stops the batch and the Overview message reflects it, then re-run the scan and confirm the previously-failed photo(s) are retried.
