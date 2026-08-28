@@ -49,6 +49,7 @@ message ScanSummary {
   int32 failed = 5;
   bool has_configuration_error = 6;
   string message = 7;
+  bool stopped_early = 8;
 }
 
 // Sidecar fields needed to render a card in a list/grid view - every row needs these, so they

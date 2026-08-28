@@ -44,6 +44,13 @@ internal sealed record CardAnalysisResult
     public string? ErrorMessage { get; init; }
     public string? RawModelResponse { get; init; }
     public string ReviewStatus { get; init; } = ReviewStatuses.Unreviewed;
+
+    /// <summary>
+    /// True when this failure means Gemini never produced a response it evaluated the photo with
+    /// (HTTP-level failure or an exception attempting the call) - as opposed to a content-level
+    /// failure from a response Gemini did return. Only meaningful when AnalysisStatus is Failed.
+    /// </summary>
+    public bool IsTransportFailure { get; init; }
 }
 
 internal sealed class GeminiCardPayload

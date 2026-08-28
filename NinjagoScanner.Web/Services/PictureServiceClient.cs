@@ -74,6 +74,7 @@ internal sealed class PictureServiceClient
             Uncertain = response.Uncertain,
             Failed = response.Failed,
             HasConfigurationError = response.HasConfigurationError,
+            StoppedEarly = response.StoppedEarly,
             Message = string.IsNullOrWhiteSpace(response.Message) ? null : response.Message
         };
     }

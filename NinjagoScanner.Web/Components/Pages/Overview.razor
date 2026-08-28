@@ -136,9 +136,7 @@
 		{
 			var summary = await PictureServiceClient.ScanAsync();
 
-			scanStatusMessage = summary.HasConfigurationError
-				? summary.Message ?? "Scan konnte nicht gestartet werden."
-				: $"Scan fertig: {summary.Processed} verarbeitet, {summary.Skipped} uebersprungen, {summary.Uncertain} unsicher, {summary.Failed} fehlgeschlagen.";
+			scanStatusMessage = ScanStatusMessageFormatter.BuildMessage(summary);
 		}
 		catch (Exception exception)
 		{

@@ -97,6 +97,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var skippedCount = 0;
         var failedCount = 0;
         var uncertainCount = 0;
+        var stoppedEarly = false;
 
         for (var index = 0; index < photoIds.Count; index++)
         {
@@ -105,7 +106,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             var photoId = photoIds[index];
             var existing = await sidecarCache.GetAsync(photoId, cancellationToken);
 
-            if (!config.OverwriteExistingSidecars && existing is not null)
+            if (ShouldSkipExistingSidecar(existing, config.OverwriteExistingSidecars))
             {
                 skippedCount++;
                 continue;
@@ -130,7 +131,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                     AiModel = config.Model,
                     ScannedAtUtc = DateTimeOffset.UtcNow,
                     ErrorMessage = $"Unerwarteter Fehler: {exception.Message}",
-                    DetectedText = Array.Empty<string>()
+                    DetectedText = Array.Empty<string>(),
+                    IsTransportFailure = true
                 };
             }
 
@@ -161,6 +163,16 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 uncertainCount++;
             }
 
+            if (result.IsTransportFailure)
+            {
+                stoppedEarly = true;
+                logger.LogWarning(
+                    "Scan wird nach {PhotoId} abgebrochen: Gemini war ueber die Transportebene nicht erreichbar ({ErrorMessage})",
+                    photoId,
+                    result.ErrorMessage);
+                break;
+            }
+
             if (index < photoIds.Count - 1 && config.DelayBetweenRequestsMs > 0)
             {
                 await Task.Delay(config.DelayBetweenRequestsMs, cancellationToken);
@@ -174,8 +186,27 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             Skipped = skippedCount,
             Uncertain = uncertainCount,
             Failed = failedCount,
-            Message = "Batch abgeschlossen."
+            StoppedEarly = stoppedEarly,
+            Message = stoppedEarly
+                ? "Scan vorzeitig abgebrochen: Gemini war wiederholt nicht erreichbar. Spaeter erneut versuchen."
+                : "Batch abgeschlossen."
         };
+    }
+
+    /// <summary>
+    /// A photo is skipped only when it already has a sidecar recording a completed analysis
+    /// (<c>ok</c> or <c>uncertain</c>) and overwrite wasn't requested. A missing sidecar or one
+    /// recording <c>failed</c> is always retry-eligible, so a later Scan naturally picks up both
+    /// never-analyzed photos and previously-failed ones.
+    /// </summary>
+    internal static bool ShouldSkipExistingSidecar(SidecarRecord? existing, bool overwriteExistingSidecars)
+    {
+        if (overwriteExistingSidecars || existing is null)
+        {
+            return false;
+        }
+
+        return !string.Equals(existing.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

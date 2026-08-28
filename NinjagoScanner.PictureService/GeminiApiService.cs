@@ -35,10 +35,11 @@ internal static class GeminiApiService
                 sourceFileName,
                 config.Model,
                 BuildApiErrorMessage(response.StatusCode, responseText, config.Model),
-                responseText);
+                responseText,
+                isTransportFailure: true);
         }
 
-        return CreateFailureResult(photoId, sourceFileName, config.Model, "Unbekannter API-Fehler.");
+        return CreateFailureResult(photoId, sourceFileName, config.Model, "Unbekannter API-Fehler.", isTransportFailure: true);
     }
 
     private static object CreateGeminiRequest(ScannerConfig config, IReadOnlyList<SeriesInfo> seriesCatalog, string sourceFileName, byte[] imageBytes)
@@ -167,7 +168,7 @@ internal static class GeminiApiService
         }
     }
 
-    private static CardAnalysisResult CreateFailureResult(string photoId, string sourceFileName, string model, string errorMessage, string? rawModelResponse = null)
+    private static CardAnalysisResult CreateFailureResult(string photoId, string sourceFileName, string model, string errorMessage, string? rawModelResponse = null, bool isTransportFailure = false)
     {
         return new CardAnalysisResult
         {
@@ -178,7 +179,8 @@ internal static class GeminiApiService
             ScannedAtUtc = DateTimeOffset.UtcNow,
             ErrorMessage = errorMessage,
             RawModelResponse = rawModelResponse,
-            DetectedText = Array.Empty<string>()
+            DetectedText = Array.Empty<string>(),
+            IsTransportFailure = isTransportFailure
         };
     }
 
