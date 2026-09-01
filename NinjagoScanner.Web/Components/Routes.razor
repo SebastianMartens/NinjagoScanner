@@ -1,22 +1,28 @@
-<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)" OnNavigateAsync="HandleNavigateAsync">
-    <Found Context="routeData">
-        <ErrorBoundary @ref="routeErrorBoundary">
-            <ChildContent>
-                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-                <FocusOnNavigate RouteData="routeData" Selector="h1" />
-            </ChildContent>
-            <ErrorContent Context="exception">
-                <LayoutView Layout="typeof(Layout.MainLayout)">
-                    <div class="empty-state">
-                        <h2>Seite konnte nicht geladen werden</h2>
-                        <p>Beim Laden der Seite ist ein Fehler aufgetreten.</p>
-                        <p class="table-secondary">@exception.Message</p>
-                    </div>
-                </LayoutView>
-            </ErrorContent>
-        </ErrorBoundary>
-    </Found>
-</Router>
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)" OnNavigateAsync="HandleNavigateAsync">
+        <Found Context="routeData">
+            <ErrorBoundary @ref="routeErrorBoundary">
+                <ChildContent>
+                    <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                        <NotAuthorized>
+                            <RedirectToLogin />
+                        </NotAuthorized>
+                    </AuthorizeRouteView>
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+                </ChildContent>
+                <ErrorContent Context="exception">
+                    <LayoutView Layout="typeof(Layout.MainLayout)">
+                        <div class="empty-state">
+                            <h2>Seite konnte nicht geladen werden</h2>
+                            <p>Beim Laden der Seite ist ein Fehler aufgetreten.</p>
+                            <p class="table-secondary">@exception.Message</p>
+                        </div>
+                    </LayoutView>
+                </ErrorContent>
+            </ErrorBoundary>
+        </Found>
+    </Router>
+</CascadingAuthenticationState>
 
 @code {
     private ErrorBoundary? routeErrorBoundary;

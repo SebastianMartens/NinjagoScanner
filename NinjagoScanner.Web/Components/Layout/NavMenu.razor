@@ -12,6 +12,17 @@
             <NavLink class="cv-nav-link" href="upload">Upload</NavLink>
             <NavLink class="cv-nav-link" href="about">Über</NavLink>
         </nav>
+        <div class="cv-nav-user">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="cv-nav-username">@context.User.Identity?.Name</span>
+                    <form method="post" action="/Account/Logout" class="cv-nav-logout-form">
+                        <AntiforgeryToken />
+                        <button type="submit" class="cv-nav-logout">Abmelden</button>
+                    </form>
+                </Authorized>
+            </AuthorizeView>
+        </div>
     </div>
 </header>
 
