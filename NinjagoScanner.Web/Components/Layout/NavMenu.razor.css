@@ -75,6 +75,48 @@
     background: oklch(24% 0.04 300);
 }
 
+.cv-nav-logout-form {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
+
+.cv-nav-logout {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.86rem;
+    letter-spacing: 0.03em;
+    padding: 0.55rem 0.9rem;
+    border-radius: 8px;
+    color: var(--cv-text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease, background 0.15s ease;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.cv-nav-logout:hover {
+    color: var(--cv-text-soft);
+    background: var(--cv-surface);
+}
+
+.cv-nav-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.cv-nav-username {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 0.86rem;
+    letter-spacing: 0.03em;
+    color: var(--cv-text-muted);
+}
+
 .cv-nav-bottom {
     display: none;
     position: fixed;

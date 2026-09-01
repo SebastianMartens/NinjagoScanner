@@ -1,0 +1,99 @@
+@page
+@model NinjagoScanner.Web.Pages.Account.RegisterModel
+@{
+    ViewData["Title"] = "Registrieren";
+}
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registrieren - Ninjago Scanner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            line-height: 1.5;
+        }
+        .auth-container { max-width: 400px; margin: 80px auto; padding: 0 1rem; }
+        .auth-brand { text-align: center; margin-bottom: 2rem; }
+        .auth-brand-text { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.5rem; color: #58a6ff; letter-spacing: 0.05em; }
+        .auth-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 2rem; }
+        .auth-title { font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 1.25rem; margin-bottom: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        .form-label { display: block; font-size: 0.875rem; color: #8b949e; margin-bottom: 0.375rem; }
+        .form-control {
+            display: block; width: 100%; padding: 0.5rem 0.75rem;
+            font-size: 0.95rem; line-height: 1.5;
+            background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+            border-radius: 6px; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-control:focus { border-color: #58a6ff; box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+        .btn-auth {
+            display: block; width: 100%; margin-top: 1.25rem;
+            background: #58a6ff; color: #fff; border: none; border-radius: 6px;
+            padding: 0.625rem; font-family: 'Rajdhani', sans-serif;
+            font-weight: 600; font-size: 1rem; letter-spacing: 0.02em; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-auth:hover { background: #4c94e6; }
+        .auth-footer { text-align: center; margin-top: 1.5rem; font-size: 0.875rem; }
+        .auth-footer a { color: #58a6ff; text-decoration: none; }
+        .auth-footer a:hover { text-decoration: underline; }
+        .alert-auth { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.4); color: #f85149; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.875rem; }
+        .field-validation-error { display: block; color: #f85149; font-size: 0.8rem; margin-top: 0.25rem; }
+        .password-hint { font-size: 0.8rem; color: #8b949e; margin-top: 0.25rem; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-brand">
+            <span class="auth-brand-text">NINJAGO SCANNER</span>
+        </div>
+        <div class="auth-card">
+            <h1 class="auth-title">Registrieren</h1>
+
+            @if (Model.Errors.Count > 0)
+            {
+                <div class="alert-auth">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <div>@error</div>
+                    }
+                </div>
+            }
+
+            <form method="post">
+                <div class="form-group">
+                    <label asp-for="Input.UserName" class="form-label">Benutzername</label>
+                    <input asp-for="Input.UserName" class="form-control" autocomplete="username" autofocus />
+                    <span asp-validation-for="Input.UserName" class="field-validation-error"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.Password" class="form-label">Passwort</label>
+                    <input asp-for="Input.Password" class="form-control" type="password" autocomplete="new-password" />
+                    <span asp-validation-for="Input.Password" class="field-validation-error"></span>
+                    <div class="password-hint">Mindestens 6 Zeichen, eine Ziffer und ein Sonderzeichen.</div>
+                </div>
+                <div class="form-group">
+                    <label asp-for="Input.ConfirmPassword" class="form-label">Passwort bestätigen</label>
+                    <input asp-for="Input.ConfirmPassword" class="form-control" type="password" autocomplete="new-password" />
+                    <span asp-validation-for="Input.ConfirmPassword" class="field-validation-error"></span>
+                </div>
+                <button type="submit" class="btn-auth">Registrieren</button>
+            </form>
+
+            <div class="auth-footer">
+                Bereits ein Konto? <a href="/Account/Login">Anmelden</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

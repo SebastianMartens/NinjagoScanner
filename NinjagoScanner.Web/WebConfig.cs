@@ -25,6 +25,13 @@ internal static class WebConfig
                ?? "http://localhost:5169";
     }
 
+    public static string ResolveAuthDatabasePath(IConfiguration configuration)
+    {
+        return configuration["Auth:DatabasePath"]
+               ?? Environment.GetEnvironmentVariable("AUTH_DATABASE_PATH")
+               ?? (Environment.OSVersion.Platform == PlatformID.Win32NT ? "Data/users.db" : "/data/users.db");
+    }
+
     public static long ResolveMaxUploadBytes(IConfiguration configuration)
     {
         const long defaultMaxUploadBytes = 15 * 1024 * 1024;

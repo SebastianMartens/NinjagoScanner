@@ -16,6 +16,10 @@ build/
 TestResults/
 *.nupkg
 packages/
+
+**/Data/users.db
+**/Data/users.db-shm
+**/Data/users.db-wal
 /GitExtensions.settings
 node_modules/.package-lock.json
 node_modules/.bin/node-which
