@@ -37,6 +37,17 @@ public sealed class PictureScannerGrpcServiceScanSkipCheckTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("pending")]
+    [InlineData("notAnalyzed")]
+    public void ShouldSkipExistingSidecar_ReturnsFalse_ForNotAnalyzedSidecar_WithoutOverwrite(string? analysisStatus)
+    {
+        var existing = new SidecarRecord { AnalysisStatus = analysisStatus };
+
+        Assert.False(PictureScannerGrpcService.ShouldSkipExistingSidecar(existing, overwriteExistingSidecars: false));
+    }
+
+    [Theory]
     [InlineData("ok")]
     [InlineData("uncertain")]
     [InlineData("failed")]

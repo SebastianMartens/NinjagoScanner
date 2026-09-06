@@ -195,9 +195,10 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
     /// <summary>
     /// A photo is skipped only when it already has a sidecar recording a completed analysis
-    /// (<c>ok</c> or <c>uncertain</c>) and overwrite wasn't requested. A missing sidecar or one
-    /// recording <c>failed</c> is always retry-eligible, so a later Scan naturally picks up both
-    /// never-analyzed photos and previously-failed ones.
+    /// (<c>ok</c> or <c>uncertain</c>) and overwrite wasn't requested. A missing sidecar, one
+    /// recording <c>failed</c>, or one that isn't analyzed yet (no recognized status, e.g. a
+    /// sidecar created only by a manual edit) is always retry-eligible, so a later Scan naturally
+    /// picks up never-analyzed photos, previously-failed ones, and manually-edited-but-unanalyzed ones.
     /// </summary>
     internal static bool ShouldSkipExistingSidecar(SidecarRecord? existing, bool overwriteExistingSidecars)
     {
@@ -206,7 +207,8 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             return false;
         }
 
-        return !string.Equals(existing.AnalysisStatus, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(existing.AnalysisStatus, AnalysisStatuses.Ok, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(existing.AnalysisStatus, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

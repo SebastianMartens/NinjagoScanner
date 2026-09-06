@@ -17,7 +17,6 @@ Explicit product decision: no data migration. Already-stored DynamoDB sidecar re
 - No proto/gRPC contract change — `AnalysisStatus` stays a plain string.
 - No change to when Gemini analysis runs or what it writes (`ok`/`uncertain`/`failed` are unaffected).
 - No general redesign of the Review page's filter/label mechanism beyond swapping the renamed value in.
-- No change to `Scan`'s existing skip logic (`ShouldSkipExistingSidecar`) — noted under Risks below as a related but separate pre-existing behavior, not something this change alters or fixes.
 
 ## Decisions
 
@@ -26,11 +25,11 @@ Explicit product decision: no data migration. Already-stored DynamoDB sidecar re
 - **Stop writing an explicit analysis status in the four manual-edit fallback paths.** Since any missing/unrecognized value now reads as `notAnalyzed`, `UpdateSetName`/`UpdateCardNumber`/`UpdateCardLanguage`/`UpdateReviewStatus` can create a bare `new SidecarRecord()` (its `AnalysisStatus` stays `null`) instead of setting a literal that only exists to be read back the same way. This removes the four-call-site duplication called out in the proposal without needing a shared "creation" constant at all.
 - **Add `NotAnalyzed` to PictureService's own internal `AnalysisStatuses` class rather than sharing Web's.** The two services don't share a library; extending PictureService's existing enum-of-constants class (used by the new normalization helper) is consistent with how `Ok`/`Uncertain`/`Failed` are already avoided as raw strings elsewhere in that file.
 - **Rename the Review page's filter label from "Kein Sidecar" to a not-analyzed-worded label** (e.g. "Nicht analysiert") to match the merged meaning, since "no sidecar" is no longer an accurate description once manually-edited-but-unanalyzed sidecars share the same status.
+- **Fix `ShouldSkipExistingSidecar` to check for `ok`/`uncertain` instead of excluding `failed`.** Its own doc comment already stated the intended rule ("skipped only when it already has a sidecar recording a completed analysis (`ok` or `uncertain`)"), and `picture-service-photo-scan`'s spec already requires the same — the implementation just inverted on the wrong value, so any non-`failed` status (including a manual-edit sidecar's `pending`, and now `notAnalyzed`) was wrongly treated as already handled and never retried by `Scan`. This surfaced directly from this change: the four manual-edit fallbacks stop writing an explicit status, making the not-yet-analyzed case more common and more visible, so it's fixed alongside the rename rather than left as a latent bug.
 
 ## Risks / Trade-offs
 
 - [The read-time fallback silently reclassifies *any* unrecognized `AnalysisStatus` as `notAnalyzed`, not just the legacy `pending` value — a genuine future bug that produces a garbage status string would be masked as "not analyzed" instead of surfacing as an error] → Accepted: `AnalysisStatus` is only ever written by PictureService's own code from a small closed set (`ok`/`uncertain`/`failed`, or left unset), so an unrecognized value can only mean "not yet analyzed by today's code" (including the legacy `pending` case) — there's no external writer that could inject something else.
-- [Unrelated pre-existing behavior noticed while touching this code: `ShouldSkipExistingSidecar` (used by the bulk `Scan` RPC) skips re-analysis for *any* existing sidecar whose status isn't `Failed` — including a `notAnalyzed` one created by a manual edit — even though the method's own doc comment says only `ok`/`uncertain` ("completed analysis") should be skipped. This change neither fixes nor worsens it: today a manual-edit sidecar stores `pending` and gets skipped the same way a `notAnalyzed`/unset one will after this change] → Left out of scope; flagged here for a possible follow-up change rather than folded into this rename.
 
 ## Migration Plan
 

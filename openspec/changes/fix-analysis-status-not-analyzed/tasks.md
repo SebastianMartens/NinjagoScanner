@@ -17,7 +17,12 @@
 
 - [x] 3.1 Update `openspec/GLOSSARY.md`'s Analysis Status entry to list `notAnalyzed` in place of `pending`.
 
-## 4. Verify end to end
+## 4. Fix Scan's re-analysis skip filter
 
-- [x] 4.1 Run `dotnet build NinjagoScanner.slnx` and `dotnet test NinjagoScanner.slnx` and confirm everything passes.
-- [ ] 4.2 Manually verify in the running app (Web + PictureService + CatalogService): upload a photo, confirm it shows the not-analyzed label/filter before analysis completes, then confirm it moves to the correct status once Gemini analysis finishes.
+- [x] 4.1 Fix `ShouldSkipExistingSidecar` (`PictureScannerGrpcService.cs`) to skip only when the existing sidecar's `AnalysisStatus` is `ok` or `uncertain`, instead of skipping everything except `failed` — matching its own doc comment and the `picture-service-photo-scan` spec, and correctly retrying a `notAnalyzed` sidecar the same as a missing one.
+- [x] 4.2 Add test cases to `PictureScannerGrpcServiceScanSkipCheckTests.cs` covering a `null`, `"pending"`, and `"notAnalyzed"` existing `AnalysisStatus` all returning `false` (retry-eligible) without overwrite, and verify `dotnet test NinjagoScanner.PictureService.Tests --filter "FullyQualifiedName~ScanSkipCheck"` passes.
+
+## 5. Verify end to end
+
+- [x] 5.1 Run `dotnet build NinjagoScanner.slnx` and `dotnet test NinjagoScanner.slnx` and confirm everything passes.
+- [ ] 5.2 Manually verify in the running app (Web + PictureService + CatalogService): upload a photo, confirm it shows the not-analyzed label/filter before analysis completes, then confirm it moves to the correct status once Gemini analysis finishes.
