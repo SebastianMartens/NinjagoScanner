@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using NinjagoScanner.PictureService;
 using NinjagoScanner.PictureService.Services;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -28,7 +29,10 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
         .AddMeter("System.Runtime")
-        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf));
+        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf))
+    .WithLogging(logging => logging
+        .AddOtlpExporter(options => options.Protocol = OtlpExportProtocol.HttpProtobuf),
+        options => options.IncludeFormattedMessage = true);
 
 builder.WebHost.ConfigureKestrel(options =>
 {
