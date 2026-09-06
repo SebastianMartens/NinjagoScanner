@@ -90,10 +90,13 @@ for each and reporting a summary of processed/skipped/uncertain/failed
 counts.
 
 ### Analysis Status
-The machine-produced outcome of an **AI Analysis** for a card photo:
-`pending` (not yet analyzed), `ok`, `uncertain` (low confidence or
-model-reported), or `failed`. Set automatically by the pipeline, never by a
-human.
+The machine-produced outcome of an **AI Analysis** for a card photo: `ok`,
+`uncertain` (low confidence or model-reported), or `failed`, set
+automatically by the pipeline, never by a human. `notAnalyzed` is the
+default/fallback reported for any card photo that hasn't gone through
+**AI Analysis** yet — no **Sidecar** at all, or one that exists only
+because of a manual edit — and for any other value that doesn't match one
+of the above.
 
 ### Confidence
 A value between 0 and 1 reported by the **AI Analysis** expressing how sure

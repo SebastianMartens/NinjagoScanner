@@ -5,7 +5,7 @@ public static class AnalysisStatuses
     public const string Ok = "ok";
     public const string Uncertain = "uncertain";
     public const string Failed = "failed";
-    public const string Pending = "pending";
+    public const string NotAnalyzed = "notAnalyzed";
 }
 
 public static class ReviewStatuses

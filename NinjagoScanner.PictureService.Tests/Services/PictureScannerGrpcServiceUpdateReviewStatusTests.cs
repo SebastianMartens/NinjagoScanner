@@ -20,7 +20,7 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
     }
 
     [Fact]
-    public async Task UpdateReviewStatus_CreatesPendingSidecar_WhenNoneExists()
+    public async Task UpdateReviewStatus_CreatesNotAnalyzedSidecar_WhenNoneExists()
     {
         var store = new FakeSidecarStore();
         var service = CreateService(store);
@@ -30,7 +30,7 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
             new FakeServerCallContext());
 
         var record = await store.GetAsync("card-1", CancellationToken.None);
-        Assert.Equal("pending", record!.AnalysisStatus);
+        Assert.Null(record!.AnalysisStatus);
         Assert.Equal("verified", record.ReviewStatus);
     }
 

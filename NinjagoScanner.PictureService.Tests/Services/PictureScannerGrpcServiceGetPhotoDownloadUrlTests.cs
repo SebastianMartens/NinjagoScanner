@@ -82,8 +82,25 @@ public sealed class PictureScannerGrpcServiceGetPhotoDownloadUrlTests
         var response = await service.ListCards(new ListCardsRequest(), new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
-        Assert.Equal("unknown", entry.AnalysisStatus);
+        Assert.Equal("notAnalyzed", entry.AnalysisStatus);
         Assert.False(string.IsNullOrWhiteSpace(entry.DownloadUrl));
+    }
+
+    [Fact]
+    public async Task ListCards_ReportsNotAnalyzed_ForLegacyOrUnrecognizedStoredStatus()
+    {
+        var photoStore = new FakePhotoStore();
+        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        photoStore.Seed("card-2", [0xFF, 0xD8, 0xFF, 0xD9]);
+        var sidecarStore = new FakeSidecarStore();
+        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "pending" });
+        sidecarStore.Tamper("card-2", new SidecarRecord { AnalysisStatus = "some-unexpected-value" });
+        var service = CreateService(photoStore, sidecarStore);
+
+        var response = await service.ListCards(new ListCardsRequest(), new FakeServerCallContext());
+
+        Assert.Equal(2, response.Cards.Count);
+        Assert.All(response.Cards, card => Assert.Equal("notAnalyzed", card.AnalysisStatus));
     }
 
     [Fact]

@@ -33,7 +33,7 @@
 						<option value="@AnalysisStatuses.Ok">@GetAnalysisStatusLabel(AnalysisStatuses.Ok)</option>
 						<option value="@AnalysisStatuses.Uncertain">@GetAnalysisStatusLabel(AnalysisStatuses.Uncertain)</option>
 						<option value="@AnalysisStatuses.Failed">@GetAnalysisStatusLabel(AnalysisStatuses.Failed)</option>
-						<option value="@AnalysisStatuses.Pending">@GetAnalysisStatusLabel(AnalysisStatuses.Pending)</option>
+						<option value="@AnalysisStatuses.NotAnalyzed">@GetAnalysisStatusLabel(AnalysisStatuses.NotAnalyzed)</option>
 					</select>
 				</label>
 				<label class="review-filter">
@@ -444,7 +444,7 @@
 	{
 		AnalysisStatuses.Ok => "Erkannt",
 		AnalysisStatuses.Uncertain => "Unsicher",
-		AnalysisStatuses.Pending => "Kein Sidecar",
+		AnalysisStatuses.NotAnalyzed => "Nicht analysiert",
 		_ => "Fehler"
 	};
 

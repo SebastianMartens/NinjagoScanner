@@ -48,7 +48,7 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
 
         // Tamper with the store directly, bypassing the cache. If ListCards fell back to a fresh
         // store read, it would now report "incorrect" instead of "verified".
-        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "pending", ReviewStatus = "incorrect" });
+        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect" });
 
         var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
 
@@ -73,7 +73,7 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
             new FakeServerCallContext());
 
         // Tamper with the store directly; only the cache can still answer correctly.
-        sidecarStore.Tamper("card-2", new SidecarRecord { AnalysisStatus = "pending", ReviewStatus = "incorrect", SetName = "Serie 1" });
+        sidecarStore.Tamper("card-2", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect", SetName = "Serie 1" });
 
         var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
 

@@ -402,7 +402,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateSetNameResponse> UpdateSetName(UpdateSetNameRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
 
@@ -414,7 +414,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardNumberResponse> UpdateCardNumber(UpdateCardNumberRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { CardNumber = NormalizeNullable(request.CardNumber) };
 
@@ -426,7 +426,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardLanguageResponse> UpdateCardLanguage(UpdateCardLanguageRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { Language = NormalizeNullable(request.Language) };
 
@@ -438,7 +438,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateReviewStatusResponse> UpdateReviewStatus(UpdateReviewStatusRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord { AnalysisStatus = "pending" };
+        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { ReviewStatus = NormalizeNullable(request.ReviewStatus) };
 
@@ -509,7 +509,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         {
             PhotoId = photoId,
             SourceFileName = sidecar?.SourceFileName ?? string.Empty,
-            AnalysisStatus = sidecar?.AnalysisStatus ?? "unknown",
+            AnalysisStatus = NormalizeAnalysisStatus(sidecar?.AnalysisStatus),
             CardName = sidecar?.CardName ?? string.Empty,
             CardNumber = sidecar?.CardNumber ?? string.Empty,
             SetName = sidecar?.SetName ?? string.Empty,
@@ -518,6 +518,23 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed,
             DownloadUrl = downloadUrl
         };
+    }
+
+    /// <summary>
+    /// Reports a recognized status as-is; anything else (missing sidecar, unset field, or a
+    /// legacy/unrecognized value such as the retired "pending") falls back to NotAnalyzed, so no
+    /// data migration is needed when this set of recognized values changes.
+    /// </summary>
+    private static string NormalizeAnalysisStatus(string? status)
+    {
+        if (string.Equals(status, AnalysisStatuses.Ok, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, AnalysisStatuses.Uncertain, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, AnalysisStatuses.Failed, StringComparison.OrdinalIgnoreCase))
+        {
+            return status!;
+        }
+
+        return AnalysisStatuses.NotAnalyzed;
     }
 
     private static CardDetails ToCardDetails(string photoId, SidecarRecord? sidecar)

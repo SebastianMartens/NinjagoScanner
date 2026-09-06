@@ -20,7 +20,7 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
     }
 
     [Fact]
-    public async Task UpdateCardNumber_CreatesPendingSidecar_WhenNoneExists()
+    public async Task UpdateCardNumber_CreatesNotAnalyzedSidecar_WhenNoneExists()
     {
         var store = new FakeSidecarStore();
         var service = CreateService(store);
@@ -30,7 +30,7 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
             new FakeServerCallContext());
 
         var record = await store.GetAsync("card-1", CancellationToken.None);
-        Assert.Equal("pending", record!.AnalysisStatus);
+        Assert.Null(record!.AnalysisStatus);
         Assert.Equal("17", record.CardNumber);
     }
 

@@ -85,7 +85,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", analysisStatus: AnalysisStatuses.Ok));
 
-        Assert.False(Review.MatchesAnalysisStatusFilter(group, AnalysisStatuses.Pending));
+        Assert.False(Review.MatchesAnalysisStatusFilter(group, AnalysisStatuses.NotAnalyzed));
     }
 
     [Fact]
