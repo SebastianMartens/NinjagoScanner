@@ -4,27 +4,34 @@ using Amazon.DynamoDBv2.DocumentModel;
 namespace NinjagoScanner.PictureService;
 
 /// <summary>
-/// Storage seam for sidecar records, keyed by generated photo ID. Implemented against DynamoDB
-/// by <see cref="SidecarTable"/>; tests substitute an in-memory fake instead of mocking the AWS SDK.
+/// Storage seam for sidecar records, keyed by collection ID and generated photo ID. Implemented
+/// against DynamoDB by <see cref="SidecarTable"/>; tests substitute an in-memory fake instead of
+/// mocking the AWS SDK.
 /// </summary>
 internal interface ISidecarStore
 {
-    Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken);
+    Task<SidecarRecord?> GetAsync(string collectionId, string photoId, CancellationToken cancellationToken);
 
-    Task PutAsync(string photoId, SidecarRecord record, CancellationToken cancellationToken);
+    Task PutAsync(string collectionId, string photoId, SidecarRecord record, CancellationToken cancellationToken);
 
-    Task DeleteAsync(string photoId, CancellationToken cancellationToken);
+    Task DeleteAsync(string collectionId, string photoId, CancellationToken cancellationToken);
 
-    IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(CancellationToken cancellationToken);
+    /// <summary>Every sidecar within one collection - used by Scan/ListCards.</summary>
+    IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListByCollectionAsync(string collectionId, CancellationToken cancellationToken);
+
+    /// <summary>Every sidecar across every collection - used only by the global MigrateSidecars maintenance RPC.</summary>
+    IAsyncEnumerable<(string CollectionId, string PhotoId, SidecarRecord Record)> ListAllAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
 /// Reads and writes sidecar records in the DynamoDB table configured via
-/// <see cref="ScannerConfig.ResolveSidecarTableName"/>, keyed by generated photo ID
-/// (see <see cref="PhotoStore"/> for the matching S3 object identity).
+/// <see cref="ScannerConfig.ResolveSidecarTableName"/>, keyed by collection ID (partition key)
+/// and generated photo ID (sort key) — see picture-service-photo-storage's "Photo storage is
+/// partitioned by collection" (matching the S3 object identity in <see cref="PhotoStore"/>).
 /// </summary>
 internal sealed class SidecarTable : ISidecarStore
 {
+    private const string CollectionIdAttribute = "CollectionId";
     private const string PhotoIdAttribute = "PhotoId";
 
     private readonly ITable table;
@@ -32,36 +39,39 @@ internal sealed class SidecarTable : ISidecarStore
     public SidecarTable(IAmazonDynamoDB dynamoDb, string tableName)
     {
         table = new TableBuilder(dynamoDb, tableName)
-            .AddHashKey(PhotoIdAttribute, DynamoDBEntryType.String)
+            .AddHashKey(CollectionIdAttribute, DynamoDBEntryType.String)
+            .AddRangeKey(PhotoIdAttribute, DynamoDBEntryType.String)
             .Build();
     }
 
-    public async Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken)
+    public async Task<SidecarRecord?> GetAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        var document = await table.GetItemAsync(photoId, cancellationToken);
+        var document = await table.GetItemAsync(collectionId, photoId, cancellationToken);
         return document is null ? null : FromDocument(document);
     }
 
-    public async Task PutAsync(string photoId, SidecarRecord record, CancellationToken cancellationToken)
+    public async Task PutAsync(string collectionId, string photoId, SidecarRecord record, CancellationToken cancellationToken)
     {
-        var document = ToDocument(photoId, record);
+        var document = ToDocument(collectionId, photoId, record);
         await table.PutItemAsync(document, cancellationToken);
     }
 
-    public async Task DeleteAsync(string photoId, CancellationToken cancellationToken)
+    public async Task DeleteAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        await table.DeleteItemAsync(photoId, cancellationToken);
+        await table.DeleteItemAsync(collectionId, photoId, cancellationToken);
     }
 
     /// <summary>
-    /// Scans the whole table. Sidecar counts are small enough (thousands, not millions) for a
-    /// full table scan to be an acceptable read pattern, mirroring the previous
-    /// read-every-sidecar-file behavior.
+    /// Queries by the CollectionId partition key. Sidecar counts per collection are small enough
+    /// (thousands, not millions) for the full per-collection page set to be an acceptable read
+    /// pattern, mirroring the previous read-every-sidecar-file behavior - but scoped to one
+    /// collection instead of the whole table (see picture-service-card-listing/picture-service-photo-scan).
     /// </summary>
-    public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(
+    public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListByCollectionAsync(
+        string collectionId,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var search = table.Scan(new ScanOperationConfig());
+        var search = table.Query(collectionId, new QueryFilter());
         while (!search.IsDone)
         {
             var page = await search.GetNextSetAsync(cancellationToken);
@@ -73,10 +83,31 @@ internal sealed class SidecarTable : ISidecarStore
         }
     }
 
-    private static Document ToDocument(string photoId, SidecarRecord record)
+    /// <summary>
+    /// Scans the whole table across every collection. Only used by the global MigrateSidecars
+    /// maintenance RPC (see collection-scoped-picture-access's deliberate exception for it).
+    /// </summary>
+    public async IAsyncEnumerable<(string CollectionId, string PhotoId, SidecarRecord Record)> ListAllAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var search = table.Scan(new ScanOperationConfig());
+        while (!search.IsDone)
+        {
+            var page = await search.GetNextSetAsync(cancellationToken);
+            foreach (var document in page)
+            {
+                var collectionId = document[CollectionIdAttribute].AsString();
+                var photoId = document[PhotoIdAttribute].AsString();
+                yield return (collectionId, photoId, FromDocument(document));
+            }
+        }
+    }
+
+    private static Document ToDocument(string collectionId, string photoId, SidecarRecord record)
     {
         var document = new Document
         {
+            [CollectionIdAttribute] = collectionId,
             [PhotoIdAttribute] = photoId
         };
 

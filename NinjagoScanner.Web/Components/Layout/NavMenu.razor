@@ -15,6 +15,10 @@
         <div class="cv-nav-user">
             <AuthorizeView>
                 <Authorized>
+                    @if (!string.IsNullOrWhiteSpace(_collectionName))
+                    {
+                        <span class="cv-nav-collection">@_collectionName</span>
+                    }
                     <span class="cv-nav-username">@context.User.Identity?.Name</span>
                     <form method="post" action="/Account/Logout" class="cv-nav-logout-form">
                         <AntiforgeryToken />
@@ -52,3 +56,17 @@
         <span>Über</span>
     </NavLink>
 </nav>
+
+@code {
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+    [Inject] private ICurrentCollectionContext CurrentCollectionContext { get; set; } = default!;
+
+    private string? _collectionName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var collection = await CurrentCollectionContext.GetOwnedCollectionAsync(authState.User);
+        _collectionName = collection?.Name;
+    }
+}

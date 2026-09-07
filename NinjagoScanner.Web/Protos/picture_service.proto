@@ -5,13 +5,20 @@ option csharp_namespace = "NinjagoScanner.PictureService.Protos";
 package pictureservice;
 
 // Photo bytes live in S3 (bucket configured at the service level, not per-request) and sidecar
-// records live in DynamoDB, keyed by a generated photo_id. Callers stream photo bytes to this
-// service via UploadPhoto, which assigns the generated photo_id, stores the bytes, and triggers
-// AI Analysis. ListCards includes a ready-to-use download_url on every entry; GetPhotoDownloadUrl
-// exists only for resolving a single photo_id a caller has in hand without a ListCards result
-// (e.g. right after UploadPhoto). CardEntry only carries the fields every list/grid view needs
-// for every row; GetCardDetails resolves the rest for one photo_id at a time, for callers showing
-// a single card's full details (an expanded review tile, the collection detail pane).
+// records live in DynamoDB, keyed by a generated photo_id within a collection_id. Every RPC that
+// reads or writes photo/sidecar data requires a collection_id (see collection-scoped-picture-access):
+// PictureService validates that it refers to a collection it has recorded and never returns or
+// modifies data belonging to a different collection, but does not itself re-authorize the caller -
+// Web resolves and supplies the caller's authorized collection_id, since PictureService has no
+// public endpoint and Web is its only caller. Callers stream photo bytes to this service via
+// UploadPhoto, which assigns the generated photo_id, stores the bytes, and triggers AI Analysis.
+// ListCards includes a ready-to-use download_url on every entry; GetPhotoDownloadUrl exists only
+// for resolving a single photo_id a caller has in hand without a ListCards result (e.g. right
+// after UploadPhoto). CardEntry only carries the fields every list/grid view needs for every row;
+// GetCardDetails resolves the rest for one photo_id at a time, for callers showing a single card's
+// full details (an expanded review tile, the collection detail pane). MigrateSidecars is the one
+// exception: a global, unscoped maintenance RPC that repairs legacy sidecar records across all
+// collections, not a per-user product path.
 service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
   rpc UploadPhoto (stream UploadPhotoRequest) returns (UploadPhotoResponse);
@@ -39,6 +46,7 @@ message ScanRequest {
   optional int32 retry_delay_ms = 6;
   optional int32 max_attempts = 7;
   optional int32 timeout_seconds = 8;
+  string collection_id = 9;
 }
 
 message ScanSummary {
@@ -68,6 +76,7 @@ message CardEntry {
 }
 
 message ListCardsRequest {
+  string collection_id = 1;
 }
 
 message ListCardsResponse {
@@ -87,6 +96,7 @@ message CardDetails {
 
 message GetCardDetailsRequest {
   string photo_id = 1;
+  string collection_id = 2;
 }
 
 message GetCardDetailsResponse {
@@ -111,6 +121,7 @@ message UploadPhotoMetadata {
   optional int32 retry_delay_ms = 5;
   optional int32 max_attempts = 6;
   optional int32 timeout_seconds = 7;
+  string collection_id = 8;
 }
 
 message UploadPhotoResponse {
@@ -119,6 +130,7 @@ message UploadPhotoResponse {
 
 message GetPhotoDownloadUrlRequest {
   string photo_id = 1;
+  string collection_id = 2;
 }
 
 message GetPhotoDownloadUrlResponse {
@@ -138,6 +150,7 @@ message UpdateSidecarRequest {
   string error_message = 11;
   string review_status = 12;
   string language = 13;
+  string collection_id = 14;
 }
 
 message UpdateSidecarResponse {
@@ -147,6 +160,7 @@ message UpdateSidecarResponse {
 message UpdateSetNameRequest {
   string photo_id = 1;
   string set_name = 3;
+  string collection_id = 4;
 }
 
 message UpdateSetNameResponse {
@@ -156,6 +170,7 @@ message UpdateSetNameResponse {
 message UpdateCardNumberRequest {
   string photo_id = 1;
   string card_number = 3;
+  string collection_id = 4;
 }
 
 message UpdateCardNumberResponse {
@@ -165,6 +180,7 @@ message UpdateCardNumberResponse {
 message UpdateCardLanguageRequest {
   string photo_id = 1;
   string language = 3;
+  string collection_id = 4;
 }
 
 message UpdateCardLanguageResponse {
@@ -174,6 +190,7 @@ message UpdateCardLanguageResponse {
 message UpdateReviewStatusRequest {
   string photo_id = 1;
   string review_status = 3;
+  string collection_id = 4;
 }
 
 message UpdateReviewStatusResponse {
@@ -194,6 +211,7 @@ message MigrateSidecarsResponse {
 
 message DeletePhotoRequest {
   string photo_id = 1;
+  string collection_id = 2;
 }
 
 message DeletePhotoResponse {

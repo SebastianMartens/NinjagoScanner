@@ -26,10 +26,10 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
         var service = CreateService(store);
 
         await service.UpdateCardNumber(
-            new UpdateCardNumberRequest { PhotoId = "card-1", CardNumber = "17" },
+            new UpdateCardNumberRequest { PhotoId = "card-1", CardNumber = "17", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-1", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-1", CancellationToken.None);
         Assert.Null(record!.AnalysisStatus);
         Assert.Equal("17", record.CardNumber);
     }
@@ -38,7 +38,7 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
     public async Task UpdateCardNumber_OnlyChangesCardNumber_OnExistingSidecar()
     {
         var store = new FakeSidecarStore();
-        store.Tamper("card-2", new SidecarRecord
+        store.Tamper(TestCollection.Id, "card-2", new SidecarRecord
         {
             AnalysisStatus = "ok",
             CardName = "Kai",
@@ -52,10 +52,10 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
         var service = CreateService(store);
 
         await service.UpdateCardNumber(
-            new UpdateCardNumberRequest { PhotoId = "card-2", CardNumber = "44" },
+            new UpdateCardNumberRequest { PhotoId = "card-2", CardNumber = "44", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-2", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-2", CancellationToken.None);
         Assert.Equal("44", record!.CardNumber);
         Assert.Equal("ok", record.AnalysisStatus);
         Assert.Equal("Kai", record.CardName);
@@ -69,15 +69,15 @@ public sealed class PictureScannerGrpcServiceUpdateCardNumberTests
     public async Task UpdateCardNumber_NormalizesBlankInput_ToAbsent()
     {
         var store = new FakeSidecarStore();
-        store.Tamper("card-3", new SidecarRecord { AnalysisStatus = "ok", CardNumber = "43", SetName = "Serie 9" });
+        store.Tamper(TestCollection.Id, "card-3", new SidecarRecord { AnalysisStatus = "ok", CardNumber = "43", SetName = "Serie 9" });
 
         var service = CreateService(store);
 
         await service.UpdateCardNumber(
-            new UpdateCardNumberRequest { PhotoId = "card-3", CardNumber = "   " },
+            new UpdateCardNumberRequest { PhotoId = "card-3", CardNumber = "   ", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-3", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-3", CancellationToken.None);
         Assert.Null(record!.CardNumber);
     }
 }

@@ -5,49 +5,54 @@ namespace NinjagoScanner.PictureService.Tests.Fixtures;
 
 /// <summary>
 /// In-memory stand-in for <see cref="IPhotoStore"/> (S3 in production), so tests can exercise
-/// photo existence/read/delete without real AWS credentials.
+/// photo existence/read/delete without real AWS credentials. Keyed by (collectionId, photoId) to
+/// match the production store's collection-partitioned key scheme.
 /// </summary>
 internal sealed class FakePhotoStore : IPhotoStore
 {
-    private readonly ConcurrentDictionary<string, byte[]> objects = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(string CollectionId, string PhotoId), byte[]> objects = new();
 
-    public void Seed(string photoId, byte[] bytes) => objects[photoId] = bytes;
+    public void Seed(string collectionId, string photoId, byte[] bytes) => objects[(collectionId, photoId)] = bytes;
 
-    public Task PutBytesAsync(string photoId, byte[] bytes, CancellationToken cancellationToken)
+    public Task PutBytesAsync(string collectionId, string photoId, byte[] bytes, CancellationToken cancellationToken)
     {
-        objects[photoId] = bytes;
+        objects[(collectionId, photoId)] = bytes;
         return Task.CompletedTask;
     }
 
-    public Task<string> CreateDownloadUrlAsync(string photoId, CancellationToken cancellationToken)
+    public Task<string> CreateDownloadUrlAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        return Task.FromResult($"https://fake-bucket.example/{photoId}");
+        return Task.FromResult($"https://fake-bucket.example/{collectionId}/{photoId}");
     }
 
-    public Task<byte[]> GetBytesAsync(string photoId, CancellationToken cancellationToken)
+    public Task<byte[]> GetBytesAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        return objects.TryGetValue(photoId, out var bytes)
+        return objects.TryGetValue((collectionId, photoId), out var bytes)
             ? Task.FromResult(bytes)
-            : throw new FileNotFoundException($"No fake photo bytes seeded for '{photoId}'.");
+            : throw new FileNotFoundException($"No fake photo bytes seeded for '{collectionId}/{photoId}'.");
     }
 
-    public Task<bool> ExistsAsync(string photoId, CancellationToken cancellationToken)
+    public Task<bool> ExistsAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        return Task.FromResult(objects.ContainsKey(photoId));
+        return Task.FromResult(objects.ContainsKey((collectionId, photoId)));
     }
 
-    public Task DeleteAsync(string photoId, CancellationToken cancellationToken)
+    public Task DeleteAsync(string collectionId, string photoId, CancellationToken cancellationToken)
     {
-        objects.TryRemove(photoId, out _);
+        objects.TryRemove((collectionId, photoId), out _);
         return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<string> ListPhotoIdsAsync(
+        string collectionId,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        foreach (var photoId in objects.Keys)
+        foreach (var key in objects.Keys)
         {
-            yield return photoId;
+            if (key.CollectionId == collectionId)
+            {
+                yield return key.PhotoId;
+            }
         }
 
         await Task.CompletedTask;

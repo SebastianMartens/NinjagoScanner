@@ -39,6 +39,11 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
         var config = ScannerConfig.Load(appConfiguration, request);
 
+        if (string.IsNullOrWhiteSpace(request.CollectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
+
         if (string.IsNullOrWhiteSpace(config.ApiKey))
         {
             return new ScanSummary
@@ -73,7 +78,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         }
 
         var photoIds = new List<string>();
-        await foreach (var photoId in photoStore.ListPhotoIdsAsync(cancellationToken))
+        await foreach (var photoId in photoStore.ListPhotoIdsAsync(request.CollectionId, cancellationToken))
         {
             photoIds.Add(photoId);
         }
@@ -104,7 +109,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             cancellationToken.ThrowIfCancellationRequested();
 
             var photoId = photoIds[index];
-            var existing = await sidecarCache.GetAsync(photoId, cancellationToken);
+            var existing = await sidecarCache.GetAsync(request.CollectionId, photoId, cancellationToken);
 
             if (ShouldSkipExistingSidecar(existing, config.OverwriteExistingSidecars))
             {
@@ -117,7 +122,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             CardAnalysisResult result;
             try
             {
-                var imageBytes = await photoStore.GetBytesAsync(photoId, cancellationToken);
+                var imageBytes = await photoStore.GetBytesAsync(request.CollectionId, photoId, cancellationToken);
                 result = await GeminiApiService.AnalyzeCardAsync(httpClient, config, seriesCatalog, photoId, sourceFileName, imageBytes, cancellationToken);
             }
             catch (Exception exception)
@@ -141,7 +146,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                 result = result with { ReviewStatus = existing.ReviewStatus };
             }
 
-            await sidecarCache.SetAsync(photoId, result, cancellationToken);
+            await sidecarCache.SetAsync(request.CollectionId, photoId, result, cancellationToken);
 
             logger.LogDebug(
                 "[{Index}/{Total}] {PhotoId} → Status: {AnalysisStatus} | Karte: {CardName} | Serie: {SetName} | Nr: {CardNumber}",
@@ -227,6 +232,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         }
 
         var metadata = requestStream.Current.Metadata;
+
+        if (string.IsNullOrWhiteSpace(metadata.CollectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
+
         var sourceFileName = string.IsNullOrWhiteSpace(metadata.SourceFileName) ? "upload" : metadata.SourceFileName;
 
         var extension = Path.GetExtension(sourceFileName).ToLowerInvariant();
@@ -253,7 +264,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
 
         var photoId = Guid.NewGuid().ToString("n");
         var imageBytes = buffer.ToArray();
-        await photoStore.PutBytesAsync(photoId, imageBytes, cancellationToken);
+        await photoStore.PutBytesAsync(metadata.CollectionId, photoId, imageBytes, cancellationToken);
 
         var appConfiguration = new ConfigurationBuilder()
             .AddConfiguration(configuration)
@@ -304,11 +315,11 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             };
         }
 
-        await sidecarCache.SetAsync(photoId, result, cancellationToken);
+        await sidecarCache.SetAsync(metadata.CollectionId, photoId, result, cancellationToken);
 
         return new UploadPhotoResponse
         {
-            Card = ToCardEntry(photoId, await sidecarCache.GetAsync(photoId, cancellationToken))
+            Card = ToCardEntry(photoId, await sidecarCache.GetAsync(metadata.CollectionId, photoId, cancellationToken))
         };
     }
 
@@ -325,12 +336,17 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
         }
 
-        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
+        if (string.IsNullOrWhiteSpace(request.CollectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
+
+        if (!await photoStore.ExistsAsync(request.CollectionId, request.PhotoId, cancellationToken))
         {
             throw new RpcException(new Status(StatusCode.NotFound, $"Foto '{request.PhotoId}' wurde im Speicher nicht gefunden."));
         }
 
-        var downloadUrl = await photoStore.CreateDownloadUrlAsync(request.PhotoId, cancellationToken);
+        var downloadUrl = await photoStore.CreateDownloadUrlAsync(request.CollectionId, request.PhotoId, cancellationToken);
         return new GetPhotoDownloadUrlResponse { DownloadUrl = downloadUrl };
     }
 
@@ -344,14 +360,20 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
+
+        if (string.IsNullOrWhiteSpace(request.CollectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
+
         var response = new ListCardsResponse();
 
-        await sidecarCache.WarmFromStoreAsync(cancellationToken);
+        await sidecarCache.WarmFromStoreAsync(request.CollectionId, cancellationToken);
 
-        await foreach (var photoId in photoStore.ListPhotoIdsAsync(cancellationToken))
+        await foreach (var photoId in photoStore.ListPhotoIdsAsync(request.CollectionId, cancellationToken))
         {
-            var record = await sidecarCache.GetAsync(photoId, cancellationToken);
-            var downloadUrl = await photoStore.CreateDownloadUrlAsync(photoId, cancellationToken);
+            var record = await sidecarCache.GetAsync(request.CollectionId, photoId, cancellationToken);
+            var downloadUrl = await photoStore.CreateDownloadUrlAsync(request.CollectionId, photoId, cancellationToken);
             response.Cards.Add(ToCardEntry(photoId, record, downloadUrl));
         }
 
@@ -372,14 +394,20 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
         }
 
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(request.CollectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
+
+        var sidecar = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken);
         return new GetCardDetailsResponse { Details = ToCardDetails(request.PhotoId, sidecar) };
     }
 
     public override async Task<UpdateSidecarResponse> UpdateSidecar(UpdateSidecarRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var existing = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
+        EnsureCollectionId(request.CollectionId);
+        var existing = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         var updated = existing with
         {
@@ -396,7 +424,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             ReviewStatus = NormalizeNullable(request.ReviewStatus)
         };
 
-        await sidecarCache.SetAsync(request.PhotoId, updated, cancellationToken);
+        await sidecarCache.SetAsync(request.CollectionId, request.PhotoId, updated, cancellationToken);
 
         return new UpdateSidecarResponse { Success = true };
     }
@@ -404,11 +432,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateSetNameResponse> UpdateSetName(UpdateSetNameRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
+        EnsureCollectionId(request.CollectionId);
+        var sidecar = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { SetName = NormalizeNullable(request.SetName) };
 
-        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.CollectionId, request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateSetNameResponse { Success = true };
     }
@@ -416,11 +445,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardNumberResponse> UpdateCardNumber(UpdateCardNumberRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
+        EnsureCollectionId(request.CollectionId);
+        var sidecar = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { CardNumber = NormalizeNullable(request.CardNumber) };
 
-        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.CollectionId, request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateCardNumberResponse { Success = true };
     }
@@ -428,11 +458,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateCardLanguageResponse> UpdateCardLanguage(UpdateCardLanguageRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
+        EnsureCollectionId(request.CollectionId);
+        var sidecar = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { Language = NormalizeNullable(request.Language) };
 
-        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.CollectionId, request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateCardLanguageResponse { Success = true };
     }
@@ -440,11 +471,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<UpdateReviewStatusResponse> UpdateReviewStatus(UpdateReviewStatusRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
-        var sidecar = await sidecarCache.GetAsync(request.PhotoId, cancellationToken) ?? new SidecarRecord();
+        EnsureCollectionId(request.CollectionId);
+        var sidecar = await sidecarCache.GetAsync(request.CollectionId, request.PhotoId, cancellationToken) ?? new SidecarRecord();
 
         sidecar = sidecar with { ReviewStatus = NormalizeNullable(request.ReviewStatus) };
 
-        await sidecarCache.SetAsync(request.PhotoId, sidecar, cancellationToken);
+        await sidecarCache.SetAsync(request.CollectionId, request.PhotoId, sidecar, cancellationToken);
 
         return new UpdateReviewStatusResponse { Success = true };
     }
@@ -459,7 +491,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
         var cancellationToken = context.CancellationToken;
         var response = new MigrateSidecarsResponse();
 
-        await foreach (var (photoId, record) in sidecarCache.ListAllAsync(cancellationToken))
+        await foreach (var (collectionId, photoId, record) in sidecarCache.ListAllAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             response.TotalFiles++;
@@ -477,12 +509,12 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
                     AnalysisStatus = AnalysisStatuses.Failed,
                     ErrorMessage = record.ErrorMessage ?? "Sidecar-Datensatz wurde ohne AnalysisStatus migriert."
                 };
-                await sidecarCache.SetAsync(photoId, repaired, cancellationToken);
+                await sidecarCache.SetAsync(collectionId, photoId, repaired, cancellationToken);
                 response.Migrated++;
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, "Sidecar-Migration fuer {PhotoId} fehlgeschlagen", photoId);
+                logger.LogError(exception, "Sidecar-Migration fuer {CollectionId}/{PhotoId} fehlgeschlagen", collectionId, photoId);
                 response.Errors++;
             }
         }
@@ -493,16 +525,30 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
     public override async Task<DeletePhotoResponse> DeletePhoto(DeletePhotoRequest request, ServerCallContext context)
     {
         var cancellationToken = context.CancellationToken;
+        EnsureCollectionId(request.CollectionId);
 
-        if (!await photoStore.ExistsAsync(request.PhotoId, cancellationToken))
+        if (!await photoStore.ExistsAsync(request.CollectionId, request.PhotoId, cancellationToken))
         {
             throw new RpcException(new Status(StatusCode.NotFound, $"Das Foto '{request.PhotoId}' wurde nicht gefunden."));
         }
 
-        await photoStore.DeleteAsync(request.PhotoId, cancellationToken);
-        await sidecarCache.RemoveAsync(request.PhotoId, cancellationToken);
+        await photoStore.DeleteAsync(request.CollectionId, request.PhotoId, cancellationToken);
+        await sidecarCache.RemoveAsync(request.CollectionId, request.PhotoId, cancellationToken);
 
         return new DeletePhotoResponse { Success = true };
+    }
+
+    /// <summary>
+    /// Guards every collection-scoped RPC per collection-scoped-picture-access's "Every
+    /// collection-scoped RPC requires a collection_id" requirement. MigrateSidecars is the one
+    /// deliberate exception (see its own doc comment) and does not call this.
+    /// </summary>
+    private static void EnsureCollectionId(string collectionId)
+    {
+        if (string.IsNullOrWhiteSpace(collectionId))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine collection_id angegeben."));
+        }
     }
 
     private static CardEntry ToCardEntry(string photoId, SidecarRecord? sidecar, string downloadUrl = "")

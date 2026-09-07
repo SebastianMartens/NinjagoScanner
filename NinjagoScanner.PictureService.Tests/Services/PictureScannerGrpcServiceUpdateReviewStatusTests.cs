@@ -26,10 +26,10 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
         var service = CreateService(store);
 
         await service.UpdateReviewStatus(
-            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified" },
+            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-1", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-1", CancellationToken.None);
         Assert.Null(record!.AnalysisStatus);
         Assert.Equal("verified", record.ReviewStatus);
     }
@@ -38,7 +38,7 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
     public async Task UpdateReviewStatus_OnlyChangesReviewStatus_OnExistingSidecar()
     {
         var store = new FakeSidecarStore();
-        store.Tamper("card-2", new SidecarRecord
+        store.Tamper(TestCollection.Id, "card-2", new SidecarRecord
         {
             AnalysisStatus = "ok",
             CardName = "Kai",
@@ -52,10 +52,10 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
         var service = CreateService(store);
 
         await service.UpdateReviewStatus(
-            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "incorrect" },
+            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "incorrect", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-2", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-2", CancellationToken.None);
         Assert.Equal("incorrect", record!.ReviewStatus);
         Assert.Equal("ok", record.AnalysisStatus);
         Assert.Equal("Kai", record.CardName);
@@ -63,5 +63,21 @@ public sealed class PictureScannerGrpcServiceUpdateReviewStatusTests
         Assert.Equal("Serie 9", record.SetName);
         Assert.Equal("Common", record.Rarity);
         Assert.Equal(0.95, record.Confidence);
+    }
+
+    [Fact]
+    public async Task UpdateReviewStatus_DoesNotAffectSameFileNameInDifferentCollection()
+    {
+        var store = new FakeSidecarStore();
+        store.Tamper("other-collection", "card-2", new SidecarRecord { AnalysisStatus = "ok", ReviewStatus = "unreviewed" });
+
+        var service = CreateService(store);
+
+        await service.UpdateReviewStatus(
+            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "verified", CollectionId = TestCollection.Id },
+            new FakeServerCallContext());
+
+        var otherCollectionRecord = await store.GetAsync("other-collection", "card-2", CancellationToken.None);
+        Assert.Equal("unreviewed", otherCollectionRecord!.ReviewStatus);
     }
 }

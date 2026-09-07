@@ -59,7 +59,7 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
         pictureHost.WritePhoto("photo-7", Sidecar(setName: "Serie 10", cardNumber: "1"));
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        var pictureServiceClient = new PictureServiceClient(
+        var pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);
@@ -166,7 +166,7 @@ public sealed class CollectionQueryServiceReviewGroupsCardNumberOrderingTests : 
         pictureHost.WritePhoto("photo-2", Sidecar(setName: "Serie 2", cardNumber: "2"));
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        var pictureServiceClient = new PictureServiceClient(
+        var pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);

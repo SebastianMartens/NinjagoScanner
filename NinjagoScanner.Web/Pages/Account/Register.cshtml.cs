@@ -13,10 +13,12 @@ namespace NinjagoScanner.Web.Pages.Account;
 public class RegisterModel : PageModel
 {
     private readonly UserManager<AppUser> _userManager;
+    private readonly AppDbContext _dbContext;
 
-    public RegisterModel(UserManager<AppUser> userManager)
+    public RegisterModel(UserManager<AppUser> userManager, AppDbContext dbContext)
     {
         _userManager = userManager;
+        _dbContext = dbContext;
     }
 
     [BindProperty]
@@ -51,18 +53,38 @@ public class RegisterModel : PageModel
         if (!ModelState.IsValid)
             return Page();
 
+        // Registration creates the AppUser and its owned Collection together, atomically (see
+        // web-collections' "Collection created at registration" requirement) - if either step
+        // fails, neither is left behind.
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
         var user = new AppUser { UserName = Input.UserName };
         var result = await _userManager.CreateAsync(user, Input.Password);
 
-        if (result.Succeeded)
-            return RedirectToPage("/Account/Login");
-
-        foreach (var error in result.Errors)
+        if (!result.Succeeded)
         {
-            Errors.Add(TranslateIdentityError(error));
+            await transaction.RollbackAsync();
+
+            foreach (var error in result.Errors)
+            {
+                Errors.Add(TranslateIdentityError(error));
+            }
+
+            return Page();
         }
 
-        return Page();
+        var collection = new Collection { Name = $"Sammlung von {user.UserName}" };
+        _dbContext.Collections.Add(collection);
+        _dbContext.CollectionMemberships.Add(new CollectionMembership
+        {
+            CollectionId = collection.Id,
+            UserId = user.Id,
+            Role = CollectionRole.Owner
+        });
+        await _dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return RedirectToPage("/Account/Login");
     }
 
     private static string TranslateIdentityError(IdentityError error) => error.Code switch

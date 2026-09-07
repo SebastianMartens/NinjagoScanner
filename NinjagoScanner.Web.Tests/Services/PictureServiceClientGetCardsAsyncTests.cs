@@ -26,7 +26,7 @@ public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
         pictureHost.WritePhoto("photo-2", Sidecar(setName: "Serie 2", cardNumber: "2"));
         pictureHost.WritePhoto("photo-3", Sidecar(setName: "Serie 2", cardNumber: "3"));
 
-        pictureServiceClient = new PictureServiceClient(
+        pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: "http://localhost:0",
             maxUploadBytes: 10 * 1024 * 1024);

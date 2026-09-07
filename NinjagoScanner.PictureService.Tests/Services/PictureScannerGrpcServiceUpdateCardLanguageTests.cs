@@ -26,10 +26,10 @@ public sealed class PictureScannerGrpcServiceUpdateCardLanguageTests
         var service = CreateService(store);
 
         await service.UpdateCardLanguage(
-            new UpdateCardLanguageRequest { PhotoId = "card-1", Language = "pl" },
+            new UpdateCardLanguageRequest { PhotoId = "card-1", Language = "pl", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-1", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-1", CancellationToken.None);
         Assert.Null(record!.AnalysisStatus);
         Assert.Equal("pl", record.Language);
     }
@@ -38,7 +38,7 @@ public sealed class PictureScannerGrpcServiceUpdateCardLanguageTests
     public async Task UpdateCardLanguage_OnlyChangesLanguage_OnExistingSidecar()
     {
         var store = new FakeSidecarStore();
-        store.Tamper("card-2", new SidecarRecord
+        store.Tamper(TestCollection.Id, "card-2", new SidecarRecord
         {
             AnalysisStatus = "ok",
             CardName = "Kai",
@@ -53,10 +53,10 @@ public sealed class PictureScannerGrpcServiceUpdateCardLanguageTests
         var service = CreateService(store);
 
         await service.UpdateCardLanguage(
-            new UpdateCardLanguageRequest { PhotoId = "card-2", Language = "pl" },
+            new UpdateCardLanguageRequest { PhotoId = "card-2", Language = "pl", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-2", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-2", CancellationToken.None);
         Assert.Equal("pl", record!.Language);
         Assert.Equal("ok", record.AnalysisStatus);
         Assert.Equal("Kai", record.CardName);
@@ -71,15 +71,15 @@ public sealed class PictureScannerGrpcServiceUpdateCardLanguageTests
     public async Task UpdateCardLanguage_NormalizesBlankInput_ToAbsent()
     {
         var store = new FakeSidecarStore();
-        store.Tamper("card-3", new SidecarRecord { AnalysisStatus = "ok", CardNumber = "43", SetName = "Serie 9", Language = "de" });
+        store.Tamper(TestCollection.Id, "card-3", new SidecarRecord { AnalysisStatus = "ok", CardNumber = "43", SetName = "Serie 9", Language = "de" });
 
         var service = CreateService(store);
 
         await service.UpdateCardLanguage(
-            new UpdateCardLanguageRequest { PhotoId = "card-3", Language = "   " },
+            new UpdateCardLanguageRequest { PhotoId = "card-3", Language = "   ", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
-        var record = await store.GetAsync("card-3", CancellationToken.None);
+        var record = await store.GetAsync(TestCollection.Id, "card-3", CancellationToken.None);
         Assert.Null(record!.Language);
     }
 }

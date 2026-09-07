@@ -41,7 +41,7 @@ public sealed class CollectionQueryServiceAnalysisStatusCountsTests : IAsyncLife
         pictureHost.WritePhoto("not-analyzed-photo", sidecarJson: null);
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        var pictureServiceClient = new PictureServiceClient(
+        var pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);

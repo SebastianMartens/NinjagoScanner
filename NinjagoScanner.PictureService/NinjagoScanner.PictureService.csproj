@@ -33,6 +33,7 @@
     <InternalsVisibleTo Include="NinjagoScanner.PictureService.Tests" />
     <InternalsVisibleTo Include="NinjagoScanner.Web.Tests" />
     <InternalsVisibleTo Include="NinjagoScanner.CardFotosMigration" />
+    <InternalsVisibleTo Include="NinjagoScanner.CollectionAssignmentMigration" />
   </ItemGroup>
 
 </Project>

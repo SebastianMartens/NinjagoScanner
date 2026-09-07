@@ -39,7 +39,7 @@ public sealed class CollectionQueryServiceCardNumberBeforeCategoryTests : IAsync
         await pictureHost.StartAsync();
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        var pictureServiceClient = new PictureServiceClient(
+        var pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);

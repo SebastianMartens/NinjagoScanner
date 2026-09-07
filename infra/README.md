@@ -179,8 +179,23 @@ flyctl secrets set --config ../../../NinjagoScanner.PictureService/fly.toml `
 Also set PictureService's Gemini credentials and the bucket/table names the
 same way (`Gemini__ApiKey`, `Gemini__Model`, `Storage__PhotosBucketName` —
 from `terraform output photo_bucket_name` —, `Storage__SidecarTableName` —
-from `terraform output sidecar_table_name`), matching how the Gemini key is
+from `terraform output collection_sidecar_table_name`, **not**
+`sidecar_table_name` — see the next section), matching how the Gemini key is
 already handled: never committed, set once as a secret on the running app.
+
+## Two sidecar tables (add-collection-data-isolation migration)
+
+`modules/sidecar-table` (output `sidecar_table_name`) and
+`modules/collection-sidecar-table` (output `collection_sidecar_table_name`)
+are two separate DynamoDB tables, not a versioned pair — see the comment
+block at the top of `modules/collection-sidecar-table/main.tf` for why a
+second table exists instead of editing the first one's key schema in place.
+`collection_sidecar_table_name` is PictureService's live table going
+forward (point `Storage__SidecarTableName` at it); `sidecar_table_name`
+is kept only so the one-time `NinjagoScanner.CollectionAssignmentMigration`
+tool can read the old data (`--old-table`) and for eventual manual
+decommissioning once that migration is verified in production. Don't
+point a running PictureService at `sidecar_table_name` after cutover.
 
 ## AWS compute (what's not here) vs. Fly.io compute (what's not Terraform)
 

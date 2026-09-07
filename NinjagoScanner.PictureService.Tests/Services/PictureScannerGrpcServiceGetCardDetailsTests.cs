@@ -32,9 +32,9 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
     public async Task ListCards_KeepsRarity()
     {
         var photoStore = new FakePhotoStore();
-        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        photoStore.Seed(TestCollection.Id, "card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
         var sidecarStore = new FakeSidecarStore();
-        sidecarStore.Tamper("card-1", new SidecarRecord
+        sidecarStore.Tamper(TestCollection.Id, "card-1", new SidecarRecord
         {
             AnalysisStatus = "ok",
             Rarity = "Legendary",
@@ -42,7 +42,7 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
         });
         var service = CreateService(photoStore, sidecarStore);
 
-        var response = await service.ListCards(new ListCardsRequest(), new FakeServerCallContext());
+        var response = await service.ListCards(new ListCardsRequest { CollectionId = TestCollection.Id }, new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
         Assert.Equal("Legendary", entry.Rarity);
@@ -52,10 +52,10 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
     public async Task GetCardDetails_ResolvesDetailFields_ForGivenPhotoId()
     {
         var photoStore = new FakePhotoStore();
-        photoStore.Seed("card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
+        photoStore.Seed(TestCollection.Id, "card-1", [0xFF, 0xD8, 0xFF, 0xD9]);
         var sidecarStore = new FakeSidecarStore();
         var scannedAt = DateTimeOffset.Parse("2026-08-27T10:00:00Z");
-        sidecarStore.Tamper("card-1", new SidecarRecord
+        sidecarStore.Tamper(TestCollection.Id, "card-1", new SidecarRecord
         {
             AnalysisStatus = "ok",
             Rarity = "Legendary",
@@ -67,7 +67,9 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
         });
         var service = CreateService(photoStore, sidecarStore);
 
-        var response = await service.GetCardDetails(new GetCardDetailsRequest { PhotoId = "card-1" }, new FakeServerCallContext());
+        var response = await service.GetCardDetails(
+            new GetCardDetailsRequest { PhotoId = "card-1", CollectionId = TestCollection.Id },
+            new FakeServerCallContext());
 
         Assert.Equal("card-1", response.Details.PhotoId);
         Assert.Equal(0.42, response.Details.Confidence);
@@ -82,7 +84,9 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
     {
         var service = CreateService(new FakePhotoStore());
 
-        var response = await service.GetCardDetails(new GetCardDetailsRequest { PhotoId = "card-1" }, new FakeServerCallContext());
+        var response = await service.GetCardDetails(
+            new GetCardDetailsRequest { PhotoId = "card-1", CollectionId = TestCollection.Id },
+            new FakeServerCallContext());
 
         Assert.Equal("card-1", response.Details.PhotoId);
         Assert.Equal(0, response.Details.Confidence);
@@ -95,7 +99,19 @@ public sealed class PictureScannerGrpcServiceGetCardDetailsTests
         var service = CreateService(new FakePhotoStore());
 
         var exception = await Assert.ThrowsAsync<RpcException>(() => service.GetCardDetails(
-            new GetCardDetailsRequest { PhotoId = "" },
+            new GetCardDetailsRequest { PhotoId = "", CollectionId = TestCollection.Id },
+            new FakeServerCallContext()));
+
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCardDetails_FailsWithInvalidArgument_WhenCollectionIdMissing()
+    {
+        var service = CreateService(new FakePhotoStore());
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() => service.GetCardDetails(
+            new GetCardDetailsRequest { PhotoId = "card-1", CollectionId = "" },
             new FakeServerCallContext()));
 
         Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);

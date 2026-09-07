@@ -58,7 +58,7 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
         pictureHost.WritePhoto("photo-4", Sidecar(setName: "Serie 10", cardNumber: "1"));
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        var pictureServiceClient = new PictureServiceClient(
+        var pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);

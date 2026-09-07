@@ -20,9 +20,9 @@ public sealed class PictureScannerGrpcServiceUploadPhotoTests
             photoStore);
     }
 
-    private static UploadPhotoRequest MetadataMessage(string sourceFileName) => new()
+    private static UploadPhotoRequest MetadataMessage(string sourceFileName, string? collectionId = TestCollection.Id) => new()
     {
-        Metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName }
+        Metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName, CollectionId = collectionId ?? string.Empty }
     };
 
     private static UploadPhotoRequest ChunkMessage(params byte[] bytes) => new()
@@ -82,6 +82,21 @@ public sealed class PictureScannerGrpcServiceUploadPhotoTests
     }
 
     [Fact]
+    public async Task UploadPhoto_RejectsMissingCollectionId()
+    {
+        var service = CreateService(new FakePhotoStore());
+        var requestStream = new FakeAsyncStreamReader<UploadPhotoRequest>([
+            MetadataMessage("card.jpg", collectionId: null),
+            ChunkMessage(0xFF, 0xD8, 0xFF, 0xD9)
+        ]);
+
+        var exception = await Assert.ThrowsAsync<RpcException>(() =>
+            service.UploadPhoto(requestStream, new FakeServerCallContext()));
+
+        Assert.Equal(StatusCode.InvalidArgument, exception.StatusCode);
+    }
+
+    [Fact]
     public async Task UploadPhoto_StoresBytesUnderGeneratedId_BeforeRunningAnalysis()
     {
         // Analysis itself needs a reachable Gemini API/CatalogService, which this unit test can't
@@ -98,13 +113,13 @@ public sealed class PictureScannerGrpcServiceUploadPhotoTests
             service.UploadPhoto(requestStream, new FakeServerCallContext()));
 
         var storedIds = new List<string>();
-        await foreach (var id in photoStore.ListPhotoIdsAsync(CancellationToken.None))
+        await foreach (var id in photoStore.ListPhotoIdsAsync(TestCollection.Id, CancellationToken.None))
         {
             storedIds.Add(id);
         }
 
         var storedId = Assert.Single(storedIds);
-        Assert.Equal([0xFF, 0xD8, 0xFF, 0xD9], await photoStore.GetBytesAsync(storedId, CancellationToken.None));
+        Assert.Equal([0xFF, 0xD8, 0xFF, 0xD9], await photoStore.GetBytesAsync(TestCollection.Id, storedId, CancellationToken.None));
     }
 
     [Fact]
@@ -122,13 +137,13 @@ public sealed class PictureScannerGrpcServiceUploadPhotoTests
         await Assert.ThrowsAsync<RpcException>(() => service2.UploadPhoto(stream2, new FakeServerCallContext()));
 
         var ids1 = new List<string>();
-        await foreach (var id in photoStore1.ListPhotoIdsAsync(CancellationToken.None))
+        await foreach (var id in photoStore1.ListPhotoIdsAsync(TestCollection.Id, CancellationToken.None))
         {
             ids1.Add(id);
         }
 
         var ids2 = new List<string>();
-        await foreach (var id in photoStore2.ListPhotoIdsAsync(CancellationToken.None))
+        await foreach (var id in photoStore2.ListPhotoIdsAsync(TestCollection.Id, CancellationToken.None))
         {
             ids2.Add(id);
         }

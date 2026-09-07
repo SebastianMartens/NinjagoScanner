@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Grpc.Net.Client;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -64,10 +65,14 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.SlidingExpiration = true;
 });
 
+builder.Services.AddScoped<ICurrentCollectionContext, CurrentCollectionContext>();
+builder.Services.AddScoped<IAuthorizationHandler, CollectionOwnerHandler>();
+
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
+        .AddRequirements(new CollectionOwnerRequirement())
         .Build();
 });
 
@@ -110,8 +115,29 @@ var pictureServiceAddress = WebConfig.ResolvePictureServiceAddress(builder.Confi
 var maxUploadBytes = WebConfig.ResolveMaxUploadBytes(builder.Configuration);
 
 builder.Services.AddSingleton(_ => new CatalogServiceClient(catalogServiceAddress));
-builder.Services.AddSingleton(_ => new PictureServiceClient(pictureServiceAddress, catalogServiceAddress, maxUploadBytes));
-builder.Services.AddSingleton(provider => new CollectionQueryService(
+
+// PictureServiceClient is scoped (one instance per Blazor circuit) so it can resolve and cache
+// the acting user's collection_id for that circuit's lifetime - see ICurrentCollectionContext.
+// The underlying GrpcChannel stays a singleton dependency so web-grpc-client-connection-reuse's
+// "one channel per target service, reused across calls" guarantee still holds; only the
+// identity-aware wrapper is per-circuit, not the connection itself.
+builder.Services.AddSingleton(_ => GrpcChannel.ForAddress(pictureServiceAddress, new GrpcChannelOptions
+{
+    HttpHandler = new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+    },
+    // See PictureServiceClient's prior single-channel setup: ListCards' presigned download_url
+    // per entry makes the response grow with photo count, past the client's default 4 MB limit.
+    MaxReceiveMessageSize = null
+}));
+builder.Services.AddScoped(provider => new PictureServiceClient(
+    provider.GetRequiredService<GrpcChannel>(),
+    catalogServiceAddress,
+    maxUploadBytes,
+    provider.GetRequiredService<ICurrentCollectionContext>(),
+    provider.GetRequiredService<AuthenticationStateProvider>()));
+builder.Services.AddScoped(provider => new CollectionQueryService(
     provider.GetRequiredService<CatalogServiceClient>(),
     provider.GetRequiredService<PictureServiceClient>()));
 
@@ -148,7 +174,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 // Configure the HTTP request pipeline.

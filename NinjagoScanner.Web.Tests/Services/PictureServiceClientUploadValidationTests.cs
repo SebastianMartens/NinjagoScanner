@@ -1,4 +1,5 @@
 using NinjagoScanner.Web.Services;
+using NinjagoScanner.Web.Tests.Fixtures;
 
 namespace NinjagoScanner.Web.Tests.Services;
 
@@ -9,7 +10,7 @@ namespace NinjagoScanner.Web.Tests.Services;
 /// </summary>
 public sealed class PictureServiceClientUploadValidationTests
 {
-    private readonly PictureServiceClient pictureServiceClient = new(
+    private readonly PictureServiceClient pictureServiceClient = TestPictureServiceClientFactory.Create(
         pictureServiceAddress: "http://localhost:0",
         catalogServiceAddress: "http://localhost:0",
         maxUploadBytes: 1024);

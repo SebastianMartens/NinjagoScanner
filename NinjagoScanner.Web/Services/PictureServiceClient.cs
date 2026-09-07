@@ -1,7 +1,9 @@
 using System.Globalization;
 using Google.Protobuf;
 using Grpc.Net.Client;
+using Microsoft.AspNetCore.Components.Authorization;
 using NinjagoScanner.PictureService.Protos;
+using NinjagoScanner.Web.Data;
 using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
@@ -9,35 +11,57 @@ namespace NinjagoScanner.Web.Services;
 /// <summary>
 /// gRPC client for PictureService only - photo upload/CRUD, sidecar updates, and download URLs.
 /// Never touches catalog data; see CollectionQueryService for anything that combines this data
-/// with the catalog.
+/// with the catalog. Scoped (one instance per Blazor circuit, see collection-scoped-picture-access)
+/// so it can resolve the acting user's collection_id once and attach it to every outgoing
+/// request - callers never pass a collection_id themselves.
 /// </summary>
 internal sealed class PictureServiceClient
 {
     private readonly string catalogServiceAddress;
     private readonly long maxUploadBytes;
     private readonly GrpcChannel channel;
+    private readonly ICurrentCollectionContext currentCollectionContext;
+    private readonly AuthenticationStateProvider authenticationStateProvider;
+    private string? cachedCollectionId;
 
-    public PictureServiceClient(string pictureServiceAddress, string catalogServiceAddress, long maxUploadBytes)
+    public PictureServiceClient(
+        GrpcChannel channel,
+        string catalogServiceAddress,
+        long maxUploadBytes,
+        ICurrentCollectionContext currentCollectionContext,
+        AuthenticationStateProvider authenticationStateProvider)
     {
+        this.channel = channel;
         this.catalogServiceAddress = catalogServiceAddress;
         this.maxUploadBytes = maxUploadBytes;
-        channel = GrpcChannel.ForAddress(pictureServiceAddress, new GrpcChannelOptions
-        {
-            HttpHandler = new SocketsHttpHandler
-            {
-                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
-            },
-            // ListCards now embeds a presigned S3 download_url (a few hundred bytes) on every
-            // entry (see inline-photo-download-urls), so the response grows with the photo count
-            // instead of staying flat - past a few thousand photos it exceeds the client's
-            // default 4 MB receive limit and ListCards fails with RESOURCE_EXHAUSTED. The server
-            // already sends without a size limit (MaxSendMessageSize defaults to unlimited), so
-            // removing the limit here just matches that.
-            MaxReceiveMessageSize = null
-        });
+        this.currentCollectionContext = currentCollectionContext;
+        this.authenticationStateProvider = authenticationStateProvider;
     }
 
     public long MaxUploadBytes => maxUploadBytes;
+
+    /// <summary>
+    /// Resolves and caches (for this circuit's lifetime) the collection_id every collection-scoped
+    /// RPC in this class attaches to its request - see collection-scoped-picture-access's "Web
+    /// resolves and supplies the caller's authorized collection_id" requirement.
+    /// </summary>
+    private async Task<string> GetCollectionIdAsync(CancellationToken cancellationToken)
+    {
+        if (cachedCollectionId is not null)
+        {
+            return cachedCollectionId;
+        }
+
+        var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
+        var collection = await currentCollectionContext.GetOwnedCollectionAsync(authState.User, cancellationToken);
+        if (collection is null)
+        {
+            throw new InvalidOperationException("Der aktuelle Benutzer besitzt keine Sammlung.");
+        }
+
+        cachedCollectionId = collection.Id;
+        return cachedCollectionId;
+    }
 
     private void EnsureUploadIsValid(string fileName, long fileSizeBytes)
     {
@@ -61,9 +85,10 @@ internal sealed class PictureServiceClient
     public async Task<ScanSummaryDto> ScanAsync(CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         var response = await client.ScanAsync(
-            new ScanRequest { CatalogServiceAddress = catalogServiceAddress },
+            new ScanRequest { CatalogServiceAddress = catalogServiceAddress, CollectionId = collectionId },
             cancellationToken: cancellationToken);
 
         return new ScanSummaryDto
@@ -93,11 +118,12 @@ internal sealed class PictureServiceClient
         EnsureUploadIsValid(sourceFileName, fileSizeBytes);
 
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
         using var call = client.UploadPhoto(cancellationToken: cancellationToken);
 
         await call.RequestStream.WriteAsync(new UploadPhotoRequest
         {
-            Metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName }
+            Metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName, CollectionId = collectionId }
         });
 
         var buffer = new byte[81920];
@@ -127,7 +153,10 @@ internal sealed class PictureServiceClient
     public async Task<IReadOnlyList<CardEntry>> ListCardEntriesAsync(CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
-        var response = await client.ListCardsAsync(new ListCardsRequest(), cancellationToken: cancellationToken);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
+        var response = await client.ListCardsAsync(
+            new ListCardsRequest { CollectionId = collectionId },
+            cancellationToken: cancellationToken);
 
         return response.Cards;
     }
@@ -135,8 +164,9 @@ internal sealed class PictureServiceClient
     public async Task<string> GetDownloadUrlAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
         var response = await client.GetPhotoDownloadUrlAsync(
-            new GetPhotoDownloadUrlRequest { PhotoId = photoId },
+            new GetPhotoDownloadUrlRequest { PhotoId = photoId, CollectionId = collectionId },
             cancellationToken: cancellationToken);
 
         return response.DownloadUrl;
@@ -150,8 +180,9 @@ internal sealed class PictureServiceClient
     public async Task<CardDetailsItem> GetCardDetailsAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
         var response = await client.GetCardDetailsAsync(
-            new GetCardDetailsRequest { PhotoId = photoId },
+            new GetCardDetailsRequest { PhotoId = photoId, CollectionId = collectionId },
             cancellationToken: cancellationToken);
 
         return ToCardDetailsItem(response.Details);
@@ -163,10 +194,12 @@ internal sealed class PictureServiceClient
         CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         var request = new UpdateSidecarRequest
         {
             PhotoId = photoId,
+            CollectionId = collectionId,
             AnalysisStatus = update.AnalysisStatus ?? string.Empty,
             CardName = update.CardName ?? string.Empty,
             CardNumber = update.CardNumber ?? string.Empty,
@@ -186,43 +219,65 @@ internal sealed class PictureServiceClient
     public async Task UpdateReviewStatusAsync(string photoId, string reviewStatus, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         await client.UpdateReviewStatusAsync(
-            new UpdateReviewStatusRequest { PhotoId = photoId, ReviewStatus = reviewStatus },
+            new UpdateReviewStatusRequest { PhotoId = photoId, ReviewStatus = reviewStatus, CollectionId = collectionId },
             cancellationToken: cancellationToken);
     }
 
     public async Task DeletePhotoAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
-        await client.DeletePhotoAsync(new DeletePhotoRequest { PhotoId = photoId }, cancellationToken: cancellationToken);
+        await client.DeletePhotoAsync(
+            new DeletePhotoRequest { PhotoId = photoId, CollectionId = collectionId },
+            cancellationToken: cancellationToken);
     }
 
     public async Task UpdateSetNameAsync(string photoId, string? setName, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         await client.UpdateSetNameAsync(
-            new UpdateSetNameRequest { PhotoId = photoId, SetName = string.IsNullOrWhiteSpace(setName) ? string.Empty : setName.Trim() },
+            new UpdateSetNameRequest
+            {
+                PhotoId = photoId,
+                SetName = string.IsNullOrWhiteSpace(setName) ? string.Empty : setName.Trim(),
+                CollectionId = collectionId
+            },
             cancellationToken: cancellationToken);
     }
 
     public async Task UpdateCardNumberAsync(string photoId, string? cardNumber, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         await client.UpdateCardNumberAsync(
-            new UpdateCardNumberRequest { PhotoId = photoId, CardNumber = string.IsNullOrWhiteSpace(cardNumber) ? string.Empty : cardNumber.Trim() },
+            new UpdateCardNumberRequest
+            {
+                PhotoId = photoId,
+                CardNumber = string.IsNullOrWhiteSpace(cardNumber) ? string.Empty : cardNumber.Trim(),
+                CollectionId = collectionId
+            },
             cancellationToken: cancellationToken);
     }
 
     public async Task UpdateCardLanguageAsync(string photoId, string? language, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
 
         await client.UpdateCardLanguageAsync(
-            new UpdateCardLanguageRequest { PhotoId = photoId, Language = string.IsNullOrWhiteSpace(language) ? string.Empty : language.Trim() },
+            new UpdateCardLanguageRequest
+            {
+                PhotoId = photoId,
+                Language = string.IsNullOrWhiteSpace(language) ? string.Empty : language.Trim(),
+                CollectionId = collectionId
+            },
             cancellationToken: cancellationToken);
     }
 

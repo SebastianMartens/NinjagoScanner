@@ -42,6 +42,10 @@ data "aws_iam_policy_document" "picture_service" {
       "dynamodb:PutItem",
       "dynamodb:DeleteItem",
       "dynamodb:Scan",
+      # Query (not just Scan) is needed since add-collection-data-isolation:
+      # SidecarTable.ListByCollectionAsync queries by the CollectionId partition key instead of
+      # scanning the whole table for ListCards/Scan.
+      "dynamodb:Query",
     ]
     resources = [
       var.sidecar_table_arn,

@@ -47,7 +47,7 @@ public sealed class PictureServiceClientDeletePhotoTests : IAsyncLifetime
         """);
 
         var catalogServiceClient = new CatalogServiceClient(catalogHost.Address);
-        pictureServiceClient = new PictureServiceClient(
+        pictureServiceClient = TestPictureServiceClientFactory.Create(
             pictureServiceAddress: pictureHost.Address,
             catalogServiceAddress: catalogHost.Address,
             maxUploadBytes: 10 * 1024 * 1024);

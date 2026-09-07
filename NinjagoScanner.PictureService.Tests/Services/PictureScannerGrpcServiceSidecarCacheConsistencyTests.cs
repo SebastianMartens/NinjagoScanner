@@ -35,7 +35,7 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
     [Fact]
     public async Task UpdateReviewStatus_IsVisibleInListCards_EvenWhenStoreContentDivergesAfterward()
     {
-        photoStore.Seed("card-1", [0x01]);
+        photoStore.Seed(TestCollection.Id, "card-1", [0x01]);
 
         // Two separate service instances, mirroring production where each RPC call gets a new
         // scoped PictureScannerGrpcService but shares the same singleton SidecarCache.
@@ -43,14 +43,14 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
         var reader = CreateService();
 
         await writer.UpdateReviewStatus(
-            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified" },
+            new UpdateReviewStatusRequest { PhotoId = "card-1", ReviewStatus = "verified", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
         // Tamper with the store directly, bypassing the cache. If ListCards fell back to a fresh
         // store read, it would now report "incorrect" instead of "verified".
-        sidecarStore.Tamper("card-1", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect" });
+        sidecarStore.Tamper(TestCollection.Id, "card-1", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect" });
 
-        var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
+        var response = await reader.ListCards(new ListCardsRequest { CollectionId = TestCollection.Id }, new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
         Assert.Equal("verified", entry.ReviewStatus);
@@ -59,23 +59,23 @@ public sealed class PictureScannerGrpcServiceSidecarCacheConsistencyTests
     [Fact]
     public async Task UpdateSetName_ThenUpdateReviewStatus_BothReflectedInListCards_EvenWhenStoreContentDivergesAfterward()
     {
-        photoStore.Seed("card-2", [0x01]);
+        photoStore.Seed(TestCollection.Id, "card-2", [0x01]);
 
         var writer = CreateService();
         var reader = CreateService();
 
         await writer.UpdateSetName(
-            new UpdateSetNameRequest { PhotoId = "card-2", SetName = "Serie 9" },
+            new UpdateSetNameRequest { PhotoId = "card-2", SetName = "Serie 9", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
         await writer.UpdateReviewStatus(
-            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "verified" },
+            new UpdateReviewStatusRequest { PhotoId = "card-2", ReviewStatus = "verified", CollectionId = TestCollection.Id },
             new FakeServerCallContext());
 
         // Tamper with the store directly; only the cache can still answer correctly.
-        sidecarStore.Tamper("card-2", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect", SetName = "Serie 1" });
+        sidecarStore.Tamper(TestCollection.Id, "card-2", new SidecarRecord { AnalysisStatus = "notAnalyzed", ReviewStatus = "incorrect", SetName = "Serie 1" });
 
-        var response = await reader.ListCards(new ListCardsRequest(), new FakeServerCallContext());
+        var response = await reader.ListCards(new ListCardsRequest { CollectionId = TestCollection.Id }, new FakeServerCallContext());
 
         var entry = Assert.Single(response.Cards);
         Assert.Equal("Serie 9", entry.SetName);

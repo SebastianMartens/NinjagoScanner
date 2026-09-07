@@ -27,6 +27,10 @@ var bucketName = configuration["bucket"] ?? configuration["PHOTOS_BUCKET_NAME"]
     ?? Fail("Missing --bucket (or PHOTOS_BUCKET_NAME) — the target S3 bucket for photo bytes.");
 var tableName = configuration["table"] ?? configuration["SIDECAR_TABLE_NAME"]
     ?? Fail("Missing --table (or SIDECAR_TABLE_NAME) — the target DynamoDB table for sidecar records.");
+// Storage is collection-scoped now (see add-collection-data-isolation) - every photo/sidecar this
+// tool writes needs a target collection_id, same as any other write path.
+var collectionId = configuration["collection"]
+    ?? Fail("Missing --collection — the target collection_id every migrated photo/sidecar is written under.");
 var manifestPath = configuration["manifest"]
     ?? Path.Combine(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(sourceDirectory))!, ".card-fotos-migration-manifest.json");
 var maxDegreeOfParallelism = int.TryParse(configuration["parallelism"], out var parsedParallelism) ? Math.Max(1, parsedParallelism) : 4;
@@ -41,6 +45,7 @@ if (!Directory.Exists(sourceDirectory))
 Console.WriteLine($"Quelle:    {sourceDirectory}");
 Console.WriteLine($"S3 Bucket: {bucketName}");
 Console.WriteLine($"DynamoDB:  {tableName}");
+Console.WriteLine($"Collection:{collectionId}");
 Console.WriteLine($"Manifest:  {manifestPath}");
 Console.WriteLine(dryRun ? "Modus:     DRY RUN (kein Upload, keine DB-Schreibvorgänge)" : "Modus:     LIVE");
 Console.WriteLine();
@@ -98,11 +103,11 @@ await Parallel.ForEachAsync(
                 await s3Client!.PutObjectAsync(new PutObjectRequest
                 {
                     BucketName = bucketName,
-                    Key = PhotoStore.BuildObjectKey(photoId),
+                    Key = PhotoStore.BuildObjectKey(collectionId, photoId),
                     FilePath = imagePath
                 }, cancellationToken);
 
-                await sidecarTable!.PutAsync(photoId, record, cancellationToken);
+                await sidecarTable!.PutAsync(collectionId, photoId, record, cancellationToken);
             }
 
             if (!dryRun)

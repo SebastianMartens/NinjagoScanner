@@ -27,16 +27,17 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
     public string Address { get; private set; } = string.Empty;
 
-    public void WritePhoto(string photoId, string? sidecarJson = null)
+    public void WritePhoto(string photoId, string? sidecarJson = null, string? collectionId = null)
     {
-        photoStore.Seed(photoId, DummyImageBytes);
+        var resolvedCollectionId = collectionId ?? TestCurrentCollectionContext.CollectionId;
+        photoStore.Seed(resolvedCollectionId, photoId, DummyImageBytes);
 
         if (sidecarJson is not null)
         {
             var record = JsonSerializer.Deserialize<SidecarRecord>(sidecarJson, ScannerJsonOptions.Default);
             if (record is not null)
             {
-                sidecarStore.Seed(photoId, record);
+                sidecarStore.Seed(resolvedCollectionId, photoId, record);
             }
         }
     }
@@ -80,45 +81,46 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
     private sealed class InMemoryPhotoStore : IPhotoStore
     {
-        private readonly ConcurrentDictionary<string, byte[]> objects = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<(string CollectionId, string PhotoId), byte[]> objects = new();
 
-        public void Seed(string photoId, byte[] bytes) => objects[photoId] = bytes;
+        public void Seed(string collectionId, string photoId, byte[] bytes) => objects[(collectionId, photoId)] = bytes;
 
-        public Task PutBytesAsync(string photoId, byte[] bytes, CancellationToken cancellationToken)
+        public Task PutBytesAsync(string collectionId, string photoId, byte[] bytes, CancellationToken cancellationToken)
         {
-            objects[photoId] = bytes;
+            objects[(collectionId, photoId)] = bytes;
             return Task.CompletedTask;
         }
 
-        public Task<string> CreateDownloadUrlAsync(string photoId, CancellationToken cancellationToken)
+        public Task<string> CreateDownloadUrlAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
             return Task.FromResult($"https://fake-photo-store.test/{photoId}");
         }
 
-        public Task<byte[]> GetBytesAsync(string photoId, CancellationToken cancellationToken)
+        public Task<byte[]> GetBytesAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
-            return objects.TryGetValue(photoId, out var bytes)
+            return objects.TryGetValue((collectionId, photoId), out var bytes)
                 ? Task.FromResult(bytes)
-                : throw new FileNotFoundException($"No fake photo bytes seeded for '{photoId}'.");
+                : throw new FileNotFoundException($"No fake photo bytes seeded for '{collectionId}/{photoId}'.");
         }
 
-        public Task<bool> ExistsAsync(string photoId, CancellationToken cancellationToken)
+        public Task<bool> ExistsAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
-            return Task.FromResult(objects.ContainsKey(photoId));
+            return Task.FromResult(objects.ContainsKey((collectionId, photoId)));
         }
 
-        public Task DeleteAsync(string photoId, CancellationToken cancellationToken)
+        public Task DeleteAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
-            objects.TryRemove(photoId, out _);
+            objects.TryRemove((collectionId, photoId), out _);
             return Task.CompletedTask;
         }
 
         public async IAsyncEnumerable<string> ListPhotoIdsAsync(
+            string collectionId,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
-            foreach (var photoId in objects.Keys.OrderBy(id => id, StringComparer.OrdinalIgnoreCase))
+            foreach (var key in objects.Keys.Where(key => key.CollectionId == collectionId).OrderBy(key => key.PhotoId, StringComparer.OrdinalIgnoreCase))
             {
-                yield return photoId;
+                yield return key.PhotoId;
             }
 
             await Task.CompletedTask;
@@ -127,33 +129,48 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
     private sealed class InMemorySidecarStore : ISidecarStore
     {
-        private readonly ConcurrentDictionary<string, SidecarRecord> records = new(StringComparer.Ordinal);
+        private readonly ConcurrentDictionary<(string CollectionId, string PhotoId), SidecarRecord> records = new();
 
-        public void Seed(string photoId, SidecarRecord record) => records[photoId] = record;
+        public void Seed(string collectionId, string photoId, SidecarRecord record) => records[(collectionId, photoId)] = record;
 
-        public Task<SidecarRecord?> GetAsync(string photoId, CancellationToken cancellationToken)
+        public Task<SidecarRecord?> GetAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
-            return Task.FromResult(records.TryGetValue(photoId, out var record) ? record : null);
+            return Task.FromResult(records.TryGetValue((collectionId, photoId), out var record) ? record : null);
         }
 
-        public Task PutAsync(string photoId, SidecarRecord record, CancellationToken cancellationToken)
+        public Task PutAsync(string collectionId, string photoId, SidecarRecord record, CancellationToken cancellationToken)
         {
-            records[photoId] = record;
+            records[(collectionId, photoId)] = record;
             return Task.CompletedTask;
         }
 
-        public Task DeleteAsync(string photoId, CancellationToken cancellationToken)
+        public Task DeleteAsync(string collectionId, string photoId, CancellationToken cancellationToken)
         {
-            records.TryRemove(photoId, out _);
+            records.TryRemove((collectionId, photoId), out _);
             return Task.CompletedTask;
         }
 
-        public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListAllAsync(
+        public async IAsyncEnumerable<(string PhotoId, SidecarRecord Record)> ListByCollectionAsync(
+            string collectionId,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
         {
             foreach (var pair in records)
             {
-                yield return (pair.Key, pair.Value);
+                if (pair.Key.CollectionId == collectionId)
+                {
+                    yield return (pair.Key.PhotoId, pair.Value);
+                }
+            }
+
+            await Task.CompletedTask;
+        }
+
+        public async IAsyncEnumerable<(string CollectionId, string PhotoId, SidecarRecord Record)> ListAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            foreach (var pair in records)
+            {
+                yield return (pair.Key.CollectionId, pair.Key.PhotoId, pair.Value);
             }
 
             await Task.CompletedTask;
