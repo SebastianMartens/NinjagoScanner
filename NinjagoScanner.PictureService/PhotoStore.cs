@@ -117,7 +117,7 @@ internal sealed class PhotoStore : IPhotoStore
         do
         {
             response = await s3Client.ListObjectsV2Async(request, cancellationToken);
-            foreach (var entry in response.S3Objects)
+            foreach (var entry in response.S3Objects ?? [])
             {
                 yield return entry.Key[prefix.Length..];
             }
