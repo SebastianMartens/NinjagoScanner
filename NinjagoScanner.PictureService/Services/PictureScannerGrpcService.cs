@@ -167,7 +167,7 @@ public sealed class PictureScannerGrpcService : CardPictureService.CardPictureSe
             {
                 stoppedEarly = true;
                 logger.LogWarning(
-                    "Scan wird nach {PhotoId} abgebrochen: Gemini war ueber die Transportebene nicht erreichbar ({ErrorMessage})",
+                    "Scan wird nach {PhotoId} abgebrochen: Gemini war über die Transportebene nicht erreichbar ({ErrorMessage})",
                     photoId,
                     result.ErrorMessage);
                 break;
