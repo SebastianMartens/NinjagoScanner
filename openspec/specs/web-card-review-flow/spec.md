@@ -197,7 +197,7 @@ The review-status filter SHALL default to `Unreviewed` when the review page is l
 - **THEN** the review-status filter is set to `Unreviewed`, so only groups with at least one unreviewed photo are shown initially
 
 ### Requirement: Groups can be filtered by analysis status
-The review page SHALL provide an analysis-status filter control offering `All`, `Ok`, `Uncertain`, `Failed`, and `Pending`. When a status other than `All` is selected, a group SHALL be included in the list used for display and navigation if and only if at least one of its photos currently has that `AnalysisStatus`; every photo in an included group SHALL still be shown, regardless of that individual photo's own `AnalysisStatus`. Selecting `All` removes this filter's constraint, matching the page's behavior without it. This filter combines with the review-status filter and the free-text search filter using AND: a group is included only if it satisfies this filter and every other currently active filter.
+The review page SHALL provide an analysis-status filter control offering `All`, `Ok`, `Uncertain`, `Failed`, and `NotAnalyzed`. When a status other than `All` is selected, a group SHALL be included in the list used for display and navigation if and only if at least one of its photos currently has that `AnalysisStatus`; every photo in an included group SHALL still be shown, regardless of that individual photo's own `AnalysisStatus`. Selecting `All` removes this filter's constraint, matching the page's behavior without it. This filter combines with the review-status filter and the free-text search filter using AND: a group is included only if it satisfies this filter and every other currently active filter.
 
 #### Scenario: Filtering to groups with a failed photo
 - **WHEN** a user selects `Failed` in the analysis-status filter
@@ -210,6 +210,10 @@ The review page SHALL provide an analysis-status filter control offering `All`, 
 #### Scenario: Clearing the analysis-status filter
 - **WHEN** a user selects `All` in the analysis-status filter
 - **THEN** every group excluded solely by that filter becomes eligible again, subject to the review-status filter and free-text search filter still being satisfied
+
+#### Scenario: Filtering to a not-analyzed photo
+- **WHEN** a user selects `NotAnalyzed` in the analysis-status filter
+- **THEN** only groups containing at least one photo whose `AnalysisStatus` is `notAnalyzed` are shown, and every photo in each shown group is displayed regardless of its own `AnalysisStatus`
 
 ### Requirement: Groups can be filtered by free-text search over card name and number
 The review page SHALL provide a free-text search input. While the search text is non-empty, a group SHALL be included in the list used for display and navigation if and only if at least one of its photos has a `CardName` or `CardNumber` that contains the search text as a case-insensitive substring; every photo in an included group SHALL still be shown, regardless of whether that individual photo itself matched the search text. Matching updates live as the search text changes, without requiring a separate submit action. Clearing the search text removes this filter's constraint, matching the page's behavior without it. This filter combines with the review-status filter and the analysis-status filter using AND: a group is included only if it satisfies this filter and every other currently active filter.
