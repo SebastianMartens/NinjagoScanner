@@ -33,12 +33,13 @@ infra/
     photo-storage/               S3 bucket for card photos: versioning,
                                   CORS (for direct browser upload), lifecycle
                                   rules.
-    sidecar-table/                 DynamoDB table for sidecar records + GSIs.
+    collection-sidecar-table/       DynamoDB table for sidecar records,
+                                      keyed by Collection ID + Photo ID.
     iam-user/                        IAM user + scoped policy PictureService
                                        authenticates to AWS with on Fly.io.
 ```
 
-`environments/prod/main.tf` composes `photo-storage`, `sidecar-table`,
+`environments/prod/main.tf` composes `photo-storage`, `collection-sidecar-table`,
 `iam-user`, and `github-oidc` into one deployable stack. `environments/prod/iam-policies.tf`
 builds the IAM policy documents attached to the two GitHub Actions roles,
 since only the root module knows every resource ARN those policies need to
@@ -139,14 +140,14 @@ terraform apply
   `environments/prod/iam-policies.tf`.
 - **DynamoDB sidecar table**: `PAY_PER_REQUEST` billing (no capacity
   planning), point-in-time recovery on, deletion protection on by default.
-  Partition key `PhotoId` (a generated ID, not the original filename — see
-  design.md's "Photo identity" decision in `cloud-hosting-migration`), with
-  three GSIs matching the app's three real query patterns today: by review
-  status, by analysis status, and by series+card-number (how "Owned Copies"
-  is computed — see `openspec/GLOSSARY.md`). See the comment block at the
-  top of `modules/sidecar-table/main.tf` for the full reasoning, including a
-  naming note: the table's `SeriesName` attribute corresponds to what
-  PictureService's current C# code calls `SetName`.
+  Partition key `CollectionId`, sort key `PhotoId` (`PhotoId` a generated ID,
+  not the original filename — see design.md's "Photo identity" decision in
+  `cloud-hosting-migration`). No GSIs — PictureService queries this table
+  only by its own `Query`-by-`CollectionId` access pattern (`ListCards`/
+  `Scan`); the review-status/analysis-status/series-card GSIs that existed
+  on the predecessor table were dead infrastructure, not reproduced here.
+  See the comment block at the top of `modules/collection-sidecar-table/
+  main.tf` for the full reasoning.
 - **S3 photo bucket**: versioning + SSE-S3 encryption + all-public-access
   blocked, with a CORS rule (currently `allowed_origins = ["*"]`) so the
   browser can `PUT` directly to S3 using a presigned URL. Tighten this to
@@ -195,23 +196,21 @@ flyctl secrets set --config ../../../NinjagoScanner.PictureService/fly.toml `
 Also set PictureService's Gemini credentials and the bucket/table names the
 same way (`Gemini__ApiKey`, `Gemini__Model`, `Storage__PhotosBucketName` —
 from `terraform output photo_bucket_name` —, `Storage__SidecarTableName` —
-from `terraform output collection_sidecar_table_name`, **not**
-`sidecar_table_name` — see the next section), matching how the Gemini key is
-already handled: never committed, set once as a secret on the running app.
+from `terraform output collection_sidecar_table_name`), matching how the
+Gemini key is already handled: never committed, set once as a secret on
+the running app.
 
-## Two sidecar tables (add-collection-data-isolation migration)
+## Sidecar table history (add-collection-data-isolation migration)
 
-`modules/sidecar-table` (output `sidecar_table_name`) and
 `modules/collection-sidecar-table` (output `collection_sidecar_table_name`)
-are two separate DynamoDB tables, not a versioned pair — see the comment
-block at the top of `modules/collection-sidecar-table/main.tf` for why a
-second table exists instead of editing the first one's key schema in place.
-`collection_sidecar_table_name` is PictureService's live table going
-forward (point `Storage__SidecarTableName` at it); `sidecar_table_name`
-is kept only so the one-time `NinjagoScanner.CollectionAssignmentMigration`
-tool can read the old data (`--old-table`) and for eventual manual
-decommissioning once that migration is verified in production. Don't
-point a running PictureService at `sidecar_table_name` after cutover.
+is PictureService's live sidecar table — see the comment block at the top
+of its `main.tf` for why it's a separate resource rather than an edit to
+the old table's key schema. The old `modules/sidecar-table` (PhotoId-only
+key) was a temporary rollback fallback during the migration; it was
+decommissioned on 2026-09-08 after confirming its item count (7,475)
+matched the new table's exactly. The module directory is left in the repo
+only as historical reference for anyone reading old commits/comments — no
+environment sources it anymore.
 
 ## AWS compute (what's not here) vs. Fly.io compute (what's not Terraform)
 

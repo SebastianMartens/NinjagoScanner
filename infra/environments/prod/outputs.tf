@@ -2,13 +2,6 @@ output "photo_bucket_name" {
   value = module.photo_storage.bucket_name
 }
 
-# The old (PhotoId-only) table - kept only for the add-collection-data-isolation migration tool's
-# --old-table argument and eventual decommissioning; PictureService no longer talks to it once
-# Storage__SidecarTableName is switched to collection_sidecar_table_name below.
-output "sidecar_table_name" {
-  value = module.sidecar_table.table_name
-}
-
 output "collection_sidecar_table_name" {
   value = module.collection_sidecar_table.table_name
 }

@@ -111,11 +111,7 @@ data "aws_iam_policy_document" "manage_resources_core" {
       "dynamodb:DescribeContinuousBackups", "dynamodb:UpdateTimeToLive",
       "dynamodb:DescribeTimeToLive",
     ]
-    # Both the old (unused, kept until decommissioned) and new tables are
-    # still live Terraform resources in this stack's state — see main.tf's
-    # module.sidecar_table / module.collection_sidecar_table comment.
     resources = [
-      module.sidecar_table.table_arn, "${module.sidecar_table.table_arn}/index/*",
       module.collection_sidecar_table.table_arn, "${module.collection_sidecar_table.table_arn}/index/*",
     ]
   }
@@ -221,8 +217,6 @@ data "aws_iam_policy_document" "plan_only" {
     ]
     resources = [
       module.photo_storage.bucket_arn,
-      module.sidecar_table.table_arn,
-      "${module.sidecar_table.table_arn}/index/*",
       module.collection_sidecar_table.table_arn,
       "${module.collection_sidecar_table.table_arn}/index/*",
     ]

@@ -14,19 +14,11 @@ module "photo_storage" {
   tags                 = local.common_tags
 }
 
-module "sidecar_table" {
-  source = "../../modules/sidecar-table"
-
-  project_name                = var.project_name
-  deletion_protection_enabled = var.sidecar_table_deletion_protection
-  tags                        = local.common_tags
-}
-
-# Replaces module.sidecar_table as PictureService's live table once
-# add-collection-data-isolation's migration has run and been verified - see
-# modules/collection-sidecar-table/main.tf for why this is a separate resource rather than an
-# edit to module.sidecar_table. Keep module.sidecar_table (and its data) around, unused by the
-# running app, until that migration is confirmed and the old table is deliberately decommissioned.
+# Replaced module.sidecar_table (PhotoId-only key) as PictureService's live table once
+# add-collection-data-isolation's migration ran and was verified in production on 2026-09-08:
+# item counts matched exactly (7,475 in each) between the old and new tables before the old one
+# was decommissioned. See modules/collection-sidecar-table/main.tf for why this was a separate
+# resource rather than an edit to module.sidecar_table.
 module "collection_sidecar_table" {
   source = "../../modules/collection-sidecar-table"
 
