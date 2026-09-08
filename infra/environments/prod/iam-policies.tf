@@ -111,7 +111,13 @@ data "aws_iam_policy_document" "manage_resources_core" {
       "dynamodb:DescribeContinuousBackups", "dynamodb:UpdateTimeToLive",
       "dynamodb:DescribeTimeToLive",
     ]
-    resources = [module.sidecar_table.table_arn, "${module.sidecar_table.table_arn}/index/*"]
+    # Both the old (unused, kept until decommissioned) and new tables are
+    # still live Terraform resources in this stack's state — see main.tf's
+    # module.sidecar_table / module.collection_sidecar_table comment.
+    resources = [
+      module.sidecar_table.table_arn, "${module.sidecar_table.table_arn}/index/*",
+      module.collection_sidecar_table.table_arn, "${module.collection_sidecar_table.table_arn}/index/*",
+    ]
   }
 
   # modules/iam-user's PictureService user — a separate identity from the
@@ -217,6 +223,8 @@ data "aws_iam_policy_document" "plan_only" {
       module.photo_storage.bucket_arn,
       module.sidecar_table.table_arn,
       "${module.sidecar_table.table_arn}/index/*",
+      module.collection_sidecar_table.table_arn,
+      "${module.collection_sidecar_table.table_arn}/index/*",
     ]
   }
 
