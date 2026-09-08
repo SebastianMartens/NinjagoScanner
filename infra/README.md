@@ -50,11 +50,27 @@ Every resource is tagged `Project = "ninjago-scanner"`, `ManagedBy =
 
 ## State & locking
 
-Terraform state lives in S3 (bucket created by `bootstrap/`), with a
-DynamoDB table providing locking so two `terraform apply` runs (e.g. a human
+Terraform state lives in S3 (bucket created by `bootstrap/`), locked via
+Terraform's native S3 lockfile mechanism (`use_lockfile = true` in
+`backend.hcl` — see `backend.hcl.example` and `bootstrap`'s
+`state_backend_config` output) so two `terraform apply` runs (e.g. a human
 and a CI job) can't race each other. `environments/prod` never manages the
-bucket/table it stores its own state in — that would be circular — it only
-consumes them as a backend.
+bucket it stores its own state in — that would be circular — it only
+consumes it as a backend.
+
+`modules/state-backend` also provisions a DynamoDB lock table
+(`lock_table_name`/`lock_table_arn`), a holdover from the legacy
+DynamoDB-digest locking scheme. It's no longer used for locking — every
+`backend.hcl` must use `use_lockfile`, not `dynamodb_table` — but is kept
+around (and the CI IAM roles still hold scoped `dynamodb:*Item` permissions
+on it) rather than torn down. **Never mix the two mechanisms across
+`backend.hcl` files for the same state key**: a `dynamodb_table` backend
+writes/checks an MD5 digest of the state on every read, but a
+`use_lockfile` backend never updates that digest, so an apply from a
+`use_lockfile` backend followed by a read from a `dynamodb_table` backend
+fails with a checksum mismatch (`state data in S3 does not have the
+expected content`) until the stale digest is manually corrected in
+DynamoDB.
 
 ## Bootstrapping (first-time setup, once per AWS account)
 

@@ -59,11 +59,11 @@ jobs:
       - name: Materialize backend + tfvars (gitignored, account-specific — see infra/README.md)
         run: |
           {
-            echo 'bucket         = "${{ vars.TF_STATE_BUCKET_NAME }}"'
-            echo 'key            = "ninjago-scanner/prod/terraform.tfstate"'
-            echo 'region         = "${{ vars.AWS_REGION }}"'
-            echo 'dynamodb_table = "${{ vars.TF_STATE_LOCK_TABLE_NAME }}"'
-            echo 'encrypt        = true'
+            echo 'bucket       = "${{ vars.TF_STATE_BUCKET_NAME }}"'
+            echo 'key          = "ninjago-scanner/prod/terraform.tfstate"'
+            echo 'region       = "${{ vars.AWS_REGION }}"'
+            echo 'use_lockfile = true'
+            echo 'encrypt      = true'
           } > backend.hcl
           {
             echo 'state_bucket_arn     = "${{ vars.TF_STATE_BUCKET_ARN }}"'
@@ -109,11 +109,11 @@ jobs:
       - name: Materialize backend + tfvars (gitignored, account-specific — see infra/README.md)
         run: |
           {
-            echo 'bucket         = "${{ vars.TF_STATE_BUCKET_NAME }}"'
-            echo 'key            = "ninjago-scanner/prod/terraform.tfstate"'
-            echo 'region         = "${{ vars.AWS_REGION }}"'
-            echo 'dynamodb_table = "${{ vars.TF_STATE_LOCK_TABLE_NAME }}"'
-            echo 'encrypt        = true'
+            echo 'bucket       = "${{ vars.TF_STATE_BUCKET_NAME }}"'
+            echo 'key          = "ninjago-scanner/prod/terraform.tfstate"'
+            echo 'region       = "${{ vars.AWS_REGION }}"'
+            echo 'use_lockfile = true'
+            echo 'encrypt      = true'
           } > backend.hcl
           {
             echo 'state_bucket_arn     = "${{ vars.TF_STATE_BUCKET_ARN }}"'
