@@ -101,3 +101,10 @@ If a single photo's analysis fails at the transport level (the Gemini API never 
 #### Scenario: Mixed batch outcome
 - **WHEN** a batch contains images that are newly analyzed as `ok`, `uncertain`, and `failed`, plus images skipped because a sidecar already existed
 - **THEN** `total_images` equals the total number of supported image files found, `processed` counts every image that was analyzed (not skipped), `skipped` counts images left untouched, and `uncertain`/`failed` count the subset of processed images with those statuses
+
+### Requirement: Scan operates within one collection
+`Scan` SHALL restrict its batch processing — validating prerequisites, enumerating images, analyzing, and reporting — to the photos belonging to the given `collection_id`, and SHALL NOT process or report on photos belonging to any other collection.
+
+#### Scenario: Scanning one collection does not touch another
+- **WHEN** `Scan` is invoked with a `collection_id` for a collection that has unanalyzed photos, while a different collection also has unanalyzed photos
+- **THEN** only the specified collection's photos are analyzed, and the returned `ScanSummary` counts do not include the other collection's photos

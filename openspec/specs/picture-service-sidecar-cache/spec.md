@@ -31,3 +31,10 @@ Whenever a sidecar is created or updated by any operation (photo scanning, a sid
 #### Scenario: Multiple writes to the same sidecar over time
 - **WHEN** a sidecar is written more than once (for example an initial scan followed by a manual edit)
 - **THEN** a read requested after the second write returns the second write's content, not the first
+
+### Requirement: Cache entries are keyed by collection and photo together
+The system SHALL key each in-memory cache entry by the combination of `collection_id` and photo identifier, so that a read scoped to one collection is never served from another collection's cached entry, even if the same photo identifier exists in both.
+
+#### Scenario: Same photo identifier in two collections is cached independently
+- **WHEN** sidecar data is read for the same photo identifier in two different collections
+- **THEN** each collection's read is served from (and populates) its own cache entry, and neither reflects the other collection's data
