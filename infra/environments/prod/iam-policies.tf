@@ -56,9 +56,14 @@ locals {
 # lock exactly like `apply` does, even though it changes nothing in AWS.
 data "aws_iam_policy_document" "backend_access" {
   statement {
-    sid       = "StateObjectReadWrite"
-    effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:PutObject"]
+    sid    = "StateObjectReadWrite"
+    effect = "Allow"
+    # DeleteObject is for the state lockfile (`use_lockfile = true`): a
+    # `.tflock` object is created under this same prefix and deleted again
+    # when the lock is released. Without it, apply/plan can acquire the lock
+    # but fails with AccessDenied releasing it, leaving an orphaned lockfile
+    # that blocks every subsequent run until force-unlocked.
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
     resources = ["${var.state_bucket_arn}/${var.project_name}/${var.environment}/*"]
   }
 
