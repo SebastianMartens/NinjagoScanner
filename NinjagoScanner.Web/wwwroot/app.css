@@ -1288,7 +1288,7 @@ h1:focus {
 /* ===== Gallery page ===== */
 
 .gallery-page {
-    max-width: 1500px;
+    max-width: 4400px;
     margin: 0 auto;
     padding: 2rem 1.5rem 3rem;
 }
@@ -1348,7 +1348,7 @@ h1:focus {
 }
 
 .gallery-grid-standard {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
 }
 
 .gallery-grid-puzzle {
