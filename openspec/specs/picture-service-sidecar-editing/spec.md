@@ -28,12 +28,12 @@ If a sidecar file already exists, `UpdateSidecar` SHALL merge the requested valu
 - **WHEN** the `UpdateSidecar` request's detected text list contains blank or whitespace-only entries
 - **THEN** those entries are dropped and the remaining entries are trimmed before being stored
 
-### Requirement: UpdateSetName creates a pending sidecar record if none exists
-If no sidecar file exists yet for the given image, `UpdateSetName` SHALL create one with `AnalysisStatus` `pending` before setting its set name.
+### Requirement: UpdateSetName creates a sidecar record that reports as not-analyzed if none exists
+If no sidecar file exists yet for the given image, `UpdateSetName` SHALL create one before setting its set name. Until that image is analyzed, its analysis status SHALL be reported as `notAnalyzed` (see `picture-service-card-listing`'s not-analyzed fallback).
 
 #### Scenario: Setting the name of an unscanned image
 - **WHEN** `UpdateSetName` is called for an image with no existing sidecar file
-- **THEN** a new sidecar file is created with `AnalysisStatus` `pending` and the requested set name
+- **THEN** a new sidecar file is created with the requested set name, and subsequently reading that image's card entry reports `AnalysisStatus` `notAnalyzed`
 
 ### Requirement: UpdateSetName only changes the set name field
 If a sidecar file already exists, `UpdateSetName` SHALL update only its `SetName` field, leaving every other field (analysis status, card name, confidence, review status, etc.) unchanged.
@@ -42,12 +42,12 @@ If a sidecar file already exists, `UpdateSetName` SHALL update only its `SetName
 - **WHEN** `UpdateSetName` is called for an image with an existing sidecar
 - **THEN** only the sidecar's `SetName` is updated; `AnalysisStatus`, `ReviewStatus`, and all other fields keep their prior values
 
-### Requirement: UpdateCardNumber creates a pending sidecar record if none exists
-If no sidecar file exists yet for the given image, `UpdateCardNumber` SHALL create one with `AnalysisStatus` `pending` before setting its `CardNumber`.
+### Requirement: UpdateCardNumber creates a sidecar record that reports as not-analyzed if none exists
+If no sidecar file exists yet for the given image, `UpdateCardNumber` SHALL create one before setting its `CardNumber`. Until that image is analyzed, its analysis status SHALL be reported as `notAnalyzed` (see `picture-service-card-listing`'s not-analyzed fallback).
 
 #### Scenario: Correcting the card number of an unscanned image
 - **WHEN** `UpdateCardNumber` is called for an image with no existing sidecar file
-- **THEN** a new sidecar file is created with `AnalysisStatus` `pending` and the requested `CardNumber`
+- **THEN** a new sidecar file is created with the requested `CardNumber`, and subsequently reading that image's card entry reports `AnalysisStatus` `notAnalyzed`
 
 ### Requirement: UpdateCardNumber only changes the CardNumber field
 If a sidecar file already exists, `UpdateCardNumber` SHALL update only its `CardNumber` field, leaving every other field (analysis status, card name, set name, review status, etc.) unchanged.
@@ -60,12 +60,12 @@ If a sidecar file already exists, `UpdateCardNumber` SHALL update only its `Card
 - **WHEN** the `UpdateCardNumber` request's card number is empty or whitespace-only
 - **THEN** the sidecar's `CardNumber` field is stored as absent/null rather than as a blank string
 
-### Requirement: UpdateCardLanguage creates a pending sidecar record if none exists
-If no sidecar file exists yet for the given image, `UpdateCardLanguage` SHALL create one with `AnalysisStatus` `pending` before setting its `Language`.
+### Requirement: UpdateCardLanguage creates a sidecar record that reports as not-analyzed if none exists
+If no sidecar file exists yet for the given image, `UpdateCardLanguage` SHALL create one before setting its `Language`. Until that image is analyzed, its analysis status SHALL be reported as `notAnalyzed` (see `picture-service-card-listing`'s not-analyzed fallback).
 
 #### Scenario: Setting the language of an unscanned image
 - **WHEN** `UpdateCardLanguage` is called for an image with no existing sidecar file
-- **THEN** a new sidecar file is created with `AnalysisStatus` `pending` and the requested `Language`
+- **THEN** a new sidecar file is created with the requested `Language`, and subsequently reading that image's card entry reports `AnalysisStatus` `notAnalyzed`
 
 ### Requirement: UpdateCardLanguage only changes the Language field
 If a sidecar file already exists, `UpdateCardLanguage` SHALL update only its `Language` field, leaving every other field (analysis status, card name, card number, set name, review status, etc.) unchanged.
@@ -78,12 +78,12 @@ If a sidecar file already exists, `UpdateCardLanguage` SHALL update only its `La
 - **WHEN** the `UpdateCardLanguage` request's language is empty or whitespace-only
 - **THEN** the sidecar's `Language` field is stored as absent/null rather than as a blank string
 
-### Requirement: UpdateReviewStatus creates a pending sidecar record if none exists
-If no sidecar file exists yet for the given image, `UpdateReviewStatus` SHALL create one with `AnalysisStatus` `pending` before setting its `ReviewStatus`.
+### Requirement: UpdateReviewStatus creates a sidecar record that reports as not-analyzed if none exists
+If no sidecar file exists yet for the given image, `UpdateReviewStatus` SHALL create one before setting its `ReviewStatus`. Until that image is analyzed, its analysis status SHALL be reported as `notAnalyzed` (see `picture-service-card-listing`'s not-analyzed fallback).
 
 #### Scenario: Setting the review status of an unscanned image
 - **WHEN** `UpdateReviewStatus` is called for an image with no existing sidecar file
-- **THEN** a new sidecar file is created with `AnalysisStatus` `pending` and the requested `ReviewStatus`
+- **THEN** a new sidecar file is created with the requested `ReviewStatus`, and subsequently reading that image's card entry reports `AnalysisStatus` `notAnalyzed`
 
 ### Requirement: UpdateReviewStatus only changes the ReviewStatus field
 If a sidecar file already exists, `UpdateReviewStatus` SHALL update only its `ReviewStatus` field, leaving every other field (analysis status, card name, card number, set name, confidence, etc.) unchanged.
