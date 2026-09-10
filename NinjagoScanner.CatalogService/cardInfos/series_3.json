@@ -133,10 +133,10 @@
         {"Karten-Nr.": 119, "Name": "Auferstandener General Kozu"},
         {"Karten-Nr.": 120, "Name": "Auferstandener General Cryptor"},
         {"Karten-Nr.": 121, "Name": "Mächtige Nindroids"},
-        {"Karten-Nr.": 122, "Name": "Pythor Statue"},
-        {"Karten-Nr.": 123, "Name": "Böser Nebel"}
+        {"Karten-Nr.": 122, "Name": "Pythor Statue"}        
       ],
       "Action_Cards": [
+        {"Karten-Nr.": 123, "Name": "Böser Nebel"},
         {"Karten-Nr.": 124, "Name": "Handschellen"},
         {"Karten-Nr.": 125, "Name": "Über dem Abgrund"},
         {"Karten-Nr.": 126, "Name": "Achtung Steinschlag"},
