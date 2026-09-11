@@ -246,7 +246,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             if (element.TryGetProperty("Karten-Nr.", out var numberProperty)
                 && element.TryGetProperty("Name", out var nameProperty)
                 && numberProperty.ValueKind != JsonValueKind.Object
-                && nameProperty.ValueKind == JsonValueKind.String)
+                && nameProperty.ValueKind == JsonValueKind.Object)
             {
                 var number = numberProperty.ValueKind switch
                 {
@@ -255,7 +255,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                     _ => null
                 };
 
-                var name = nameProperty.GetString();
+                var name = ResolveCardName(nameProperty);
                 if (!string.IsNullOrWhiteSpace(number) && !string.IsNullOrWhiteSpace(name))
                 {
                     yield return (number, name, BuildCategoryLabel(categoryPath));
@@ -291,6 +291,25 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 }
             }
         }
+    }
+
+    private static string? ResolveCardName(JsonElement nameElement)
+    {
+        if (nameElement.TryGetProperty("de", out var germanProperty) && germanProperty.ValueKind == JsonValueKind.String)
+        {
+            var germanName = germanProperty.GetString();
+            if (!string.IsNullOrWhiteSpace(germanName))
+            {
+                return germanName;
+            }
+        }
+
+        if (nameElement.TryGetProperty("en", out var englishProperty) && englishProperty.ValueKind == JsonValueKind.String)
+        {
+            return englishProperty.GetString();
+        }
+
+        return null;
     }
 
     private static bool ShouldTrackCategory(string propertyName)

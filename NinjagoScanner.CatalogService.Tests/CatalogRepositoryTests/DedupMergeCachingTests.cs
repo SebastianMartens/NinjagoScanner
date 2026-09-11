@@ -14,8 +14,8 @@ public sealed class DedupMergeCachingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": "1", "Name": "Kai"},
-                {"Karten-Nr.": "01", "Name": "Kai"}
+                {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
+                {"Karten-Nr.": "01", "Name": {"de": "Kai"}}
               ]
             }
           }
@@ -28,13 +28,35 @@ public sealed class DedupMergeCachingTests : IDisposable
     }
 
     [Fact]
+    public void GetSnapshot_CollapsesEntries_WhenNameLanguageDiffersButResolvedNameMatches()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
+                {"Karten-Nr.": "01", "Name": {"en": "Kai"}}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var card = Assert.Single(repository.GetSnapshot().Cards);
+
+        Assert.Equal("Kai", card.CardName);
+    }
+
+    [Fact]
     public void GetSnapshot_BuildsSeriesEntry_FromDetailFile()
     {
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
             "Jahr": 2016,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
           }
         }
         """);
@@ -56,7 +78,7 @@ public sealed class DedupMergeCachingTests : IDisposable
             "Jahr": 2016,
             "Besonderheiten": ["Feature A"],
             "Sondereditionen": ["Edition A"],
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
           }
         }
         """);
@@ -77,7 +99,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
           }
         }
         """);
@@ -96,7 +118,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         var filePath = directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
           }
         }
         """);

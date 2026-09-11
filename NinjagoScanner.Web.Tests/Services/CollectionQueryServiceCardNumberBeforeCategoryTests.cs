@@ -24,11 +24,11 @@ public sealed class CollectionQueryServiceCardNumberBeforeCategoryTests : IAsync
             "SortOrder": 1,
             "Kategorien": {
               "Action_Cards": [
-                {"Karten-Nr.": 101, "Name": "First Action Card"}
+                {"Karten-Nr.": 101, "Name": {"de": "First Action Card"}}
               ],
               "Heroes": [
-                {"Karten-Nr.": 1, "Name": "First Hero"},
-                {"Karten-Nr.": 2, "Name": "Second Hero"}
+                {"Karten-Nr.": 1, "Name": {"de": "First Hero"}},
+                {"Karten-Nr.": 2, "Name": {"de": "Second Hero"}}
               ]
             }
           }

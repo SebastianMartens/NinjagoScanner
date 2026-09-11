@@ -15,7 +15,7 @@ public sealed class ParsingTests : IDisposable
             "Jahr": 2016,
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": 1, "Name": "Kai"}
+                {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
               ]
             }
           }
@@ -33,6 +33,48 @@ public sealed class ParsingTests : IDisposable
     }
 
     [Fact]
+    public void GetSnapshot_ResolvesCardName_PreferringGerman_WhenBothPresent()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": 1, "Name": {"de": "Kai", "en": "Fire Ninja"}}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var card = Assert.Single(repository.GetSnapshot().Cards);
+
+        Assert.Equal("Kai", card.CardName);
+    }
+
+    [Fact]
+    public void GetSnapshot_ResolvesCardName_FromEnglish_WhenGermanAbsent()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Good_Guys": [
+                {"Karten-Nr.": 1, "Name": {"en": "Kai"}}
+              ]
+            }
+          }
+        }
+        """);
+
+        var repository = directory.CreateRepository();
+        var card = Assert.Single(repository.GetSnapshot().Cards);
+
+        Assert.Equal("Kai", card.CardName);
+    }
+
+    [Fact]
     public void GetSnapshot_BuildsCategoryLabel_FromMultipleNestedLevels()
     {
         directory.WriteFile("series_1.json", """
@@ -41,7 +83,7 @@ public sealed class ParsingTests : IDisposable
             "Kategorien": {
               "Villains": {
                 "Sub_Bosses": [
-                  {"Karten-Nr.": 99, "Name": "Garmadon"}
+                  {"Karten-Nr.": 99, "Name": {"de": "Garmadon"}}
                 ]
               }
             }
@@ -61,7 +103,7 @@ public sealed class ParsingTests : IDisposable
     {
         directory.WriteFile("series_1.json", """
         {
-          "Serie_1": {"Karten-Nr.": 1, "Name": "Kai"}
+          "Serie_1": {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
         }
         """);
 
@@ -74,9 +116,10 @@ public sealed class ParsingTests : IDisposable
 
     [Theory]
     [InlineData("""{"Karten-Nr.": 1}""")]
-    [InlineData("""{"Name": "Kai"}""")]
-    [InlineData("""{"Karten-Nr.": "", "Name": "Kai"}""")]
-    [InlineData("""{"Karten-Nr.": 1, "Name": "   "}""")]
+    [InlineData("""{"Name": {"de": "Kai"}}""")]
+    [InlineData("""{"Karten-Nr.": "", "Name": {"de": "Kai"}}""")]
+    [InlineData("""{"Karten-Nr.": 1, "Name": {"de": "   "}}""")]
+    [InlineData("""{"Karten-Nr.": 1, "Name": {"pl": "Kai"}}""")]
     public void GetSnapshot_ExcludesEntries_MissingOrBlankCardNumberOrName(string cardJson)
     {
         directory.WriteFile("series_1.json", $$"""
@@ -106,7 +149,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "{{rawCategory}}": [
-                {"Karten-Nr.": 1, "Name": "Kai"}
+                {"Karten-Nr.": 1, "Name": {"de": "Kai"} }
               ]
             }
           }
@@ -136,7 +179,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "{{reservedKey}}": {
               "Karten-Nr.": 1,
-              "Name": "Should not be extracted as a card of a category named '{{reservedKey}}'"
+              "Name": {"de": "Should not be extracted as a card of a category named '{{reservedKey}}'"}
             }
           }
         }
@@ -162,7 +205,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_2": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": 1, "Name": "Zane"}
+                {"Karten-Nr.": 1, "Name": {"de": "Zane"}}
               ]
             }
           }
@@ -188,7 +231,7 @@ public sealed class ParsingTests : IDisposable
             "Besonderheiten": ["Highlight A", "Highlight B"],
             "Sondereditionen": ["Edition A"],
             "Kategorien": {
-              "Good_Guys": [ {"Karten-Nr.": 1, "Name": "Kai"} ]
+              "Good_Guys": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]
             }
           }
         }
@@ -213,7 +256,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Logo": 12345,
             "Kategorien": {
-              "Good_Guys": [ {"Karten-Nr.": 1, "Name": "Kai"} ]
+              "Good_Guys": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]
             }
           }
         }

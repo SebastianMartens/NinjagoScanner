@@ -24,7 +24,7 @@ public sealed class CollectionQueryServiceAnalysisStatusCountsTests : IAsyncLife
             "SortOrder": 2,
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": 4, "Name": "Cole"}
+                {"Karten-Nr.": 4, "Name": {"de": "Cole"}}
               ]
             }
           }

@@ -19,7 +19,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": "{{rawNumber}}", "Name": "Kai"}
+                {"Karten-Nr.": "{{rawNumber}}", "Name": {"de": "Kai"} }
               ]
             }
           }
@@ -40,13 +40,13 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": "XXL2", "Name": "XXL Two"},
-                {"Karten-Nr.": "OTHER1", "Name": "Other One"},
-                {"Karten-Nr.": "10", "Name": "Ten"},
-                {"Karten-Nr.": "LE3", "Name": "LE Three"},
-                {"Karten-Nr.": "2", "Name": "Two"},
-                {"Karten-Nr.": "LE1", "Name": "LE One"},
-                {"Karten-Nr.": "XXL1", "Name": "XXL One"}
+                {"Karten-Nr.": "XXL2", "Name": {"de": "XXL Two"}},
+                {"Karten-Nr.": "OTHER1", "Name": {"de": "Other One"}},
+                {"Karten-Nr.": "10", "Name": {"de": "Ten"}},
+                {"Karten-Nr.": "LE3", "Name": {"de": "LE Three"}},
+                {"Karten-Nr.": "2", "Name": {"de": "Two"}},
+                {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
+                {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}}
               ]
             }
           }
@@ -70,10 +70,10 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": "XXL1", "Name": "XXL One"},
-                {"Karten-Nr.": "AB1", "Name": "AB One"},
-                {"Karten-Nr.": "LE1", "Name": "LE One"},
-                {"Karten-Nr.": "1", "Name": "One"}
+                {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}},
+                {"Karten-Nr.": "AB1", "Name": {"de": "AB One"}},
+                {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
+                {"Karten-Nr.": "1", "Name": {"de": "One"}}
               ]
             }
           }
@@ -96,9 +96,9 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": "XXL1", "Name": "XXL One"},
-                {"Karten-Nr.": "1A2B", "Name": "Non Conforming"},
-                {"Karten-Nr.": "1", "Name": "One"}
+                {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}},
+                {"Karten-Nr.": "1A2B", "Name": {"de": "Non Conforming"}},
+                {"Karten-Nr.": "1", "Name": {"de": "One"}}
               ]
             }
           }
@@ -120,15 +120,15 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "B"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "B"}} ] }
           },
           "Serie_1": {
             "SortOrder": 10,
             "Kategorien": {
-              "Villains": [ {"Karten-Nr.": "1", "Name": "V-One"} ],
+              "Villains": [ {"Karten-Nr.": "1", "Name": {"de": "V-One"}} ],
               "Good_Guys": [
-                {"Karten-Nr.": "2", "Name": "G-Two"},
-                {"Karten-Nr.": "1", "Name": "A"}
+                {"Karten-Nr.": "2", "Name": {"de": "G-Two"}},
+                {"Karten-Nr.": "1", "Name": {"de": "A"}}
               ]
             }
           }
@@ -163,11 +163,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Action_Cards": [
-                {"Karten-Nr.": 101, "Name": "First Action Card"}
+                {"Karten-Nr.": 101, "Name": {"de": "First Action Card"}}
               ],
               "Heroes": [
-                {"Karten-Nr.": 1, "Name": "First Hero"},
-                {"Karten-Nr.": 2, "Name": "Second Hero"}
+                {"Karten-Nr.": 1, "Name": {"de": "First Hero"}},
+                {"Karten-Nr.": 2, "Name": {"de": "Second Hero"}}
               ]
             }
           }
@@ -189,11 +189,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
           }
         }
         """);
@@ -213,11 +213,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Ten"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Two"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
           }
         }
         """);
@@ -236,7 +236,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] }
           }
         }
         """);
@@ -260,7 +260,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
         directory.WriteFile("series_1.json", $$"""
         {
           "{{writtenName.Replace(' ', '_')}}": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": "Kai"} ] }
+            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] }
           }
         }
         """);

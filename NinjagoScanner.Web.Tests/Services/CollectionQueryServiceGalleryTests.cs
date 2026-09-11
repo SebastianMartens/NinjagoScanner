@@ -24,12 +24,12 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
             "SortOrder": 2,
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": 4, "Name": "Cole"},
-                {"Karten-Nr.": 5, "Name": "Zane"}
+                {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
+                {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
               ],
               "Puzzle_Cards": {
                 "Day_of_the_Departed": [
-                  {"Karten-Nr.": 6, "Name": "Puzzle1"}
+                  {"Karten-Nr.": 6, "Name": {"de": "Puzzle1"}}
                 ]
               }
             }
@@ -38,7 +38,7 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
             "SortOrder": 10,
             "Kategorien": {
               "Good_Guys": [
-                {"Karten-Nr.": 1, "Name": "Kai"}
+                {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
               ]
             }
           }
