@@ -1,0 +1,12 @@
+# Local-only observability tooling - not used by any deployed environment (Fly.io apps talk to
+# Grafana Cloud directly via OTEL_EXPORTER_OTLP_ENDPOINT/HEADERS secrets, see infra/README.md and
+# each project's fly.toml). This just runs the Aspire Dashboard so traces/metrics/logs can be
+# inspected locally without touching Grafana. See local-observability/README.md for setup.
+services:
+  aspire-dashboard:
+    build: ./local-observability
+    ports:
+      - "18888:18888" # dashboard UI - http://localhost:18888
+      - "18889:18889" # OTLP/gRPC (unused by this repo's services, exposed for completeness)
+      - "18890:18890" # OTLP/HTTP - what CatalogService/Web/PictureService(C#)/picture_service export
+    restart: unless-stopped

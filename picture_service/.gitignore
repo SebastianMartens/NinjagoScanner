@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Generated gRPC stubs - regenerate with `uv run python scripts/gen_proto.py`.
+# The .proto files under NinjagoScanner.*Service/Protos/ are the source of truth.
+src/picture_service/_generated/

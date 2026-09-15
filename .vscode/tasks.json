@@ -37,6 +37,21 @@
                 "${workspaceFolder}/NinjagoScanner.Web/NinjagoScanner.Web.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            // Uses the venv's own python.exe directly (not "uv run") since `uv` itself isn't
+            // guaranteed to be on PATH (it was pip-installed into a Python user site here, not a
+            // PATH-visible location) - the venv interpreter needs no PATH lookup at all.
+            "label": "picture-service: gen-proto",
+            "command": "${workspaceFolder}/picture_service/.venv/Scripts/python.exe",
+            "type": "process",
+            "args": [
+                "scripts/gen_proto.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/picture_service"
+            },
+            "problemMatcher": []
         }
     ]
 }

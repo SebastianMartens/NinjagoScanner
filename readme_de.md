@@ -24,15 +24,13 @@ Keine unordentlichen Kartenstapel mehr auf dem Tisch. Kein Blättern mehr durch 
 
 Der Rest dieses Dokuments beschreibt, wie das Projekt aufgebaut ist und wie du es selbst zum Laufen bringst.
 
-Dieses Repository enthaelt drei eigenstaendig lauffaehige .NET-10-Services, die per gRPC kommunizieren, jeweils mit einem passenden xunit-Testprojekt, alle ueber eine Solution gebaut.
+Dieses Repository enthaelt drei eigenstaendig lauffaehige Services, die per gRPC kommunizieren: zwei .NET-10-Services (jeweils mit einem passenden xunit-Testprojekt, ueber eine Solution gebaut) und ein Python-Service.
 
 - `NinjagoScanner.CatalogService`: gRPC-Microservice, der die Katalogdaten (`cardInfos/*.json`, im Service-Projekt enthalten) besitzt — Serien, Kategorien, Karten. Weiss nichts von Fotos oder Scanning.
-- `NinjagoScanner.PictureService`: gRPC-Microservice, der die Gemini-basierte KI-Analyse der Kartenfotos durchfuehrt und den Fotospeicher (ein S3-Bucket) sowie die Sidecar-Datensaetze (eine DynamoDB-Tabelle) besitzt. Fragt fuer den Serien-/Kartenabgleich ueber einen eigenen gRPC-Client den CatalogService — liest `cardInfos` nie lokal. Der einzige Service, der jemals AWS-Zugangsdaten besitzt.
+- `picture_service/`: Python-gRPC-Microservice (`uv`-verwaltet), der die Gemini-basierte KI-Analyse der Kartenfotos durchfuehrt und den Fotospeicher (ein S3-Bucket) sowie die Sidecar-Datensaetze (eine DynamoDB-Tabelle) besitzt. Fragt fuer den Serien-/Kartenabgleich ueber einen eigenen gRPC-Client den CatalogService — liest `cardInfos` nie lokal. Der einzige Service, der jemals AWS-Zugangsdaten besitzt.
 - `NinjagoScanner.Web`: die Blazor-Server-Anwendung, die tatsaechlich genutzt wird — Kartenkacheln, vollstaendige Listen-/Filter-/Detailansicht, Galerie, mobiler Foto-Upload, Foto-Review, Login und eine Info-Seite.
 
-Dazu kommt `NinjagoScanner.CardFotosMigration`, ein einmalig auszufuehrendes, rein kopierendes Konsolentool zur Migration eines alten lokalen `cardFotos`-Ordners (Bild + `.json`-Sidecar pro Foto) nach S3 + DynamoDB — nicht Teil des normalen Entwicklungs-/Run-Kreislaufs.
-
-Die Projektmappe im Root ist `NinjagoScanner.slnx` (keine `.sln`-Datei).
+Die .NET-Projektmappe im Root ist `NinjagoScanner.slnx` (keine `.sln`-Datei); `picture_service/` ist ein eigenstaendiges, `uv`-verwaltetes Python-Projekt ausserhalb davon.
 
 ### Projektstruktur
 
@@ -40,11 +38,9 @@ Die Projektmappe im Root ist `NinjagoScanner.slnx` (keine `.sln`-Datei).
 NinjagoScanner/
 |-- NinjagoScanner.CatalogService/
 |-- NinjagoScanner.CatalogService.Tests/
-|-- NinjagoScanner.PictureService/
-|-- NinjagoScanner.PictureService.Tests/
 |-- NinjagoScanner.Web/
 |-- NinjagoScanner.Web.Tests/
-|-- NinjagoScanner.CardFotosMigration/
+|-- picture_service/
 |-- infra/
 |-- openspec/
 |-- NinjagoScanner.slnx
@@ -53,14 +49,13 @@ NinjagoScanner/
 ### Voraussetzungen
 
 - .NET SDK 10
+- Python + [uv](https://docs.astral.sh/uv/) fuer `picture_service/`
 - Ein Gemini-API-Key fuer den PictureService
 - Fuer alles ueber lokales Ausprobieren hinaus: ein AWS-Konto mit einem S3-Bucket und einer DynamoDB-Tabelle — der PictureService hat keinen lokalen Dateisystem-Fallback (siehe [infra/](infra/README.md))
 
 ### Kartenfotos und Sidecar-Daten
 
-Die Bilddateien liegen in einem S3-Bucket, mit einer generierten Foto-ID als Schluessel (`photos/<photo_id>`). Sidecar-Datensaetze — das KI-Analyseergebnis plus alle manuellen Korrekturen (Serie, Kartennummer, Seltenheit, Review-Status usw.) — liegen in einer DynamoDB-Tabelle, ein Eintrag pro Foto-ID. Zur Laufzeit wird nichts mehr im lokalen Dateisystem geschrieben; der PictureService ist der einzige Service, der mit S3/DynamoDB spricht, ausschliesslich ueber `PhotoStore.cs` / `SidecarTable.cs`.
-
-Ein aelteres lokales Ordnerlayout (`cardFotos/<bild>` plus eine Sidecar-Datei `cardFotos/<bild>.json`) stammt aus der Zeit davor und wird von keinem laufenden Service mehr gelesen oder geschrieben. `NinjagoScanner.CardFotosMigration` existiert einzig dafuer, einen solchen Ordner einmalig nach S3 + DynamoDB zu migrieren.
+Die Bilddateien liegen in einem S3-Bucket, mit einer generierten Foto-ID als Schluessel (`photos/<photo_id>`). Sidecar-Datensaetze — das KI-Analyseergebnis plus alle manuellen Korrekturen (Serie, Kartennummer, Seltenheit, Review-Status usw.) — liegen in einer DynamoDB-Tabelle, ein Eintrag pro Foto-ID. Zur Laufzeit wird nichts mehr im lokalen Dateisystem geschrieben; der PictureService ist der einzige Service, der mit S3/DynamoDB spricht, ausschliesslich ueber `photo_store.py` / `sidecar_table.py`.
 
 ### CatalogService
 
@@ -103,18 +98,20 @@ Default-Adresse: `http://localhost:5073`
 
 Projektpfad:
 
-- [NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj](NinjagoScanner.PictureService/NinjagoScanner.PictureService.csproj)
+- [picture_service/](picture_service/) (Python, `uv`-verwaltet, nicht Teil von `NinjagoScanner.slnx`)
 
-Eigenstaendiger gRPC-Microservice. Fuehrt die Gemini-basierte KI-Analyse der Kartenfotos durch und besitzt den Fotospeicher (S3) sowie die Sidecar-Datensaetze (DynamoDB).
+Eigenstaendiger gRPC-Microservice (`grpc.aio`). Fuehrt die Gemini-basierte KI-Analyse der Kartenfotos durch und besitzt den Fotospeicher (S3) sowie die Sidecar-Datensaetze (DynamoDB).
 
 #### Starten
 
 ```powershell
-Set-Location NinjagoScanner.PictureService
-dotnet run
+Set-Location picture_service
+uv sync                              # Abhaengigkeiten installieren
+uv run python scripts/gen_proto.py   # gRPC-Stubs generieren (nicht committed - vor jedem Run/Test neu erzeugen)
+uv run python -m picture_service.main
 ```
 
-Laeuft standardmaessig unter `http://localhost:5169`.
+Laeuft standardmaessig unter `http://localhost:8080` (Umgebungsvariable `PORT`).
 
 #### gRPC-Endpunkte (`CardPictureService`)
 
@@ -131,19 +128,11 @@ Konfigurierbare Adresse (auf Seite der Webanwendung):
 - `PictureService:Address`
 - `PICTURE_SERVICE_ADDRESS`
 
-Default-Adresse: `http://localhost:5169`
+Default-Adresse: `http://localhost:8080`
 
 #### Gemini konfigurieren
 
-Empfohlen ueber User Secrets:
-
-```powershell
-Set-Location NinjagoScanner.PictureService
-dotnet user-secrets set "Gemini:ApiKey" "DEIN_KEY"
-dotnet user-secrets set "Gemini:Model" "gemini-2.5-flash"
-```
-
-Alternativ ueber Umgebungsvariablen:
+Nur ueber Umgebungsvariablen:
 
 ```powershell
 $env:GEMINI_API_KEY="DEIN_KEY"
@@ -152,23 +141,22 @@ $env:GEMINI_MODEL="gemini-2.5-flash"
 
 #### Speicher konfigurieren (S3 + DynamoDB)
 
-Es gibt keinen lokalen Dateisystem-Fallback — beides muss konfiguriert sein, und AWS-Zugangsdaten muessen ueber die Standard-Credential-Chain des AWS SDK aufloesbar sein (Umgebungsvariablen, Shared-Credentials-Datei, uebernommene Rolle usw.):
+Es gibt keinen lokalen Dateisystem-Fallback — alles davon muss als Umgebungsvariable konfiguriert sein, und AWS-Zugangsdaten muessen ueber die Standard-Credential-Chain des AWS SDK aufloesbar sein (Umgebungsvariablen, Shared-Credentials-Datei, uebernommene Rolle usw.):
 
-- `Storage:PhotosBucketName` / `PHOTOS_BUCKET_NAME` — der S3-Bucket fuer die Bilddaten
-- `Storage:SidecarTableName` / `SIDECAR_TABLE_NAME` — die DynamoDB-Tabelle fuer die Sidecar-Datensaetze
+- `PHOTOS_BUCKET_NAME` — der S3-Bucket fuer die Bilddaten
+- `SIDECAR_TABLE_NAME` — die DynamoDB-Tabelle fuer die Sidecar-Datensaetze
+- `AWS_REGION` — die AWS-Region fuer beides (Achtung: muss genau `AWS_REGION` heissen — botocores eigener Default liest nur `AWS_DEFAULT_REGION`, daher loest `picture_service` `AWS_REGION` selbst auf und gibt es explizit weiter)
 
 Siehe [infra/](infra/README.md) fuer das Terraform, das beides in AWS bereitstellt.
 
-#### Build
+#### Tests
 
 ```powershell
-Set-Location NinjagoScanner.PictureService
-dotnet build
+Set-Location picture_service
+uv run pytest
 ```
 
-Der Build-Ordner liegt standardmaessig unter:
-
-- `NinjagoScanner.PictureService\bin\Debug\net10.0`
+Voellig unabhaengig von der `dotnet test`-Suite weiter unten.
 
 ### Webanwendung
 
@@ -180,14 +168,14 @@ Blazor-Server-Anwendung (Interactive-Server-Rendering).
 
 #### Entwicklung starten
 
-Fuer den vollen Funktionsumfang (inkl. Gemini-Scan und Katalogdaten) muessen `NinjagoScanner.PictureService` und `NinjagoScanner.CatalogService` zusaetzlich laufen.
+Fuer den vollen Funktionsumfang (inkl. Gemini-Scan und Katalogdaten) muessen `picture_service` und `NinjagoScanner.CatalogService` zusaetzlich laufen.
 
 ```powershell
 Set-Location NinjagoScanner.Web
 dotnet run
 ```
 
-VS Code hat eine `Launch All (CatalogService + PictureService + Web)`-Compound-Launch-Konfiguration in `.vscode/`, die alle drei zusammen startet.
+VS Code hat eine `Launch All (CatalogService + PictureService + Web)`-Compound-Launch-Konfiguration in `.vscode/`, die alle drei zusammen startet (PictureService ueber einen Python-Launch-Eintrag — erfordert die `ms-python.debugpy`-Extension).
 
 #### Verfuegbare Seiten
 
@@ -207,7 +195,7 @@ Default: `Data/users.db` unter Windows, `/data/users.db` sonst.
 
 #### Mobiler Upload (Android)
 
-1. Starte die Webanwendung auf einem Rechner im lokalen Netzwerk (z. B. `dotnet run --urls "http://0.0.0.0:5000"`), mit CatalogService und PictureService ebenfalls laufend und erreichbar.
+1. Starte die Webanwendung auf einem Rechner im lokalen Netzwerk (z. B. `dotnet run --urls "http://0.0.0.0:5000"`), mit CatalogService und `picture_service` ebenfalls laufend und erreichbar.
 2. Oeffne die App auf dem Android-Handy ueber die LAN-Adresse des Rechners.
 3. Melde dich an, gehe auf `/upload` und waehle Kamera oder Galerie.
 4. Das Foto wird per Stream an den PictureService (`UploadPhoto`) uebertragen, der es in S3 speichert und automatisch den Gemini-Scan anstoesst — kein manueller Scan-Schritt noetig.
@@ -219,11 +207,13 @@ Optional kann die maximale Upload-Dateigroesse konfiguriert werden:
 
 ### Root-Build
 
-Das gesamte Repository kann ueber die Solution im Root gebaut werden:
+Die beiden .NET-Services/Tests koennen ueber die Solution im Root gebaut werden:
 
 ```powershell
 dotnet build NinjagoScanner.slnx
 ```
+
+`picture_service/` (Python) ist ein eigenstaendiges Projekt ausserhalb dieser Solution — siehe dessen eigene Build-/Test-Befehle oben.
 
 ### Tests
 
@@ -231,7 +221,7 @@ dotnet build NinjagoScanner.slnx
 dotnet test NinjagoScanner.slnx
 ```
 
-Die Tests nutzen xunit. `NinjagoScanner.Web.Tests` referenziert alle drei Anwendungsprojekte und startet In-Process-Testhosts fuer CatalogService/PictureService (`Fixtures/CatalogServiceTestHost.cs`, `Fixtures/PictureServiceTestHost.cs`), statt die gRPC-Aufrufe zu mocken. Ein einzelnes Testprojekt: `dotnet test NinjagoScanner.Web.Tests`; ein einzelner Test nach Name: `dotnet test NinjagoScanner.Web.Tests --filter "FullyQualifiedName~SomeTestName"`.
+Die Tests nutzen xunit. `NinjagoScanner.Web.Tests` referenziert die CatalogService- und Web-Anwendungsprojekte und startet In-Process-Testhosts fuer beide (`Fixtures/CatalogServiceTestHost.cs`, `Fixtures/PictureServiceTestHost.cs`), statt die gRPC-Aufrufe zu mocken — `PictureServiceTestHost` ist ein handgeschriebener Fake, der die generierte `CardPictureServiceBase` direkt implementiert, entkoppelt vom echten (Python-)PictureService; die `.proto`-Datei ist der einzige geteilte Vertrag. Ein einzelnes Testprojekt: `dotnet test NinjagoScanner.Web.Tests`; ein einzelner Test nach Name: `dotnet test NinjagoScanner.Web.Tests --filter "FullyQualifiedName~SomeTestName"`.
 
 ### Typische Probleme
 

@@ -4,7 +4,7 @@
 # long-lived access key instead — a real security posture downgrade vs. auto-rotated STS
 # credentials, accepted as a pragmatic trade-off for a personal-scale app. The policy below is
 # scoped as tightly as that trade-off allows: exactly the S3/DynamoDB actions PictureService's own
-# code calls (see NinjagoScanner.PictureService/PhotoStore.cs and SidecarTable.cs), on exactly the
+# code calls (see picture_service/src/picture_service/photo_store.py and sidecar_table.py), on exactly the
 # photo bucket's `photos/*` prefix and the sidecar table — nothing else, and no other service gets
 # an IAM user at all.
 

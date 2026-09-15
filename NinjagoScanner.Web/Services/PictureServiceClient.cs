@@ -154,7 +154,7 @@ internal sealed class PictureServiceClient
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
         var collectionId = await GetCollectionIdAsync(cancellationToken);
-        var response = await client.ListCardsAsync(
+         var response = await client.ListCardsAsync(
             new ListCardsRequest { CollectionId = collectionId },
             cancellationToken: cancellationToken);
 

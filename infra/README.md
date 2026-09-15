@@ -188,17 +188,17 @@ resource. After `terraform apply`:
 cd infra/environments/prod
 terraform output picture_service_access_key_id
 terraform output -raw picture_service_secret_access_key
-flyctl secrets set --config ../../../NinjagoScanner.PictureService/fly.toml `
+flyctl secrets set --config ../../../picture_service/fly.toml `
   AWS_ACCESS_KEY_ID=<value from the first output> `
   AWS_SECRET_ACCESS_KEY=<value from the second output>
 ```
 
-Also set PictureService's Gemini credentials and the bucket/table names the
-same way (`Gemini__ApiKey`, `Gemini__Model`, `Storage__PhotosBucketName` —
-from `terraform output photo_bucket_name` —, `Storage__SidecarTableName` —
-from `terraform output collection_sidecar_table_name`), matching how the
-Gemini key is already handled: never committed, set once as a secret on
-the running app.
+Also set PictureService's Gemini credentials the same way (`GEMINI_API_KEY`,
+`GEMINI_MODEL`), matching how the AWS keys are already handled: never
+committed, set once as a secret on the running app. The bucket/table names
+(`PHOTOS_BUCKET_NAME`/`SIDECAR_TABLE_NAME` — from `terraform output
+photo_bucket_name`/`collection_sidecar_table_name`) aren't secret and are
+set as plain `[env]` values in `picture_service/fly.toml` instead.
 
 ## Sidecar table history (add-collection-data-isolation migration)
 
@@ -224,7 +224,7 @@ IAM user above + the Terraform/CI plumbing around them) going forward.
 Compute now runs on Fly.io instead (`fly-hosting-migration`), but Fly
 resources are **not** managed by this Terraform config — `fly.toml` per
 project (`NinjagoScanner.Web/fly.toml`, `NinjagoScanner.CatalogService/fly.toml`,
-`NinjagoScanner.PictureService/fly.toml`) plus `flyctl` is Fly's own
+`picture_service/fly.toml`) plus `flyctl` is Fly's own
 first-party config-as-code, and is what this repo uses instead (see
 `openspec/changes/fly-hosting-migration/design.md` Decision 5 for why the
 unofficial Terraform Fly provider was rejected). See each project's

@@ -29,7 +29,15 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\catalog.proto" GrpcServices="Client" />
-    <Protobuf Include="Protos\picture_service.proto" GrpcServices="Client" />
+    <!--
+      "Both" (not just "Client") so NinjagoScanner.Web.Tests can implement CardPictureServiceBase
+      directly for its hand-written PictureService fake (see Fixtures/PictureServiceTestHost.cs),
+      without depending on NinjagoScanner.PictureService at all - the .proto file is the only
+      shared contract between Web and PictureService (which may not even be a .NET project).
+      The generated server base class is unused by the running Web app itself (Program.cs never
+      calls MapGrpcService for it) - Web only ever acts as a CardPictureService client.
+    -->
+    <Protobuf Include="Protos\picture_service.proto" GrpcServices="Both" />
   </ItemGroup>
 
   <ItemGroup>

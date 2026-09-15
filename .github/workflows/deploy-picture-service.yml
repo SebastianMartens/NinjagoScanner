@@ -1,18 +1,20 @@
-name: Deploy - NinjagoScanner.PictureService
+name: Deploy - picture_service
 
-# Task 5.1: deploy NinjagoScanner.PictureService to Fly.io on every push to main that touches it.
-# Uses fly.toml's repo-root-relative Dockerfile path (see NinjagoScanner.PictureService/fly.toml's
-# header comment) - `.` is passed explicitly as the build context so it doesn't default to the
-# fly.toml's own directory.
+# Deploys picture_service (Python) to Fly.io on every push to main that touches it. Runs the
+# pytest suite first - a failing test blocks the deploy. Uses fly.toml's repo-root-relative
+# Dockerfile path (see picture_service/fly.toml's header comment) - `.` is passed explicitly as
+# the build context so it doesn't default to the fly.toml's own directory.
 #
 # Requires a repo (or environment) secret: FLY_API_TOKEN (a Fly.io deploy token scoped to this
-# app - see infra/README.md). PictureService's Gemini and AWS credentials are set as Fly secrets
-# directly (`flyctl secrets set`), not through this workflow - see infra/README.md.
+# app - see infra/README.md). Gemini and AWS credentials are set as Fly secrets directly
+# (`flyctl secrets set`), not through this workflow - see infra/README.md.
 on:
   push:
     branches: [main]
     paths:
-      - "NinjagoScanner.PictureService/**"
+      - "picture_service/**"
+      - "NinjagoScanner.Web/Protos/**"
+      - "NinjagoScanner.CatalogService/Protos/**"
       - ".github/workflows/deploy-picture-service.yml"
   workflow_dispatch:
 
@@ -21,7 +23,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          working-directory: picture_service
+
+      - name: Install dependencies
+        working-directory: picture_service
+        run: uv sync --frozen
+
+      - name: Generate proto stubs
+        working-directory: picture_service
+        run: uv run python scripts/gen_proto.py
+
+      - name: Run tests
+        working-directory: picture_service
+        run: uv run pytest
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -30,6 +54,6 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy
-        run: flyctl deploy --config NinjagoScanner.PictureService/fly.toml .
+        run: flyctl deploy --config picture_service/fly.toml .
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

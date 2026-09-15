@@ -15,7 +15,11 @@
             "cwd": "${workspaceFolder}/NinjagoScanner.Web",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
             "console": "internalConsole",
-            "stopAtEntry": false
+            "stopAtEntry": false,
+            // Points at the Python PictureService's PORT (see "Python: Launch (PictureService)" below).
+            "env": {
+                "PICTURE_SERVICE_ADDRESS": "http://localhost:8090"
+            }
         },
         {
             "name": ".NET Core Launch (CatalogService)",
@@ -28,14 +32,32 @@
             "stopAtEntry": false
         },
         {
-            "name": ".NET Core Launch (PictureService)",
-            "type": "coreclr",
+            // Requires the "Python Debugger" (ms-python.debugpy) VS Code extension.
+            // Needs GEMINI_API_KEY set in the environment (not covered by this launch config -
+            // see README/CLAUDE.md); PHOTOS_BUCKET_NAME/SIDECAR_TABLE_NAME/AWS_REGION/AWS_PROFILE
+            // below match NinjagoScanner.PictureService's appsettings.Development.json.
+            "name": "Python: Launch (PictureService)",
+            "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/NinjagoScanner.PictureService/bin/Debug/net10.0/NinjagoScanner.PictureService.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/NinjagoScanner.PictureService",
+            "module": "picture_service.main",
+            "cwd": "${workspaceFolder}/picture_service",
+            "python": "${workspaceFolder}/picture_service/.venv/Scripts/python.exe",
+            "preLaunchTask": "picture-service: gen-proto",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/picture_service/src",
+                // Port 8080 is commonly taken locally (e.g. by other Docker containers) - use 8090 instead.
+                "PORT": "8090",
+                "PHOTOS_BUCKET_NAME": "ninjago-scanner-photos-612436161060",
+                "SIDECAR_TABLE_NAME": "ninjago-scanner-collection-sidecars",
+                "AWS_REGION": "eu-central-1",
+                "AWS_PROFILE": "terraform",
+                // Local Aspire Dashboard (docker compose up -d), not Grafana Cloud - see
+                // local-observability/README.md. Without this the OTel SDK falls back to its
+                // default localhost:4318, which nothing listens on, and traces/logs silently fail.
+                "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:18890"
+            },
             "console": "internalConsole",
-            "stopAtEntry": false
+            "justMyCode": true
         },
         {
             "name": ".NET Core Attach",
@@ -49,7 +71,7 @@
             "preLaunchTask": "build",
             "configurations": [
                 ".NET Core Launch (CatalogService)",
-                ".NET Core Launch (PictureService)",
+                "Python: Launch (PictureService)",
                 ".NET Core Launch (Web)"
             ],
             "stopAll": true

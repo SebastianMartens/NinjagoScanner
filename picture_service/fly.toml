@@ -1,0 +1,48 @@
+# Deploy from the repository root - the build context (`.`) must be repo root to match the
+# Dockerfile's COPY paths, but `dockerfile` above is resolved relative to this fly.toml's own
+# directory (flyctl quirk), not the build context:
+#   flyctl deploy --config picture_service/fly.toml .
+#
+# Reuses the existing "ninjago-scanner-picture-service" app name / .internal DNS address so
+# NinjagoScanner.Web's configured PictureService address doesn't change (see design.md's
+# Migration Plan) - this is a same-slot redeploy of the C# app's Fly machine, not a new app.
+#
+# Internal-only: no [http_service]/[[services]] block, so this app gets no public Fly IP.
+#
+# Health check hits the gRPC port directly with a TCP check (unlike the C# version's separate
+# HTTP/1.1 health-check port - grpc.aio serves plain HTTP/2 without Kestrel's ALPN constraint, so
+# a TCP check against the main port is enough and the port-split isn't needed here).
+#
+# Secrets (set via `flyctl secrets set`, not here): GEMINI_API_KEY, GEMINI_MODEL, and this
+# service's AWS access key/secret (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY - see
+# infra/modules/iam-user and infra/README.md).
+#
+# The existing C# deploy of this same app has these under .NET-style names (Storage__*,
+# Gemini__ApiKey) - those aren't read by this Python service (see config.py), so GEMINI_API_KEY
+# (and optionally GEMINI_MODEL) must be set fresh via `flyctl secrets set` before deploying.
+
+app = "ninjago-scanner-picture-service"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CATALOG_SERVICE_ADDRESS = "http://ninjago-scanner-catalog-service.internal:8080"
+  AWS_REGION = "eu-central-1"
+  PORT = "8080"
+  PHOTOS_BUCKET_NAME = "ninjago-scanner-photos-612436161060"
+  SIDECAR_TABLE_NAME = "ninjago-scanner-collection-sidecars"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[checks]
+  [checks.health]
+    port = 8080
+    type = "tcp"
+    interval = "15s"
+    timeout = "4s"
+    grace_period = "10s"
