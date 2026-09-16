@@ -89,6 +89,11 @@ data "aws_iam_policy_document" "manage_resources_core" {
     effect = "Allow"
     actions = [
       "s3:CreateBucket", "s3:DeleteBucket",
+      # ListBucket is what HeadBucket's existence check is authorized
+      # against — without it, S3 returns 403 (indistinguishable from the
+      # bucket not existing) and the aws_s3_bucket resource's refresh
+      # silently treats it as deleted, planning a doomed recreate.
+      "s3:ListBucket",
       "s3:GetBucket*", "s3:PutBucket*",
       "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration",
       "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
@@ -209,6 +214,10 @@ data "aws_iam_policy_document" "plan_only" {
     sid    = "StorageRead"
     effect = "Allow"
     actions = [
+      # See the matching comment on manage_resources_core's PhotoBucket
+      # statement: ListBucket is required for the HeadBucket existence
+      # check the aws_s3_bucket resource does on every refresh.
+      "s3:ListBucket",
       "s3:GetBucket*", "s3:GetLifecycleConfiguration", "s3:GetEncryptionConfiguration",
       "s3:GetBucketPolicy", "s3:GetBucketVersioning", "s3:GetBucketCORS",
       "s3:GetBucketPublicAccessBlock", "s3:GetBucketTagging",
