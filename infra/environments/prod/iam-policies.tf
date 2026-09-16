@@ -94,6 +94,11 @@ data "aws_iam_policy_document" "manage_resources_core" {
       # bucket not existing) and the aws_s3_bucket resource's refresh
       # silently treats it as deleted, planning a doomed recreate.
       "s3:ListBucket",
+      # aws_s3_bucket's refresh also reads several deprecated-but-still-
+      # computed attributes (acceleration, replication) whose API action
+      # names don't contain "Bucket", so "GetBucket*" doesn't cover them —
+      # same failure mode as ListBucket above, just a second AWS call in.
+      "s3:GetAccelerateConfiguration", "s3:GetReplicationConfiguration",
       "s3:GetBucket*", "s3:PutBucket*",
       "s3:GetLifecycleConfiguration", "s3:PutLifecycleConfiguration",
       "s3:GetEncryptionConfiguration", "s3:PutEncryptionConfiguration",
@@ -218,6 +223,10 @@ data "aws_iam_policy_document" "plan_only" {
       # statement: ListBucket is required for the HeadBucket existence
       # check the aws_s3_bucket resource does on every refresh.
       "s3:ListBucket",
+      # See the matching comment on manage_resources_core's PhotoBucket
+      # statement: these two API actions don't contain "Bucket" so
+      # "GetBucket*" doesn't cover them.
+      "s3:GetAccelerateConfiguration", "s3:GetReplicationConfiguration",
       "s3:GetBucket*", "s3:GetLifecycleConfiguration", "s3:GetEncryptionConfiguration",
       "s3:GetBucketPolicy", "s3:GetBucketVersioning", "s3:GetBucketCORS",
       "s3:GetBucketPublicAccessBlock", "s3:GetBucketTagging",
