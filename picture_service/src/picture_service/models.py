@@ -5,18 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-
+""" Analysis status represents if the photo was analyzed by AI, yet."""
 class AnalysisStatuses:
     OK = "ok"
-    UNCERTAIN = "uncertain"
-    FAILED = "failed"
-    NOT_ANALYZED = "notAnalyzed"
+    UNCERTAIN = "uncertain" # indicates that the AI is not confident about the analysis
+    FAILED = "failed" # usually indicates that the photo does not show a card
+    NOT_ANALYZED = "notAnalyzed" # photo not yet send to the AI analysis
 
 
 class ReviewStatuses:
     UNREVIEWED = "unreviewed"
-    VERIFIED = "verified"
-    INCORRECT = "incorrect"
+    VERIFIED = "verified" # a human verified that card number and series are correct (usually via "Review" page)
+    INCORRECT = "incorrect" # a human marked card numer/series as incorrect
 
 
 class Languages:

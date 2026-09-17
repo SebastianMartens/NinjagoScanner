@@ -1,4 +1,4 @@
-"""The CardPictureService gRPC servicer, ported RPC-by-RPC from PictureScannerGrpcService.cs."""
+"""The CardPictureService gRPC service, ported RPC-by-RPC from PictureScannerGrpcService.cs."""
 
 from __future__ import annotations
 
