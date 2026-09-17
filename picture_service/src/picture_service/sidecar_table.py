@@ -12,8 +12,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from datetime import datetime
 from decimal import Decimal
-
-import aioboto3
+from typing import Any
 
 from picture_service.models import SidecarRecord
 
@@ -41,63 +40,60 @@ _SCANNED_AT_UTC_ATTR = "ScannedAtUtc"
 
 
 class SidecarTable:
-    def __init__(self, session: aioboto3.Session, table_name: str, *, endpoint_url: str | None = None) -> None:
-        self._session = session
+    def __init__(self, dynamodb_resource: Any, table_name: str) -> None:
+        """`dynamodb_resource` is an already-open aioboto3 DynamoDB resource, held for the
+        caller's lifetime (see main.py's `_serve`) rather than opened fresh per call - a fresh
+        resource per call was the picture-service-aws-client-reuse regression this replaced."""
+        self._dynamodb = dynamodb_resource
         self._table_name = table_name
-        self._endpoint_url = endpoint_url
 
-    def _resource(self):
-        return self._session.resource("dynamodb", endpoint_url=self._endpoint_url)
+    async def _table(self):
+        return await self._dynamodb.Table(self._table_name)
 
     async def get(self, collection_id: str, photo_id: str) -> SidecarRecord | None:
-        async with self._resource() as dynamodb:
-            table = await dynamodb.Table(self._table_name)
-            response = await table.get_item(
-                Key={_COLLECTION_ID_ATTR: collection_id, _PHOTO_ID_ATTR: photo_id}
-            )
-            item = response.get("Item")
-            return None if item is None else _from_item(item)
+        table = await self._table()
+        response = await table.get_item(
+            Key={_COLLECTION_ID_ATTR: collection_id, _PHOTO_ID_ATTR: photo_id}
+        )
+        item = response.get("Item")
+        return None if item is None else _from_item(item)
 
     async def put(self, collection_id: str, photo_id: str, record: SidecarRecord) -> None:
         item = _to_item(collection_id, photo_id, record)
-        async with self._resource() as dynamodb:
-            table = await dynamodb.Table(self._table_name)
-            await table.put_item(Item=item)
+        table = await self._table()
+        await table.put_item(Item=item)
 
     async def delete(self, collection_id: str, photo_id: str) -> None:
-        async with self._resource() as dynamodb:
-            table = await dynamodb.Table(self._table_name)
-            await table.delete_item(Key={_COLLECTION_ID_ATTR: collection_id, _PHOTO_ID_ATTR: photo_id})
+        table = await self._table()
+        await table.delete_item(Key={_COLLECTION_ID_ATTR: collection_id, _PHOTO_ID_ATTR: photo_id})
 
     async def list_by_collection(self, collection_id: str) -> AsyncIterator[tuple[str, SidecarRecord]]:
-        async with self._resource() as dynamodb:
-            table = await dynamodb.Table(self._table_name)
-            last_evaluated_key = None
-            while True:
-                kwargs = {"KeyConditionExpression": "CollectionId = :cid", "ExpressionAttributeValues": {":cid": collection_id}}
-                if last_evaluated_key is not None:
-                    kwargs["ExclusiveStartKey"] = last_evaluated_key
-                response = await table.query(**kwargs)
-                for item in response.get("Items", []):
-                    yield item[_PHOTO_ID_ATTR], _from_item(item)
-                last_evaluated_key = response.get("LastEvaluatedKey")
-                if last_evaluated_key is None:
-                    break
+        table = await self._table()
+        last_evaluated_key = None
+        while True:
+            kwargs = {"KeyConditionExpression": "CollectionId = :cid", "ExpressionAttributeValues": {":cid": collection_id}}
+            if last_evaluated_key is not None:
+                kwargs["ExclusiveStartKey"] = last_evaluated_key
+            response = await table.query(**kwargs)
+            for item in response.get("Items", []):
+                yield item[_PHOTO_ID_ATTR], _from_item(item)
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if last_evaluated_key is None:
+                break
 
     async def list_all(self) -> AsyncIterator[tuple[str, str, SidecarRecord]]:
-        async with self._resource() as dynamodb:
-            table = await dynamodb.Table(self._table_name)
-            last_evaluated_key = None
-            while True:
-                kwargs = {}
-                if last_evaluated_key is not None:
-                    kwargs["ExclusiveStartKey"] = last_evaluated_key
-                response = await table.scan(**kwargs)
-                for item in response.get("Items", []):
-                    yield item[_COLLECTION_ID_ATTR], item[_PHOTO_ID_ATTR], _from_item(item)
-                last_evaluated_key = response.get("LastEvaluatedKey")
-                if last_evaluated_key is None:
-                    break
+        table = await self._table()
+        last_evaluated_key = None
+        while True:
+            kwargs = {}
+            if last_evaluated_key is not None:
+                kwargs["ExclusiveStartKey"] = last_evaluated_key
+            response = await table.scan(**kwargs)
+            for item in response.get("Items", []):
+                yield item[_COLLECTION_ID_ATTR], item[_PHOTO_ID_ATTR], _from_item(item)
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if last_evaluated_key is None:
+                break
 
 
 def _to_item(collection_id: str, photo_id: str, record: SidecarRecord) -> dict:

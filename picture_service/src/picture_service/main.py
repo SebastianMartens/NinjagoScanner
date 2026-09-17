@@ -9,6 +9,7 @@ Fly.io health-check setup).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import signal
@@ -99,36 +100,41 @@ async def _serve() -> None:
     health_check_port_raw = os.environ.get("HEALTH_CHECK_PORT")
 
     session = aioboto3.Session(region_name=resolve_aws_region())
-    photo_store = PhotoStore(session, resolve_photos_bucket_name())
-    sidecar_table = SidecarTable(session, resolve_sidecar_table_name())
-    sidecar_cache = SidecarCache(sidecar_table)
 
-    server = grpc.aio.server()
-    pb2_grpc.add_CardPictureServiceServicer_to_server(PictureScannerService(sidecar_cache, photo_store), server)
-    server.add_insecure_port(f"[::]:{grpc_port}")
+    async with contextlib.AsyncExitStack() as aws_clients:
+        s3_client = await aws_clients.enter_async_context(session.client("s3"))
+        dynamodb_resource = await aws_clients.enter_async_context(session.resource("dynamodb"))
 
-    liveness_server = None
-    if health_check_port_raw:
-        liveness_server = await asyncio.start_server(_handle_liveness_connection, "::", int(health_check_port_raw))
+        photo_store = PhotoStore(s3_client, resolve_photos_bucket_name())
+        sidecar_table = SidecarTable(dynamodb_resource, resolve_sidecar_table_name())
+        sidecar_cache = SidecarCache(sidecar_table)
 
-    await server.start()
-    logger.info("PictureService listening on port %s", grpc_port)
+        server = grpc.aio.server()
+        pb2_grpc.add_CardPictureServiceServicer_to_server(PictureScannerService(sidecar_cache, photo_store), server)
+        server.add_insecure_port(f"[::]:{grpc_port}")
 
-    stop_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            loop.add_signal_handler(sig, stop_event.set)
-        except NotImplementedError:
-            # Windows' ProactorEventLoop doesn't support add_signal_handler - only relevant for
-            # local dev, since this service runs on Linux (Fly.io) in production.
-            signal.signal(sig, lambda *_: stop_event.set())
+        liveness_server = None
+        if health_check_port_raw:
+            liveness_server = await asyncio.start_server(_handle_liveness_connection, "::", int(health_check_port_raw))
 
-    await stop_event.wait()
+        await server.start()
+        logger.info("PictureService listening on port %s", grpc_port)
 
-    if liveness_server is not None:
-        liveness_server.close()
-    await server.stop(grace=5)
+        stop_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(sig, stop_event.set)
+            except NotImplementedError:
+                # Windows' ProactorEventLoop doesn't support add_signal_handler - only relevant for
+                # local dev, since this service runs on Linux (Fly.io) in production.
+                signal.signal(sig, lambda *_: stop_event.set())
+
+        await stop_event.wait()
+
+        if liveness_server is not None:
+            liveness_server.close()
+        await server.stop(grace=5)
 
 
 def main() -> None:

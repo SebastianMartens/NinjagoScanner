@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+
 import aioboto3
 import pytest_asyncio
 
@@ -7,10 +9,10 @@ BUCKET = "test-photos-bucket"
 
 
 @pytest_asyncio.fixture
-async def photo_store(aws_session: aioboto3.Session, aws_endpoint_url: str) -> PhotoStore:
+async def photo_store(aws_session: aioboto3.Session, aws_endpoint_url: str) -> AsyncIterator[PhotoStore]:
     async with aws_session.client("s3", endpoint_url=aws_endpoint_url) as s3:
         await s3.create_bucket(Bucket=BUCKET)
-    return PhotoStore(aws_session, BUCKET, endpoint_url=aws_endpoint_url)
+        yield PhotoStore(s3, BUCKET)
 
 
 def test_build_object_key_uses_photos_prefix_and_collection():

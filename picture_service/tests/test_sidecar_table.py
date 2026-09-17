@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
 import aioboto3
@@ -10,7 +11,7 @@ TABLE_NAME = "test-sidecar-table"
 
 
 @pytest_asyncio.fixture
-async def sidecar_table(aws_session: aioboto3.Session, aws_endpoint_url: str) -> SidecarTable:
+async def sidecar_table(aws_session: aioboto3.Session, aws_endpoint_url: str) -> AsyncIterator[SidecarTable]:
     async with aws_session.resource("dynamodb", endpoint_url=aws_endpoint_url) as dynamodb:
         await dynamodb.create_table(
             TableName=TABLE_NAME,
@@ -24,7 +25,7 @@ async def sidecar_table(aws_session: aioboto3.Session, aws_endpoint_url: str) ->
             ],
             BillingMode="PAY_PER_REQUEST",
         )
-    return SidecarTable(aws_session, TABLE_NAME, endpoint_url=aws_endpoint_url)
+        yield SidecarTable(dynamodb, TABLE_NAME)
 
 
 async def test_get_missing_returns_none(sidecar_table: SidecarTable):
