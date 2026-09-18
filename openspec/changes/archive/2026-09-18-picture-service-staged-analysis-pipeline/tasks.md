@@ -58,5 +58,5 @@
 - [x] 10.3 Rewrite `test_card_analysis_stage_3.py` for the new rules and move the pipeline fixtures (`test_gemini_service.py`, `test_picture_scanner_service.py`) to derived `card_number`/`card_name`
 - [x] 10.4 Update `picture-service-catalog-matching` (rewritten) and remove `picture-service-series-name-matching` in the change's delta specs, plus design.md/proposal.md
 - [x] 10.5 Run `uv run pytest` in `picture_service/` and verify all tests pass
-- [ ] 10.6 Follow-up: `catalog-service-card-class` must ship (and `catalog_client.py` read `class`) before class scoring and the class-mismatch rule have any effect; `load_series_catalog` is no longer used by stage 3 and could be dropped from `CatalogSnapshot`
-- [ ] 10.7 Follow-up: tune the score weights/thresholds against real photos
+- [x] 10.6 Follow-up: `catalog-service-card-class` must ship (and `catalog_client.py` read `class`) before class scoring and the class-mismatch rule have any effect; `load_series_catalog` is no longer used by stage 3 and could be dropped from `CatalogSnapshot`
+- [x] 10.7 Follow-up: tune the score weights/thresholds against real photos

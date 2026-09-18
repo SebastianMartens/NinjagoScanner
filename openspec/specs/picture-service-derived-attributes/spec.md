@@ -1,0 +1,54 @@
+# picture-service-derived-attributes Specification
+
+## Purpose
+
+Defines the second stage of card analysis: a text-only Gemini call that infers a coarse card class and other derived attributes from the first stage's detected attributes, without re-examining the photo.
+
+## Requirements
+
+### Requirement: Derived-attribute request is text-only and does not include the photo
+Each derived-attribute request SHALL be built from the attribute-detection stage's key-value output as text, and SHALL NOT include the photo's image data.
+
+#### Scenario: Request built from detected attributes
+- **WHEN** derived attributes are computed for a photo that was successfully analyzed by attribute detection
+- **THEN** the request sent to the Gemini API contains the detected attributes as text content and no image data
+
+#### Scenario: Derivation does not run without detected attributes
+- **WHEN** attribute detection failed for a photo (transport-level or content-level)
+- **THEN** the derived-attributes stage does not run for that photo
+
+### Requirement: Derived attributes are a generic, flat key-value map
+The parsed result of a successful derived-attributes call SHALL be a map of string keys to scalar values (string, number, or boolean), on the same terms as attribute detection's output (see `picture-service-attribute-detection`).
+
+#### Scenario: Successful derivation produces a key-value map
+- **WHEN** the Gemini API returns a successful, parseable response to a derived-attributes request
+- **THEN** the derived-attributes result is a flat map of keys to scalar values
+
+### Requirement: Derived class is one of the catalog's fixed class values
+When the derived attributes include a `class` value, it SHALL be one of the catalog's fixed set of card classes (`character`, `action`, `vehicle`, `puzzle-piece`, `trap`, `limited edition`, `art`). A value outside this set SHALL be treated as if no class was derived, not passed through as-is.
+
+#### Scenario: Recognized class value
+- **WHEN** the derived attributes include a `class` value matching one of the fixed set
+- **THEN** that value is kept as the derived class
+
+#### Scenario: Unrecognized class value
+- **WHEN** the derived attributes include a `class` value that does not match any value in the fixed set
+- **THEN** the derived class is treated as absent rather than storing the unrecognized value
+
+### Requirement: Transient failures are retried with increasing delay
+If the Gemini API call underlying derived-attribute computation fails with a retryable condition (rate limiting or a server error), the call SHALL be retried up to the configured maximum number of attempts, waiting `retry_delay_ms * attempt` between attempts. A non-retryable failure SHALL fail immediately without retrying.
+
+#### Scenario: Rate limited then succeeds
+- **WHEN** the underlying call is rate-limited on an early attempt and succeeds on a later attempt within the configured attempt limit
+- **THEN** the call is retried after waiting `retry_delay_ms * attempt` and the eventual successful response is used
+
+#### Scenario: Retries exhausted
+- **WHEN** the underlying call fails with a retryable condition on every attempt up to the configured maximum
+- **THEN** derived-attribute computation fails with a transport-level failure and no further attempts are made
+
+### Requirement: A failure result indicates whether Gemini evaluated the input
+Every failed derived-attributes result SHALL indicate whether the failure is transport-level (Gemini never produced a response) or content-level (Gemini returned a response, but it was unusable or malformed).
+
+#### Scenario: Malformed or empty model output
+- **WHEN** the call succeeds but the response contains no usable text, or the text cannot be parsed into a flat key-value map
+- **THEN** the failure result is marked as a content-level failure, with a descriptive error message and the raw model text preserved for diagnostics
