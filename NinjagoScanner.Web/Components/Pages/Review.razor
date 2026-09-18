@@ -1,5 +1,6 @@
 @page "/review"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Grpc.Core
 @inject CatalogServiceClient CatalogServiceClient
 @inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
@@ -158,15 +159,6 @@
 								}
 								else
 								{
-									<span>Confidence: @details.Confidence.ToString("0.00")</span>
-									@if (!string.IsNullOrWhiteSpace(details.ReasoningSummary))
-									{
-										<span>Begruendung: @details.ReasoningSummary</span>
-									}
-									@if (details.DetectedText.Count > 0)
-									{
-										<span>Erkannter Text: @string.Join(", ", details.DetectedText)</span>
-									}
 									@if (!string.IsNullOrWhiteSpace(details.ErrorMessage))
 									{
 										<span>Fehler: @details.ErrorMessage</span>
@@ -175,13 +167,25 @@
 									{
 										<span>Gescannt: @details.ScannedAtUtc.Value.LocalDateTime</span>
 									}
+									@if (!string.IsNullOrWhiteSpace(details.AttributesJson))
+									{
+										<pre class="review-attributes-json">@details.AttributesJson</pre>
+									}
 								}
 							</div>
 						}
 
 						<div class="review-photo-actions">
+							<button class="review-btn" type="button" disabled="@isBusy" @onclick="() => ReanalyzeAsync(photo)">
+								@(IsReanalyzing(photo) ? "Analysiere..." : "Neu analysieren")
+							</button>
 							<button class="review-btn review-btn-danger" type="button" disabled="@isBusy" @onclick="() => RequestDeletePhoto(photo)">Löschen</button>
 						</div>
+
+						@if (reanalysisErrors.TryGetValue(photo.PhotoId, out var reanalysisError))
+						{
+							<p class="review-reanalysis-error" role="alert">@reanalysisError</p>
+						}
 					</div>
 				</article>
 			}
@@ -240,6 +244,10 @@
 	private bool isLoading = true;
 	private bool isConfirmingAll;
 	private string? busyPhotoId;
+	// Re-analysis takes seconds, so several can be in flight at once (one per tile) - unlike
+	// busyPhotoId, which only tracks the single quick action currently running.
+	private readonly HashSet<string> reanalyzingPhotoIds = new(StringComparer.Ordinal);
+	private readonly Dictionary<string, string> reanalysisErrors = new(StringComparer.Ordinal);
 	private CardListItem? photoPendingDeletion;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
@@ -334,7 +342,14 @@
 
 	private bool IsBusy(CardListItem photo)
 	{
-		return isConfirmingAll || string.Equals(busyPhotoId, photo.PhotoId, StringComparison.Ordinal);
+		return isConfirmingAll
+			|| string.Equals(busyPhotoId, photo.PhotoId, StringComparison.Ordinal)
+			|| IsReanalyzing(photo);
+	}
+
+	private bool IsReanalyzing(CardListItem photo)
+	{
+		return reanalyzingPhotoIds.Contains(photo.PhotoId);
 	}
 
 	private bool IsExpanded(CardListItem photo)
@@ -451,24 +466,77 @@
 	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
 	{
 		busyPhotoId = photo.PhotoId;
-		var previousIndex = currentIndex;
 
 		try
 		{
 			await action();
-
-			var key = CurrentGroup?.Key;
-			groups = await CollectionQueryService.GetReviewGroupsAsync();
-			SyncCardNumberDrafts();
-
-			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
-				? index
-				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
+			await ReloadGroupsKeepingPositionAsync();
 		}
 		finally
 		{
 			busyPhotoId = null;
 		}
+	}
+
+	/// <summary>
+	/// Reloads the group list and stays on the group currently shown if it still exists,
+	/// otherwise on the group now at (or, past the end, nearest to) the same position.
+	/// </summary>
+	private async Task ReloadGroupsKeepingPositionAsync()
+	{
+		var previousIndex = currentIndex;
+		var key = CurrentGroup?.Key;
+
+		groups = await CollectionQueryService.GetReviewGroupsAsync();
+		SyncCardNumberDrafts();
+
+		currentIndex = key is not null && TryFindGroupIndex(key, out var index)
+			? index
+			: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
+	}
+
+	private async Task ReanalyzeAsync(CardListItem photo)
+	{
+		if (!reanalyzingPhotoIds.Add(photo.PhotoId))
+		{
+			return;
+		}
+
+		reanalysisErrors.Remove(photo.PhotoId);
+
+		try
+		{
+			try
+			{
+				await PictureServiceClient.ReanalyzePhotoAsync(photo.PhotoId);
+			}
+			catch (Exception exception) when (exception is not OperationCanceledException)
+			{
+				reanalysisErrors[photo.PhotoId] = GetReanalysisErrorMessage(exception);
+				return;
+			}
+
+			// Details are cached per photo on first expand; drop the now-stale entry and, if the
+			// tile is open, fetch the new one right away.
+			photoDetails.Remove(photo.PhotoId);
+			if (IsExpanded(photo))
+			{
+				photoDetails[photo.PhotoId] = await PictureServiceClient.GetCardDetailsAsync(photo.PhotoId);
+			}
+
+			await ReloadGroupsKeepingPositionAsync();
+		}
+		finally
+		{
+			reanalyzingPhotoIds.Remove(photo.PhotoId);
+		}
+	}
+
+	internal static string GetReanalysisErrorMessage(Exception exception)
+	{
+		return exception is RpcException { StatusCode: StatusCode.Unavailable or StatusCode.FailedPrecondition }
+			? "Die Neu-Analyse ist gerade nicht möglich (Dienst nicht erreichbar oder nicht konfiguriert). Bitte später erneut versuchen."
+			: "Die Neu-Analyse ist fehlgeschlagen.";
 	}
 
 	private void RequestDeletePhoto(CardListItem photo)
@@ -500,25 +568,7 @@
 
 	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)
 	{
-		busyPhotoId = photo.PhotoId;
-		var previousIndex = currentIndex;
-
-		try
-		{
-			await PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName);
-
-			var key = CurrentGroup?.Key;
-			groups = await CollectionQueryService.GetReviewGroupsAsync();
-			SyncCardNumberDrafts();
-
-			currentIndex = key is not null && TryFindGroupIndex(key, out var index)
-				? index
-				: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
-		}
-		finally
-		{
-			busyPhotoId = null;
-		}
+		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName));
 	}
 
 	private async Task ConfirmAllAsync()

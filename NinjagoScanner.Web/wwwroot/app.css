@@ -1173,6 +1173,15 @@ h1:focus {
     margin-top: 0.7rem;
 }
 
+.review-reanalysis-error {
+    margin: 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    background: var(--cv-status-failed-bg);
+    color: var(--cv-status-failed-fg);
+    font-size: 0.8rem;
+}
+
 .review-delete-dialog-backdrop {
     position: fixed;
     inset: 0;
@@ -1277,6 +1286,14 @@ h1:focus {
     padding: 0.7rem;
     display: grid;
     gap: 0.35rem;
+}
+
+.review-attributes-json {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
 }
 
 .review-confirm-all {

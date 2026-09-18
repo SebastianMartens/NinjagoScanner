@@ -102,3 +102,33 @@ async def test_confidence_defaults_to_zero_when_absent(sidecar_table: SidecarTab
     result = await sidecar_table.get("col-1", "photo-1")
 
     assert result.confidence == 0.0
+
+
+async def test_detected_and_derived_round_trip(sidecar_table: SidecarTable):
+    record = SidecarRecord(
+        detected={"number_top_left": "1", "color_area": 0.5},
+        derived={"class": "character", "confident": True},
+    )
+
+    await sidecar_table.put("col-1", "photo-1", record)
+    result = await sidecar_table.get("col-1", "photo-1")
+
+    assert result.detected == {"number_top_left": "1", "color_area": 0.5}
+    assert result.derived == {"class": "character", "confident": True}
+
+
+async def test_reading_legacy_record_surfaces_empty_detected_and_derived(sidecar_table: SidecarTable):
+    """A record put before this change never wrote the Detected/Derived attributes at all -
+    simulated here by writing the item directly rather than through SidecarRecord, since
+    SidecarTable.put always reflects whatever the (already-updated) SidecarRecord carries."""
+    table = await sidecar_table._table()
+    await table.put_item(
+        Item={"CollectionId": "col-1", "PhotoId": "legacy-1", "AnalysisStatus": "ok", "CardName": "Kai"}
+    )
+
+    result = await sidecar_table.get("col-1", "legacy-1")
+
+    assert result.analysis_status == "ok"
+    assert result.card_name == "Kai"
+    assert result.detected is None
+    assert result.derived is None

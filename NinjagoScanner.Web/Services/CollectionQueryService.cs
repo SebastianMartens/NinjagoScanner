@@ -287,9 +287,7 @@ internal sealed class CollectionQueryService(
             SetName = NormalizeNullable(entry.SetName),
             Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
-            Confidence = details.Confidence,
-            ReasoningSummary = details.ReasoningSummary,
-            DetectedText = details.DetectedText,
+            AttributesJson = details.AttributesJson,
             ScannedAtUtc = details.ScannedAtUtc,
             ErrorMessage = details.ErrorMessage,
             ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed

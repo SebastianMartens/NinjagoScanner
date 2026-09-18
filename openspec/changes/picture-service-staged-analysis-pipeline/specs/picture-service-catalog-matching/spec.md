@@ -56,6 +56,25 @@ The sidecar's `Judged` section's analysis status SHALL be `failed` when attribut
 - **WHEN** both series and card number are confidently resolved
 - **THEN** the Judged analysis status is `ok` or `uncertain`, never `failed`
 
+### Requirement: Verified series and card number survive re-analysis
+When a photo that already has a sidecar is analyzed again and that sidecar's Review Status is `verified`, a human has already confirmed its series and card number, so analysis SHALL NOT judge them again. Attribute detection and derived-attribute computation SHALL still run and replace the `Detected` and `Derived` sections, but the `Judged` section's series name and card number SHALL keep their existing values instead of being resolved from the new attributes. The remaining Judged fields (card name, rarity, language) SHALL still be recomputed, with the card name taken from the catalog entry for the verified series and card number when one exists. A `verified` sidecar that has no series name or no card number has nothing to keep, and is analyzed like any other photo.
+
+#### Scenario: Re-analysis of a verified photo keeps series and card number
+- **WHEN** a photo whose sidecar has Review Status `verified`, series "Serie 1" and card number "1" is analyzed again, and the new attributes point to a different series and card number
+- **THEN** detection and derivation run again and replace the `Detected` and `Derived` sections, and the Judged series name and card number remain "Serie 1" and "1"
+
+#### Scenario: Verified photo is not failed for lack of a confident match
+- **WHEN** a `verified` photo is analyzed again and the new attributes would not confidently resolve any series or card number
+- **THEN** the Judged analysis status is `ok`, with the verified series and card number unchanged
+
+#### Scenario: Stage failure does not discard the verified series and card number
+- **WHEN** a `verified` photo is analyzed again and attribute detection or derived-attribute computation fails
+- **THEN** the Judged analysis status is `failed`, and the Judged series name and card number remain the verified values
+
+#### Scenario: Photos that are not verified are judged again
+- **WHEN** a photo whose Review Status is `unreviewed` or `incorrect` is analyzed again
+- **THEN** series and card number are resolved from the new attributes as for a first analysis
+
 ### Requirement: Unresolved matches preserve the raw guess rather than storing nothing
 When series or card number resolution fails to find a confident match, the Judged section's corresponding field SHALL still be populated with the best available raw guess from the detected/derived attributes (if any), rather than being left empty, so a human reviewer has something to correct from.
 

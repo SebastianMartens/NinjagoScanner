@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -14,14 +15,23 @@ from picture_service import catalog_client, gemini_service
 from picture_service._generated import picture_service_pb2 as pb2
 from picture_service._generated import picture_service_pb2_grpc as pb2_grpc
 from picture_service.config import SUPPORTED_EXTENSIONS, ScannerConfig
-from picture_service.models import AnalysisStatuses, CardAnalysisResult, Languages, ReviewStatuses, SidecarRecord, SeriesInfo, utc_now
+from picture_service.models import (
+    AnalysisStatuses,
+    CardAnalysisResult,
+    CatalogSnapshot,
+    Languages,
+    ReviewStatuses,
+    SidecarRecord,
+    VerifiedMatch,
+    utc_now,
+)
 from picture_service.photo_store import PhotoStore
 from picture_service.sidecar_cache import SidecarCache
 
 logger = logging.getLogger("picture_service")
 
-ModelFactory = Callable[[ScannerConfig], gemini_service.StructuredModel]
-CatalogLoader = Callable[[str], Awaitable[list[SeriesInfo]]]
+ModelFactory = Callable[[ScannerConfig, dict], gemini_service.StructuredModel]
+CatalogLoader = Callable[[str], Awaitable[CatalogSnapshot]]
 
 
 class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
@@ -31,12 +41,12 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         photo_store: PhotoStore,
         *,
         build_model: ModelFactory = gemini_service.build_chat_model,
-        load_series_catalog: CatalogLoader = catalog_client.load_series_catalog,
+        load_catalog_snapshot: CatalogLoader = catalog_client.load_catalog_snapshot,
     ) -> None:
         self._sidecar_cache = sidecar_cache
         self._photo_store = photo_store
         self._build_model = build_model
-        self._load_series_catalog = load_series_catalog
+        self._load_catalog_snapshot = load_catalog_snapshot
 
     # --- Scan (bulk backfill) ---
 
@@ -59,7 +69,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             return pb2.ScanSummary(has_configuration_error=True, message="GEMINI_API_KEY ist nicht gesetzt.")
 
         try:
-            series_catalog = await self._load_series_catalog(config.catalog_service_address)
+            catalog = await self._load_catalog_snapshot(config.catalog_service_address)
         except Exception:
             logger.exception("Katalog-Service unter %s nicht erreichbar", config.catalog_service_address)
             return pb2.ScanSummary(
@@ -67,15 +77,13 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                 message=f"Der CatalogService unter '{config.catalog_service_address}' ist nicht erreichbar.",
             )
 
-        if not series_catalog:
+        if not catalog.series:
             return pb2.ScanSummary(has_configuration_error=True, message="Der CatalogService hat keine Seriendaten geliefert.")
 
         photo_ids = sorted([photo_id async for photo_id in self._photo_store.list_photo_ids(request.collection_id)])
 
         if not photo_ids:
             return pb2.ScanSummary(total_images=0, message="Im Foto-Bucket wurden keine Kartenbilder gefunden.")
-
-        model = self._build_model(config)
 
         processed_count = 0
         skipped_count = 0
@@ -91,11 +99,12 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                 continue
 
             source_file_name = existing.source_file_name if existing and existing.source_file_name else photo_id
+            verified = _verified_match(existing)
 
             try:
                 image_bytes = await self._photo_store.get_bytes(request.collection_id, photo_id)
                 result = await gemini_service.analyze_card(
-                    model, config, series_catalog, photo_id, source_file_name, image_bytes
+                    self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
                 )
             except Exception as exception:
                 logger.exception("Unerwarteter Fehler bei der Analyse von %s", photo_id)
@@ -105,6 +114,8 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                     source_file_name=source_file_name,
                     ai_model=config.model,
                     scanned_at_utc=utc_now(),
+                    set_name=verified.set_name if verified else None,
+                    card_number=verified.card_number if verified else None,
                     error_message=f"Unerwarteter Fehler: {exception}",
                     is_transport_failure=True,
                 )
@@ -187,11 +198,31 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             timeout_seconds=metadata.timeout_seconds if metadata.HasField("timeout_seconds") else None,
         )
 
+        result = await self._analyze_stored_photo(config, context, photo_id, source_file_name, image_bytes)
+
+        await self._sidecar_cache.set_from_analysis_result(metadata.collection_id, photo_id, result)
+
+        record = await self._sidecar_cache.get(metadata.collection_id, photo_id)
+        return pb2.UploadPhotoResponse(card=_to_card_entry(photo_id, record))
+
+    async def _analyze_stored_photo(
+        self,
+        config: ScannerConfig,
+        context: grpc.aio.ServicerContext,
+        photo_id: str,
+        source_file_name: str,
+        image_bytes: bytes,
+        verified: VerifiedMatch | None = None,
+    ) -> CardAnalysisResult:
+        """The analysis steps UploadPhoto and ReanalyzePhoto share: aborts if the API key or the
+        catalog is unavailable, otherwise runs the staged pipeline. An unexpected exception
+        becomes a failed result flagged as a transport failure (same as Scan), so callers that
+        must not overwrite a good sidecar with it can tell it apart from a content failure."""
         if not config.api_key:
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, "GEMINI_API_KEY ist nicht gesetzt.")
 
         try:
-            series_catalog = await self._load_series_catalog(config.catalog_service_address)
+            catalog = await self._load_catalog_snapshot(config.catalog_service_address)
         except Exception:
             logger.exception("Katalog-Service unter %s nicht erreichbar", config.catalog_service_address)
             await context.abort(
@@ -199,25 +230,59 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             )
 
         try:
-            model = self._build_model(config)
-            result = await gemini_service.analyze_card(
-                model, config, series_catalog, photo_id, source_file_name, image_bytes
+            return await gemini_service.analyze_card(
+                self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
             )
         except Exception as exception:
             logger.exception("Unerwarteter Fehler bei der Analyse von %s", photo_id)
-            result = CardAnalysisResult(
+            return CardAnalysisResult(
                 photo_id=photo_id,
                 analysis_status=AnalysisStatuses.FAILED,
                 source_file_name=source_file_name,
                 ai_model=config.model,
                 scanned_at_utc=utc_now(),
+                set_name=verified.set_name if verified else None,
+                card_number=verified.card_number if verified else None,
                 error_message=f"Unerwarteter Fehler: {exception}",
+                is_transport_failure=True,
             )
 
-        await self._sidecar_cache.set_from_analysis_result(metadata.collection_id, photo_id, result)
+    # --- ReanalyzePhoto ---
 
-        record = await self._sidecar_cache.get(metadata.collection_id, photo_id)
-        return pb2.UploadPhotoResponse(card=_to_card_entry(photo_id, record))
+    async def ReanalyzePhoto(
+        self, request: pb2.ReanalyzePhotoRequest, context: grpc.aio.ServicerContext
+    ) -> pb2.ReanalyzePhotoResponse:
+        if not request.photo_id.strip():
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Keine photo_id angegeben.")
+        await _ensure_collection_id(request.collection_id, context)
+
+        if not await self._photo_store.exists(request.collection_id, request.photo_id):
+            await context.abort(grpc.StatusCode.NOT_FOUND, f"Foto '{request.photo_id}' wurde im Speicher nicht gefunden.")
+
+        existing = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        source_file_name = existing.source_file_name if existing and existing.source_file_name else request.photo_id
+        image_bytes = await self._photo_store.get_bytes(request.collection_id, request.photo_id)
+
+        result = await self._analyze_stored_photo(
+            ScannerConfig.load_for_upload(), context, request.photo_id, source_file_name, image_bytes, _verified_match(existing)
+        )
+
+        # Unlike UploadPhoto/Scan, a transport failure must not replace what's already there:
+        # the caller is asking to improve an existing result, and a Gemini outage would
+        # otherwise silently downgrade it to "failed".
+        if result.is_transport_failure:
+            await context.abort(grpc.StatusCode.UNAVAILABLE, result.error_message or "Gemini ist nicht erreichbar.")
+
+        # Re-read now rather than reusing `existing`: the analysis takes seconds, and a review
+        # status set meanwhile must not be reverted.
+        latest = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        if latest is not None and latest.review_status:
+            result = dataclasses.replace(result, review_status=latest.review_status)
+
+        await self._sidecar_cache.set_from_analysis_result(request.collection_id, request.photo_id, result)
+
+        record = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        return pb2.ReanalyzePhotoResponse(card=_to_card_entry(request.photo_id, record))
 
     # --- Download URLs ---
 
@@ -276,15 +341,21 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             set_name=_normalize_nullable(request.set_name),
             rarity=_normalize_nullable(request.rarity),
             language=_normalize_nullable(request.language),
-            confidence=request.confidence,
-            reasoning_summary=_normalize_nullable(request.reasoning_summary),
-            detected_text=tuple(text.strip() for text in request.detected_text if text.strip()),
             error_message=_normalize_nullable(request.error_message),
             review_status=_normalize_nullable(request.review_status),
+            # Not settable via this RPC (see picture-service-staged-analysis-pipeline's task
+            # 7.1 - confidence/reasoning_summary/detected_text are PictureService-internal-only
+            # now that nothing in the staged pipeline populates them) - preserved as-is, same as
+            # the other fields below.
+            confidence=existing.confidence,
+            reasoning_summary=existing.reasoning_summary,
+            detected_text=existing.detected_text,
             scanned_at_utc=existing.scanned_at_utc,
             source_file_name=existing.source_file_name,
             ai_model=existing.ai_model,
             raw_model_response=existing.raw_model_response,
+            detected=existing.detected,
+            derived=existing.derived,
         )
 
         await self._sidecar_cache.set_record(request.collection_id, request.photo_id, updated)
@@ -327,6 +398,12 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
     async def MigrateSidecars(
         self, request: pb2.MigrateSidecarsRequest, context: grpc.aio.ServicerContext
     ) -> pb2.MigrateSidecarsResponse:
+        """Idempotently repairs legacy sidecar records on two independent fronts (a record can
+        need either, both, or neither): the pre-existing `status` -> `AnalysisStatus` rename,
+        and picture-service-sidecar-sections' flat-to-three-section shape (a legacy record's
+        `detected`/`derived` are `None` - see SidecarRecord's docstring - until explicitly set
+        to `{}` here, moving its existing fields into the Judged section as a no-op since they
+        were never nested under a literal `Detected`/`Derived` key to begin with)."""
         total_files = 0
         migrated = 0
         already_current = 0
@@ -335,16 +412,27 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         async for collection_id, photo_id, record in self._sidecar_cache.list_all():
             total_files += 1
 
-            if record.analysis_status and record.analysis_status.strip():
+            needs_status_migration = not (record.analysis_status and record.analysis_status.strip())
+            needs_sections_migration = record.detected is None or record.derived is None
+
+            if not needs_status_migration and not needs_sections_migration:
                 already_current += 1
                 continue
 
             try:
-                repaired = dataclasses.replace(
-                    record,
-                    analysis_status=AnalysisStatuses.FAILED,
-                    error_message=record.error_message or "Sidecar-Datensatz wurde ohne AnalysisStatus migriert.",
-                )
+                repaired = record
+                if needs_status_migration:
+                    repaired = dataclasses.replace(
+                        repaired,
+                        analysis_status=AnalysisStatuses.FAILED,
+                        error_message=repaired.error_message or "Sidecar-Datensatz wurde ohne AnalysisStatus migriert.",
+                    )
+                if needs_sections_migration:
+                    repaired = dataclasses.replace(
+                        repaired,
+                        detected=repaired.detected if repaired.detected is not None else {},
+                        derived=repaired.derived if repaired.derived is not None else {},
+                    )
                 await self._sidecar_cache.set_record(collection_id, photo_id, repaired)
                 migrated += 1
             except Exception:
@@ -376,6 +464,16 @@ def _should_skip_existing_sidecar(existing: SidecarRecord | None, overwrite_exis
 
     status = (existing.analysis_status or "").lower()
     return status in (AnalysisStatuses.OK, AnalysisStatuses.UNCERTAIN)
+
+
+def _verified_match(existing: SidecarRecord | None) -> VerifiedMatch | None:
+    """A human-verified sidecar's series and card number are pinned during re-analysis. A
+    verified record missing either value has nothing to pin, so it is analyzed like any other."""
+    if existing is None or existing.review_status != ReviewStatuses.VERIFIED:
+        return None
+    if not existing.set_name or not existing.card_number:
+        return None
+    return VerifiedMatch(set_name=existing.set_name, card_number=existing.card_number)
 
 
 async def _ensure_collection_id(collection_id: str, context: grpc.aio.ServicerContext) -> None:
@@ -415,16 +513,20 @@ def _normalize_analysis_status(status: str | None) -> str:
 
 
 def _to_card_details(photo_id: str, sidecar: SidecarRecord | None) -> pb2.CardDetails:
-    details = pb2.CardDetails(
+    return pb2.CardDetails(
         photo_id=photo_id,
-        confidence=sidecar.confidence if sidecar else 0,
-        reasoning_summary=sidecar.reasoning_summary if sidecar and sidecar.reasoning_summary else "",
         scanned_at_utc=sidecar.scanned_at_utc.isoformat() if sidecar and sidecar.scanned_at_utc else "",
         error_message=sidecar.error_message if sidecar and sidecar.error_message else "",
+        attributes_json=_attributes_json(sidecar),
     )
-    if sidecar and sidecar.detected_text:
-        details.detected_text.extend(sidecar.detected_text)
-    return details
+
+
+def _attributes_json(sidecar: SidecarRecord | None) -> str:
+    """The staged pipeline's Detected/Derived output, for debugging/quality checks on the
+    Review page - see picture-service-staged-analysis-pipeline's task 7.1."""
+    detected = sidecar.detected if sidecar and sidecar.detected else {}
+    derived = sidecar.derived if sidecar and sidecar.derived else {}
+    return json.dumps({"detected": detected, "derived": derived}, ensure_ascii=False, sort_keys=True)
 
 
 def _normalize_nullable(value: str | None) -> str | None:

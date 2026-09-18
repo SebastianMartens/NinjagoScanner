@@ -224,21 +224,7 @@
                                             <option value="@Languages.Unknown">Unbekannt</option>
                                         </select>
                                     </label>
-                                    <label>
-                                        <span>Confidence</span>
-                                        <input @bind="sidecarDraft.ConfidenceText" />
-                                    </label>
                                 </div>
-
-                                <label class="detail-textarea-field">
-                                    <span>Reasoning Summary</span>
-                                    <textarea rows="4" @bind="sidecarDraft.ReasoningSummary"></textarea>
-                                </label>
-
-                                <label class="detail-textarea-field">
-                                    <span>Detected Text (eine Zeile pro Eintrag)</span>
-                                    <textarea rows="4" @bind="sidecarDraft.DetectedTextLines"></textarea>
-                                </label>
 
                                 <label class="detail-textarea-field">
                                     <span>Error Message</span>
@@ -250,6 +236,14 @@
                                 @if (SelectedPhoto.Sidecar?.ScannedAtUtc is not null)
                                 {
                                     <p class="table-secondary">Zuletzt gescannt: @SelectedPhoto.Sidecar.ScannedAtUtc.Value.LocalDateTime</p>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(SelectedPhoto.Sidecar?.AttributesJson))
+                                {
+                                    <label class="detail-textarea-field">
+                                        <span>Erkannte/abgeleitete Attribute (JSON, zur Fehlersuche)</span>
+                                        <textarea rows="6" readonly>@SelectedPhoto.Sidecar.AttributesJson</textarea>
+                                    </label>
                                 }
 
                                 <div class="detail-actions">
@@ -485,12 +479,6 @@
 
         try
         {
-            if (!TryParseConfidence(sidecarDraft.ConfidenceText, out var confidence))
-            {
-                sidecarError = "Confidence muss eine gueltige Zahl sein.";
-                return;
-            }
-
             var update = new CollectionCardSidecarUpdate
             {
                 AnalysisStatus = sidecarDraft.AnalysisStatus,
@@ -499,9 +487,6 @@
                 SetName = sidecarDraft.SetName,
                 Rarity = sidecarDraft.Rarity,
                 Language = sidecarDraft.Language,
-                Confidence = confidence,
-                ReasoningSummary = sidecarDraft.ReasoningSummary,
-                DetectedText = SplitLines(sidecarDraft.DetectedTextLines),
                 ErrorMessage = sidecarDraft.ErrorMessage,
                 ReviewStatus = sidecarDraft.ReviewStatus
             };
@@ -585,38 +570,9 @@
             SetName = sidecar?.SetName ?? fallbackCard?.Series ?? string.Empty,
             Rarity = sidecar?.Rarity ?? string.Empty,
             Language = sidecar?.Language ?? Languages.Default,
-            ConfidenceText = sidecar?.Confidence.ToString("0.##") ?? "0",
-            ReasoningSummary = sidecar?.ReasoningSummary ?? string.Empty,
-            DetectedTextLines = sidecar is null ? string.Empty : string.Join(Environment.NewLine, sidecar.DetectedText),
             ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
             ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
         };
-    }
-
-    private static IReadOnlyList<string> SplitLines(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Array.Empty<string>();
-        }
-
-        return value
-            .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Trim())
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .ToArray();
-    }
-
-    private static bool TryParseConfidence(string? value, out double confidence)
-    {
-        confidence = 0;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        var normalized = value.Trim().Replace(',', '.');
-        return double.TryParse(normalized, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out confidence);
     }
 
     private sealed class SidecarDraft
@@ -627,9 +583,6 @@
         public string SetName { get; set; } = string.Empty;
         public string Rarity { get; set; } = string.Empty;
         public string Language { get; set; } = Languages.Default;
-        public string ConfidenceText { get; set; } = "0";
-        public string ReasoningSummary { get; set; } = string.Empty;
-        public string DetectedTextLines { get; set; } = string.Empty;
         public string ErrorMessage { get; set; } = string.Empty;
         public string ReviewStatus { get; set; } = ReviewStatuses.Unreviewed;
     }

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import grpc
+from google.protobuf import empty_pb2
 
 from picture_service._generated import catalog_pb2, catalog_pb2_grpc
-from picture_service.models import SeriesInfo
+from picture_service.models import CatalogCardInfo, CatalogSnapshot, SeriesInfo
 
 
 def _strip_scheme(address: str) -> str:
@@ -35,3 +36,32 @@ async def load_series_catalog(service_address: str) -> list[SeriesInfo]:
             )
             for series in response.series
         ]
+
+
+async def load_catalog_cards(service_address: str) -> list[CatalogCardInfo]:
+    """Loads every card across all series via `ListAllCards` - used by stage 3
+    (picture-service-catalog-matching) to resolve a card number within a matched series.
+    `card_class` is always `None` for now: `CatalogCardEntry` doesn't carry a class field yet
+    (see catalog-service-card-class, not yet shipped) - see CatalogCardInfo's docstring.
+    """
+    async with grpc.aio.insecure_channel(_strip_scheme(service_address)) as channel:
+        client = catalog_pb2_grpc.CardCatalogStub(channel)
+        response = await client.ListAllCards(empty_pb2.Empty())
+
+        return [
+            CatalogCardInfo(
+                series_name=card.series_name,
+                card_number=card.card_number,
+                card_name=card.card_name,
+                category=card.category,
+            )
+            for card in response.cards
+        ]
+
+
+async def load_catalog_snapshot(service_address: str) -> CatalogSnapshot:
+    """Loads everything stage 3 needs from CatalogService for one analysis - series (for series
+    resolution) and per-card data (for card-number resolution within a resolved series)."""
+    series = await load_series_catalog(service_address)
+    cards = await load_catalog_cards(service_address)
+    return CatalogSnapshot(series=tuple(series), cards=tuple(cards))

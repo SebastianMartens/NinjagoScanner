@@ -1,12 +1,15 @@
-import math
-
 from langchain_core.exceptions import ModelAPIError, ModelInvalidRequestError, ModelNotFoundError, ModelRateLimitError
 
 from picture_service.config import ScannerConfig
-from picture_service.gemini_service import analyze_card, build_messages
-from picture_service.models import AnalysisStatuses, Languages, SeriesInfo
-
-CATALOG = [SeriesInfo(serie="Serie 1", jahr=2016), SeriesInfo(serie="Serie 2", jahr=2017)]
+from picture_service.gemini_service import (
+    ATTRIBUTE_DETECTION_SCHEMA,
+    analyze_card,
+    build_attribute_detection_messages,
+    build_derived_attributes_messages,
+    compute_derived_attributes,
+    detect_attributes,
+)
+from picture_service.models import AnalysisStatuses, CatalogCardInfo, CatalogSnapshot, SeriesInfo, VerifiedMatch
 
 
 def make_config(**overrides) -> ScannerConfig:
@@ -37,19 +40,7 @@ class FakeModel:
         return response
 
 
-def ok_response(**overrides) -> dict:
-    parsed = {
-        "status": "ok",
-        "cardName": "Kai",
-        "cardNumber": "1",
-        "setName": "Serie 1",
-        "rarity": "common",
-        "language": "de",
-        "confidence": 0.9,
-        "reasoningSummary": "clear",
-        "detectedText": ["Kai", "1"],
-    }
-    parsed.update(overrides)
+def ok_raw_result(parsed: dict) -> dict:
     return {"raw": _RawMessage(str(parsed)), "parsed": parsed, "parsing_error": None}
 
 
@@ -58,225 +49,261 @@ class _RawMessage:
         self.content = content
 
 
-# --- Request building ---
+# --- Stage 1: request building ---
 
 
-def test_request_includes_image_and_series_catalog_prompt():
-    config = make_config()
-    messages = build_messages(config, CATALOG, "card.jpg", b"fake-bytes")
+def test_attribute_detection_request_includes_only_the_photo_no_catalog():
+    messages = build_attribute_detection_messages("card.jpg", b"fake-bytes")
 
     content = messages[0]["content"]
     text_block = next(b for b in content if b["type"] == "text")
     image_block = next(b for b in content if b["type"] == "image_url")
 
-    assert "Serie 1" in text_block["text"]
-    assert "Serie 2" in text_block["text"]
+    assert "Serie 1" not in text_block["text"]
     assert image_block["image_url"].startswith("data:image/jpeg;base64,")
 
 
-def test_mime_type_matches_extension():
-    config = make_config()
-    messages = build_messages(config, CATALOG, "card.png", b"fake-bytes")
+def test_attribute_detection_mime_type_matches_extension():
+    messages = build_attribute_detection_messages("card.png", b"fake-bytes")
 
     image_block = next(b for b in messages[0]["content"] if b["type"] == "image_url")
     assert image_block["image_url"].startswith("data:image/png;base64,")
 
 
-# --- Retry policy ---
+# --- Stage 1: successful detection ---
 
 
-async def test_rate_limited_then_succeeds_retries_and_uses_final_response():
-    model = FakeModel([ModelRateLimitError("rate limited"), ok_response()])
-    config = make_config(max_attempts=3)
+async def test_attribute_detection_produces_flat_key_value_map():
+    model = FakeModel([ok_raw_result({"number_top_left": "1", "color_area": "red"})])
+    result = await detect_attributes(model, make_config(), "card.jpg", b"data")
 
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
+    assert result.success is True
+    assert result.attributes == {"number_top_left": "1", "color_area": "red"}
+
+
+async def test_attribute_detection_drops_nested_values():
+    model = FakeModel([ok_raw_result({"number_top_left": "1", "nested": {"a": 1}, "list_value": [1, 2]})])
+    result = await detect_attributes(model, make_config(), "card.jpg", b"data")
+
+    assert result.success is True
+    assert result.attributes == {"number_top_left": "1"}
+
+
+# --- Stage 1: retry policy ---
+
+
+async def test_attribute_detection_rate_limited_then_succeeds():
+    model = FakeModel([ModelRateLimitError("rate limited"), ok_raw_result({"a": "b"})])
+    result = await detect_attributes(model, make_config(max_attempts=3), "card.jpg", b"data")
 
     assert model.call_count == 2
-    assert result.analysis_status == AnalysisStatuses.OK
+    assert result.success is True
 
 
-async def test_server_error_exhausts_all_attempts():
+async def test_attribute_detection_retries_exhausted_is_transport_failure():
     model = FakeModel([ModelAPIError("boom")] * 3)
-    config = make_config(max_attempts=3)
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
+    result = await detect_attributes(model, make_config(max_attempts=3), "card.jpg", b"data")
 
     assert model.call_count == 3
-    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.success is False
     assert result.is_transport_failure is True
 
 
-async def test_non_retryable_error_fails_immediately_without_retry():
+async def test_attribute_detection_non_retryable_fails_immediately():
     model = FakeModel([ModelInvalidRequestError("bad request")])
-    config = make_config(max_attempts=3)
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
+    result = await detect_attributes(model, make_config(max_attempts=3), "card.jpg", b"data")
 
     assert model.call_count == 1
-    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.success is False
     assert result.is_transport_failure is True
 
 
-# --- Transport vs content failure classification ---
-
-
-async def test_retries_exhausted_marks_transport_failure():
-    model = FakeModel([ModelRateLimitError("x")] * 3)
-    config = make_config(max_attempts=3)
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.is_transport_failure is True
-
-
-async def test_immediate_non_retryable_marks_transport_failure():
+async def test_attribute_detection_exception_is_transport_failure():
     model = FakeModel([ModelNotFoundError("not found")])
-    config = make_config()
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
+    result = await detect_attributes(model, make_config(), "card.jpg", b"data")
 
     assert result.is_transport_failure is True
 
 
-async def test_malformed_output_marks_content_failure_not_transport():
-    model = FakeModel([{"raw": _RawMessage("not json"), "parsed": None, "parsing_error": "bad json"}])
-    config = make_config()
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.analysis_status == AnalysisStatuses.FAILED
-    assert result.is_transport_failure is False
+# --- Stage 1: malformed/empty output ---
 
 
-async def test_model_reports_failed_status_marks_content_failure_not_transport():
-    model = FakeModel([ok_response(status="failed")])
-    config = make_config()
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.analysis_status == AnalysisStatuses.FAILED
-    assert result.is_transport_failure is False
-
-
-async def test_series_match_escalation_marks_content_failure_not_transport():
-    model = FakeModel([ok_response(setName="Unknown Series")])
-    config = make_config()
-
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.analysis_status == AnalysisStatuses.FAILED
-    assert result.is_transport_failure is False
-
-
-# --- Malformed/empty output ---
-
-
-async def test_empty_candidate_text_is_failed_with_message():
+async def test_attribute_detection_empty_output_is_content_failure():
     model = FakeModel([{"raw": _RawMessage(""), "parsed": None, "parsing_error": None}])
-    config = make_config()
+    result = await detect_attributes(model, make_config(), "card.jpg", b"data")
 
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.success is False
+    assert result.is_transport_failure is False
     assert "kein JSON" in result.error_message
 
 
-async def test_invalid_json_preserves_raw_text_for_diagnostics():
+async def test_attribute_detection_invalid_json_preserves_raw_text():
     model = FakeModel([{"raw": _RawMessage("{not valid"), "parsed": None, "parsing_error": "oops"}])
-    config = make_config()
+    result = await detect_attributes(model, make_config(), "card.jpg", b"data")
 
-    result = await analyze_card(model, config, CATALOG, "p1", "card.jpg", b"data")
-
-    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.success is False
+    assert result.is_transport_failure is False
     assert result.raw_model_response == "{not valid"
 
 
-# --- Confidence clamping and status normalization ---
+# --- Stage 2: request building ---
 
 
-async def test_model_failed_status_wins_regardless_of_confidence():
-    model = FakeModel([ok_response(status="failed", confidence=0.99)])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.analysis_status == AnalysisStatuses.FAILED
+def test_derived_attributes_request_is_text_only():
+    messages = build_derived_attributes_messages({"number_top_left": "1"})
+
+    assert len(messages) == 1
+    assert isinstance(messages[0]["content"], str)
+    assert "number_top_left: 1" in messages[0]["content"]
 
 
-async def test_high_confidence_ok_stays_ok():
-    model = FakeModel([ok_response(status="ok", confidence=0.65)])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.analysis_status == AnalysisStatuses.OK
+# --- Stage 2: successful derivation ---
 
 
-async def test_low_confidence_forces_uncertain():
-    model = FakeModel([ok_response(status="ok", confidence=0.3)])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.analysis_status == AnalysisStatuses.UNCERTAIN
+async def test_derived_attributes_produces_flat_key_value_map():
+    model = FakeModel([ok_raw_result({"class": "character", "series_name": "Serie 1"})])
+    result = await compute_derived_attributes(model, make_config(), {"number_top_left": "1"})
+
+    assert result.success is True
+    assert result.attributes == {"class": "character", "series_name": "Serie 1"}
 
 
-async def test_out_of_range_confidence_is_clamped():
-    for raw, expected in [(-1.0, 0.0), (2.0, 1.0), (math.nan, 0.0), (math.inf, 0.0)]:
-        model = FakeModel([ok_response(confidence=raw)])
-        result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-        assert result.confidence == expected
+async def test_derived_attributes_recognized_class_kept():
+    model = FakeModel([ok_raw_result({"class": "vehicle"})])
+    result = await compute_derived_attributes(model, make_config(), {})
+
+    assert result.attributes["class"] == "vehicle"
 
 
-# --- Set name discard/escalation ---
+async def test_derived_attributes_unrecognized_class_is_dropped():
+    model = FakeModel([ok_raw_result({"class": "not-a-real-class", "series_name": "Serie 1"})])
+    result = await compute_derived_attributes(model, make_config(), {})
+
+    assert "class" not in result.attributes
+    assert result.attributes["series_name"] == "Serie 1"
 
 
-async def test_model_reported_failure_clears_set_name():
-    model = FakeModel([ok_response(status="failed", setName="Serie 1")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.set_name is None
+# --- Stage 2: retry/failure semantics (same policy as stage 1) ---
 
 
-async def test_unresolved_series_match_escalates_and_preserves_raw_guess():
-    model = FakeModel([ok_response(status="ok", confidence=0.9, setName="Mystery Set")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.analysis_status == AnalysisStatuses.FAILED
-    assert result.set_name == "Mystery Set"
+async def test_derived_attributes_rate_limited_then_succeeds():
+    model = FakeModel([ModelRateLimitError("x"), ok_raw_result({"class": "art"})])
+    result = await compute_derived_attributes(model, make_config(max_attempts=3), {})
+
+    assert model.call_count == 2
+    assert result.success is True
 
 
-async def test_uncertain_with_unresolved_series_also_escalates():
-    model = FakeModel([ok_response(status="uncertain", confidence=0.3, setName="Mystery Set")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.analysis_status == AnalysisStatuses.FAILED
-    assert result.set_name == "Mystery Set"
+async def test_derived_attributes_retries_exhausted_is_transport_failure():
+    model = FakeModel([ModelAPIError("boom")] * 3)
+    result = await compute_derived_attributes(model, make_config(max_attempts=3), {})
+
+    assert result.success is False
+    assert result.is_transport_failure is True
 
 
-async def test_confident_series_match_is_not_escalated():
-    model = FakeModel([ok_response(status="ok", confidence=0.9, setName="serie 1")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
+async def test_derived_attributes_non_retryable_fails_immediately():
+    model = FakeModel([ModelInvalidRequestError("bad request")])
+    result = await compute_derived_attributes(model, make_config(max_attempts=3), {})
+
+    assert model.call_count == 1
+    assert result.is_transport_failure is True
+
+
+# --- analyze_card: sequential wiring across all three stages ---
+
+CATALOG = CatalogSnapshot(
+    series=(SeriesInfo(serie="Serie 1", jahr=2016),),
+    cards=(CatalogCardInfo(series_name="Serie 1", card_number="1", card_name="Kai", category="Heroes"),),
+)
+
+
+def _build_model_factory(stage1_responses, stage2_responses=None):
+    stage1_model = FakeModel(stage1_responses)
+    stage2_model = FakeModel(stage2_responses or [])
+
+    def build_model(config, schema):
+        return stage1_model if schema is ATTRIBUTE_DETECTION_SCHEMA else stage2_model
+
+    return build_model, stage1_model, stage2_model
+
+
+async def test_analyze_card_runs_all_three_stages_on_success():
+    build_model, _, stage2_model = _build_model_factory(
+        [ok_raw_result({"card_number": "1"})], [ok_raw_result({"series_name": "Serie 1"})]
+    )
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data")
+
+    assert stage2_model.call_count == 1
     assert result.analysis_status == AnalysisStatuses.OK
     assert result.set_name == "Serie 1"
+    assert result.card_number == "1"
+    assert result.detected == {"card_number": "1"}
+    assert result.derived == {"series_name": "Serie 1"}
 
 
-# --- Language normalization ---
+async def test_analyze_card_stage2_does_not_run_when_stage1_fails():
+    build_model, _, stage2_model = _build_model_factory([ModelInvalidRequestError("bad")])
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data")
+
+    assert stage2_model.call_count == 0
+    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.is_transport_failure is True
 
 
-async def test_language_de_kept():
-    model = FakeModel([ok_response(language="de")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.language == Languages.GERMAN
+async def test_analyze_card_stage3_does_not_run_when_stage2_fails():
+    build_model, _, _ = _build_model_factory(
+        [ok_raw_result({"card_number": "1"})], [ModelInvalidRequestError("bad")]
+    )
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data")
+
+    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.set_name is None
+    assert result.detected == {"card_number": "1"}
 
 
-async def test_language_case_insensitive():
-    model = FakeModel([ok_response(language="EN")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.language == Languages.ENGLISH
+# --- analyze_card: verified series/card number are pinned (picture-service-catalog-matching) ---
+
+VERIFIED = VerifiedMatch(set_name="Serie 1", card_number="1")
 
 
-async def test_language_pl_kept():
-    model = FakeModel([ok_response(language="pl")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.language == Languages.POLISH
+async def test_analyze_card_reruns_stages_but_keeps_verified_series_and_number():
+    build_model, stage1_model, stage2_model = _build_model_factory(
+        [ok_raw_result({"card_number": "7"})], [ok_raw_result({"series_name": "Serie 9", "rarity": "rare"})]
+    )
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data", VERIFIED)
+
+    assert stage1_model.call_count == 1
+    assert stage2_model.call_count == 1
+    assert result.analysis_status == AnalysisStatuses.OK
+    assert result.set_name == "Serie 1"
+    assert result.card_number == "1"
+    assert result.card_name == "Kai"
+    assert result.rarity == "rare"
+    assert result.detected == {"card_number": "7"}
+    assert result.derived == {"series_name": "Serie 9", "rarity": "rare"}
 
 
-async def test_language_outside_closed_set_is_unknown():
-    model = FakeModel([ok_response(language="fr")])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.language == Languages.UNKNOWN
+async def test_analyze_card_stage1_failure_keeps_verified_series_and_number():
+    build_model, _, _ = _build_model_factory([ModelInvalidRequestError("bad")])
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data", VERIFIED)
+
+    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.set_name == "Serie 1"
+    assert result.card_number == "1"
 
 
-async def test_language_missing_is_unknown():
-    model = FakeModel([ok_response(language=None)])
-    result = await analyze_card(model, make_config(), CATALOG, "p1", "card.jpg", b"data")
-    assert result.language == Languages.UNKNOWN
+async def test_analyze_card_stage2_failure_keeps_verified_series_and_number():
+    build_model, _, _ = _build_model_factory([ok_raw_result({"card_number": "7"})], [ModelInvalidRequestError("bad")])
+
+    result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data", VERIFIED)
+
+    assert result.analysis_status == AnalysisStatuses.FAILED
+    assert result.set_name == "Serie 1"
+    assert result.card_number == "1"
+

@@ -27,10 +27,33 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
     private readonly InMemoryPhotoStore photoStore = new();
     private readonly InMemorySidecarStore sidecarStore = new();
+    private readonly ReanalysisSettings reanalysisSettings = new();
 
     private WebApplication? app;
 
     public string Address { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// When set, the fake's <c>ReanalyzePhoto</c> fails with this status instead of re-analyzing
+    /// (e.g. <see cref="StatusCode.Unavailable"/> to mimic Gemini being down), leaving the
+    /// photo's sidecar untouched, as the real service does.
+    /// </summary>
+    public StatusCode? ReanalyzeFailureStatusCode
+    {
+        get => reanalysisSettings.FailureStatusCode;
+        set => reanalysisSettings.FailureStatusCode = value;
+    }
+
+    /// <summary>
+    /// What the fake's <c>ReanalyzePhoto</c> writes to a photo's sidecar (with analysis status
+    /// <c>ok</c>); the photo's existing review status is preserved.
+    /// </summary>
+    public void SetReanalysisResult(string cardName, string cardNumber, string setName)
+    {
+        reanalysisSettings.CardName = cardName;
+        reanalysisSettings.CardNumber = cardNumber;
+        reanalysisSettings.SetName = setName;
+    }
 
     public void WritePhoto(string photoId, string? sidecarJson = null, string? collectionId = null)
     {
@@ -59,6 +82,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         builder.Services.AddGrpc();
         builder.Services.AddSingleton(photoStore);
         builder.Services.AddSingleton(sidecarStore);
+        builder.Services.AddSingleton(reanalysisSettings);
         builder.Services.AddScoped<FakeCardPictureService>();
 
         app = builder.Build();
@@ -123,6 +147,14 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         }
     }
 
+    private sealed class ReanalysisSettings
+    {
+        public StatusCode? FailureStatusCode { get; set; }
+        public string CardName { get; set; } = "Reanalyzed";
+        public string CardNumber { get; set; } = "99";
+        public string SetName { get; set; } = "Serie 2";
+    }
+
     /// <summary>
     /// Lenient, fully-optional sidecar shape mirroring the real service's DynamoDB item fields -
     /// only what this fake and its tests' seed JSON actually need.
@@ -136,7 +168,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         public string? SetName { get; init; }
         public string? Rarity { get; init; }
         public string? Language { get; init; }
-        public double Confidence { get; init; }
         public string? SourceFileName { get; init; }
     }
 
@@ -150,11 +181,13 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
     {
         private readonly InMemoryPhotoStore photoStore;
         private readonly InMemorySidecarStore sidecarStore;
+        private readonly ReanalysisSettings reanalysisSettings;
 
-        public FakeCardPictureService(InMemoryPhotoStore photoStore, InMemorySidecarStore sidecarStore)
+        public FakeCardPictureService(InMemoryPhotoStore photoStore, InMemorySidecarStore sidecarStore, ReanalysisSettings reanalysisSettings)
         {
             this.photoStore = photoStore;
             this.sidecarStore = sidecarStore;
+            this.reanalysisSettings = reanalysisSettings;
         }
 
         public override Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
@@ -256,7 +289,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             var details = new CardDetails
             {
                 PhotoId = request.PhotoId,
-                Confidence = record?.Confidence ?? 0,
                 ScannedAtUtc = string.Empty
             };
             return Task.FromResult(new GetCardDetailsResponse { Details = details });
@@ -273,7 +305,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 SetName = NormalizeNullable(request.SetName),
                 Rarity = NormalizeNullable(request.Rarity),
                 Language = NormalizeNullable(request.Language),
-                Confidence = request.Confidence,
                 ReviewStatus = NormalizeNullable(request.ReviewStatus)
             });
             return Task.FromResult(new UpdateSidecarResponse { Success = true });
@@ -322,6 +353,33 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             sidecarStore.Delete(request.CollectionId, request.PhotoId);
 
             return Task.FromResult(new DeletePhotoResponse { Success = true });
+        }
+
+        public override Task<ReanalyzePhotoResponse> ReanalyzePhoto(ReanalyzePhotoRequest request, ServerCallContext context)
+        {
+            EnsureCollectionId(request.CollectionId);
+
+            if (!photoStore.Exists(request.CollectionId, request.PhotoId))
+            {
+                throw new RpcException(new Status(StatusCode.NotFound, $"Foto '{request.PhotoId}' wurde im Speicher nicht gefunden."));
+            }
+
+            if (reanalysisSettings.FailureStatusCode is { } failureStatusCode)
+            {
+                throw new RpcException(new Status(failureStatusCode, "Die Analyse konnte nicht ausgefuehrt werden."));
+            }
+
+            var existing = sidecarStore.Get(request.CollectionId, request.PhotoId) ?? new FakeSidecarRecord();
+            var updated = existing with
+            {
+                AnalysisStatus = "ok",
+                CardName = reanalysisSettings.CardName,
+                CardNumber = reanalysisSettings.CardNumber,
+                SetName = reanalysisSettings.SetName
+            };
+            sidecarStore.Put(request.CollectionId, request.PhotoId, updated);
+
+            return Task.FromResult(new ReanalyzePhotoResponse { Card = ToCardEntry(request.PhotoId, updated) });
         }
 
         private void ApplySingleFieldUpdate(string collectionId, string photoId, Func<FakeSidecarRecord, FakeSidecarRecord> apply)

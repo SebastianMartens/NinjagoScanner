@@ -1,26 +1,42 @@
-"""Gemini card analysis, ported from GeminiApiService.cs.
+"""Gemini card analysis, staged per picture-service-staged-analysis-pipeline.
 
-Uses `langchain-google-genai`'s structured-output chat model call in place of the
-hand-rolled HTTP request/manual-JSON-parse the C# version used (see design.md's "Decisions"
-for why). The request content, retry policy (retry only on 429/5xx, `retry_delay_ms * attempt`
-backoff, immediate failure otherwise), and parsed result shape are preserved 1:1 - the retry
-loop and transport/content failure classification stay hand-rolled here rather than relying on
-LangChain's generic built-in retry, which doesn't implement this exact policy.
+Stage 1 (attribute detection, see picture-service-attribute-detection) is a vision call, photo
+only, no series catalog - a generic, open-ended key-value map of what's visible. Stage 2
+(derived attributes, see picture-service-derived-attributes) is a text-only call reasoning over
+stage 1's output, also a generic key-value map, plus a `class` value constrained to the
+catalog's fixed set. Both calls share the same transport/content failure classification and
+retry policy (retry only on 429/5xx-equivalent conditions, `retry_delay_ms * attempt` backoff,
+immediate failure otherwise - see picture-service-gemini-analysis), factored into
+`_invoke_with_retry` below rather than duplicated per stage.
+
+Uses `langchain-google-genai`'s structured-output chat model call in place of a hand-rolled
+HTTP request/manual-JSON-parse (see design.md's "Decisions" for why); LangChain's own generic
+retry isn't used since it doesn't implement this exact policy.
+
+Stage 3 (catalog matching) is deterministic, no LLM call - see series_catalog_service.py.
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from langchain_core.exceptions import ModelError, ModelNotFoundError
 
 from picture_service.config import ScannerConfig
-from picture_service.models import AnalysisStatuses, CardAnalysisResult, Languages, SeriesInfo, utc_now
-from picture_service.series_catalog_service import GeminiCardPayload, build_prompt, resolve_set_name
-
-_LOW_CONFIDENCE_THRESHOLD = 0.65
+from picture_service.models import (
+    CARD_CLASSES,
+    AnalysisStatuses,
+    AttributeMap,
+    CardAnalysisResult,
+    CatalogSnapshot,
+    VerifiedMatch,
+    utc_now,
+)
+from picture_service.prompts import ATTRIBUTE_DETECTION_PROMPT, DERIVED_ATTRIBUTES_PROMPT
+from picture_service.series_catalog_service import match_catalog
 
 _MIME_TYPES = {
     ".jpg": "image/jpeg",
@@ -30,50 +46,15 @@ _MIME_TYPES = {
     ".webp": "image/webp",
 }
 
-RESPONSE_SCHEMA: dict[str, Any] = {
+ATTRIBUTE_DETECTION_SCHEMA: dict[str, Any] = {
     "type": "object",
-    "properties": {
-        "status": {"type": "string", "enum": ["ok", "uncertain", "failed"]},
-        "cardName": {"type": "string"},
-        "cardNumber": {"type": "string"},
-        "setName": {"type": "string"},
-        "rarity": {"type": "string"},
-        "language": {"type": "string", "enum": ["de", "en", "pl", "unknown"]},
-        "confidence": {"type": "number"},
-        "reasoningSummary": {"type": "string"},
-        "detectedText": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["status", "confidence", "reasoningSummary", "detectedText"],
+    "additionalProperties": {"type": ["string", "number", "boolean"]},
 }
 
-_PROMPT_INTRO = """\
-Du analysierst genau ein Foto einer Lego Ninjago Sammelkarte.
-Gib ausschliesslich gueltiges JSON ohne Markdown oder Codeblock zurueck.
-Wenn du dir nicht sicher bist, setze status auf "uncertain" und confidence entsprechend niedrig.
-Wenn das Bild keine klar lesbare einzelne Karte zeigt, setze status auf "failed".
-Bestimme setName primaer ueber die Kartennummer und den Text auf der Karte (Kartenname).
-Du kannst auch das Symbol in der unteren rechten Ecke der Karte benutzen.
-Wenn kein Symbol vorhanden ist, gehoert die Karte zu Serie 1.
-Bestimme die Sprache (language) anhand des gedruckten Textes und Charakternamens auf der Karte:
-"de" fuer deutschen Text, "en" fuer englischen Text, "pl" fuer polnischen Text,
-"unknown" wenn die Sprache nicht sicher bestimmt werden kann.
-
-Verwende exakt dieses JSON-Schema:
-{
-  "status": "ok|uncertain|failed",
-  "cardName": "string|null",
-  "cardNumber": "string|null",
-  "setName": "string|null",
-  "rarity": "string|null",
-  "language": "de|en|pl|unknown",
-  "confidence": 0.0,
-  "reasoningSummary": "string",
-  "detectedText": ["string"]
+DERIVED_ATTRIBUTES_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": {"type": ["string", "number", "boolean"]},
 }
-
-Nutze sichtbare Kartennummern in der unteren linken Ecke, Charakternamen, Set-Hinweise, das Symbol unten rechts und Seltenheitsmerkmale.
-Fuelle setName nur mit einem gueltigen Seriennamen aus der folgenden Liste:
-"""
 
 
 class StructuredModel(Protocol):
@@ -84,8 +65,13 @@ class StructuredModel(Protocol):
     async def ainvoke(self, messages: list[Any]) -> dict[str, Any]: ...
 
 
-def build_prompt_text(series_catalog: list[SeriesInfo]) -> str:
-    return _PROMPT_INTRO + build_prompt(series_catalog)
+def build_chat_model(config: ScannerConfig, schema: dict[str, Any]) -> StructuredModel:
+    """Builds a fresh structured-output model bound to one stage's schema - stage 1 and stage 2
+    use different schemas, so each stage calls this with its own (see analyze_card)."""
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    model = ChatGoogleGenerativeAI(model=config.model, api_key=config.api_key, temperature=0.2)
+    return model.with_structured_output(schema, include_raw=True)
 
 
 def _get_mime_type(source_file_name: str) -> str:
@@ -97,8 +83,7 @@ def _extension(source_file_name: str) -> str:
     return source_file_name[dot_index:].lower() if dot_index != -1 else ""
 
 
-def build_messages(config: ScannerConfig, series_catalog: list[SeriesInfo], source_file_name: str, image_bytes: bytes) -> list[dict]:
-    prompt = build_prompt_text(series_catalog)
+def build_attribute_detection_messages(source_file_name: str, image_bytes: bytes) -> list[dict]:
     mime_type = _get_mime_type(source_file_name)
     data_url = f"data:{mime_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"
 
@@ -106,18 +91,34 @@ def build_messages(config: ScannerConfig, series_catalog: list[SeriesInfo], sour
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt},
+                {"type": "text", "text": ATTRIBUTE_DETECTION_PROMPT},
                 {"type": "image_url", "image_url": data_url},
             ],
         }
     ]
 
 
-def build_chat_model(config: ScannerConfig) -> StructuredModel:
-    from langchain_google_genai import ChatGoogleGenerativeAI
+def build_derived_attributes_messages(detected_attributes: AttributeMap) -> list[dict]:
+    attribute_lines = "\n".join(f"{key}: {value}" for key, value in detected_attributes.items())
+    return [{"role": "user", "content": DERIVED_ATTRIBUTES_PROMPT + attribute_lines}]
 
-    model = ChatGoogleGenerativeAI(model=config.model, api_key=config.api_key, temperature=0.2)
-    return model.with_structured_output(RESPONSE_SCHEMA, include_raw=True)
+
+@dataclass(frozen=True)
+class AttributeStageResult:
+    """The outcome of one stage 1 or stage 2 call (picture-service-attribute-detection,
+    picture-service-derived-attributes)."""
+
+    success: bool
+    attributes: AttributeMap = field(default_factory=dict)
+    error_message: str | None = None
+    raw_model_response: str | None = None
+    is_transport_failure: bool = False
+
+
+@dataclass(frozen=True)
+class _InvokeOutcome:
+    raw_result: dict[str, Any] | None
+    failure_message: str | None
 
 
 def _failure_message(exception: ModelError, model: str) -> str:
@@ -129,23 +130,14 @@ def _failure_message(exception: ModelError, model: str) -> str:
     return f"Gemini API Fehler: {exception}"
 
 
-async def analyze_card(
-    model: StructuredModel,
-    config: ScannerConfig,
-    series_catalog: list[SeriesInfo],
-    photo_id: str,
-    source_file_name: str,
-    image_bytes: bytes,
-) -> CardAnalysisResult:
+async def _invoke_with_retry(model: StructuredModel, config: ScannerConfig, messages: list[dict]) -> _InvokeOutcome:
     """Retries only on conditions LangChain classifies as retryable (rate limits, server
     errors, connection/timeout issues - see langchain_core.exceptions.ModelError.is_retryable),
     the provider-agnostic equivalent of the original HTTP 429/5xx-only policy. Any other
-    exception (not a ModelError at all) propagates uncaught, mirroring the C# version, where an
-    exception raised while attempting the call was never retried in this loop - only the RPC
-    handler's outer try/except classified it as a transport failure.
+    exception (not a ModelError at all) propagates uncaught, mirroring the single-call version,
+    where an exception raised while attempting the call was never retried in this loop - only
+    the RPC handler's outer try/except classified it as a transport failure.
     """
-    messages = build_messages(config, series_catalog, source_file_name, image_bytes)
-
     for attempt in range(1, config.max_attempts + 1):
         try:
             raw_result = await model.ainvoke(messages)
@@ -154,21 +146,19 @@ async def analyze_card(
                 await asyncio.sleep(config.retry_delay_ms * attempt / 1000)
                 continue
 
-            message = _failure_message(exception, config.model)
-            return _create_failure_result(photo_id, source_file_name, config.model, message, is_transport_failure=True)
+            return _InvokeOutcome(raw_result=None, failure_message=_failure_message(exception, config.model))
 
-        return _parse_success(photo_id, source_file_name, config.model, series_catalog, raw_result)
+        return _InvokeOutcome(raw_result=raw_result, failure_message=None)
 
-    return _create_failure_result(photo_id, source_file_name, config.model, "Unbekannter API-Fehler.", is_transport_failure=True)
+    return _InvokeOutcome(raw_result=None, failure_message="Unbekannter API-Fehler.")
 
 
-def _parse_success(
-    photo_id: str,
-    source_file_name: str,
-    model: str,
-    series_catalog: list[SeriesInfo],
-    raw_result: dict[str, Any],
-) -> CardAnalysisResult:
+def _parse_attribute_map(raw_result: dict[str, Any]) -> tuple[AttributeMap | None, str | None, str | None]:
+    """Returns `(attributes, error_message, raw_text)` - `attributes` is `None` on a
+    content-level failure (see picture-service-attribute-detection's "A failure result
+    indicates whether Gemini evaluated the photo"). A value that isn't a scalar (object or
+    array) is dropped rather than accepted as-is (that requirement's "A value is not a nested
+    structure")."""
     raw_message = raw_result.get("raw")
     raw_text = getattr(raw_message, "content", None) if raw_message is not None else None
     if isinstance(raw_text, list):
@@ -177,70 +167,120 @@ def _parse_success(
     parsed = raw_result.get("parsed")
     if parsed is None:
         if not raw_text or not str(raw_text).strip():
-            return _create_failure_result(
-                photo_id, source_file_name, model, "Gemini hat kein JSON-Ergebnis geliefert.", raw_text
-            )
+            return None, "Gemini hat kein JSON-Ergebnis geliefert.", raw_text
 
         parsing_error = raw_result.get("parsing_error")
         detail = f": {parsing_error}" if parsing_error else ""
-        return _create_failure_result(
-            photo_id,
-            source_file_name,
-            model,
-            f"Gemini-Antwort war kein gueltiges JSON{detail}",
-            str(raw_text),
+        return None, f"Gemini-Antwort war kein gueltiges JSON{detail}", str(raw_text)
+
+    if not isinstance(parsed, dict):
+        return None, "Gemini-Antwort war kein Objekt.", str(raw_text) if raw_text else None
+
+    attributes: AttributeMap = {
+        key: value for key, value in parsed.items() if value is not None and not isinstance(value, (dict, list))
+    }
+
+    return attributes, None, str(raw_text) if raw_text else None
+
+
+async def detect_attributes(
+    model: StructuredModel, config: ScannerConfig, source_file_name: str, image_bytes: bytes
+) -> AttributeStageResult:
+    """Stage 1 - see picture-service-attribute-detection."""
+    messages = build_attribute_detection_messages(source_file_name, image_bytes)
+    outcome = await _invoke_with_retry(model, config, messages)
+
+    if outcome.raw_result is None:
+        return AttributeStageResult(success=False, error_message=outcome.failure_message, is_transport_failure=True)
+
+    attributes, error_message, raw_text = _parse_attribute_map(outcome.raw_result)
+    if attributes is None:
+        return AttributeStageResult(success=False, error_message=error_message, raw_model_response=raw_text)
+
+    return AttributeStageResult(success=True, attributes=attributes, raw_model_response=raw_text)
+
+
+async def compute_derived_attributes(
+    model: StructuredModel, config: ScannerConfig, detected_attributes: AttributeMap
+) -> AttributeStageResult:
+    """Stage 2 - see picture-service-derived-attributes."""
+    messages = build_derived_attributes_messages(detected_attributes)
+    outcome = await _invoke_with_retry(model, config, messages)
+
+    if outcome.raw_result is None:
+        return AttributeStageResult(success=False, error_message=outcome.failure_message, is_transport_failure=True)
+
+    attributes, error_message, raw_text = _parse_attribute_map(outcome.raw_result)
+    if attributes is None:
+        return AttributeStageResult(success=False, error_message=error_message, raw_model_response=raw_text)
+
+    if "class" in attributes and attributes["class"] not in CARD_CLASSES:
+        attributes = {key: value for key, value in attributes.items() if key != "class"}
+
+    return AttributeStageResult(success=True, attributes=attributes, raw_model_response=raw_text)
+
+
+ModelFactory = Any  # Callable[[ScannerConfig, dict[str, Any]], StructuredModel] - see picture_scanner_service.py
+
+
+async def analyze_card(
+    build_model: ModelFactory,
+    config: ScannerConfig,
+    catalog: CatalogSnapshot,
+    photo_id: str,
+    source_file_name: str,
+    image_bytes: bytes,
+    verified: VerifiedMatch | None = None,
+) -> CardAnalysisResult:
+    """Runs all three stages sequentially (picture-service-staged-analysis-pipeline's design.md
+    "Where stage 2's output lands relative to stage 3") and combines their outcomes into the
+    sidecar's Judged section (picture-service-catalog-matching's "Judged analysis status
+    reflects detection, derivation, and matching outcomes").
+
+    `verified` is the series/card number a human already confirmed for this photo, if any:
+    stages 1 and 2 still re-run, but the result always carries that series and card number
+    (picture-service-catalog-matching's "Verified series and card number survive re-analysis")."""
+    detection = await detect_attributes(
+        build_model(config, ATTRIBUTE_DETECTION_SCHEMA), config, source_file_name, image_bytes
+    )
+    if not detection.success:
+        return _stage_failure_result(photo_id, source_file_name, config.model, detection, verified=verified)
+
+    derivation = await compute_derived_attributes(
+        build_model(config, DERIVED_ATTRIBUTES_SCHEMA), config, detection.attributes
+    )
+    if not derivation.success:
+        return _stage_failure_result(
+            photo_id, source_file_name, config.model, derivation, detected=detection.attributes, verified=verified
         )
 
-    payload = GeminiCardPayload(
-        status=parsed.get("status"),
-        card_name=parsed.get("cardName"),
-        card_number=parsed.get("cardNumber"),
-        set_name=parsed.get("setName"),
-        rarity=parsed.get("rarity"),
-        language=parsed.get("language"),
-        confidence=parsed.get("confidence", 0.0) or 0.0,
-        reasoning_summary=parsed.get("reasoningSummary"),
-        detected_text=tuple(parsed.get("detectedText") or ()),
-    )
-
-    normalized_status = _normalize_status(payload.status, payload.confidence)
-    resolved_set_name = resolve_set_name(payload, series_catalog)
-
-    final_status = normalized_status
-    if normalized_status == AnalysisStatuses.FAILED:
-        final_set_name = None
-    elif resolved_set_name is not None:
-        final_set_name = resolved_set_name
-    else:
-        final_set_name = payload.set_name.strip() if payload.set_name else None
-        final_status = AnalysisStatuses.FAILED
+    match = match_catalog(detection.attributes, derivation.attributes, catalog, verified)
 
     return CardAnalysisResult(
         photo_id=photo_id,
-        analysis_status=final_status,
+        analysis_status=match.analysis_status,
         source_file_name=source_file_name,
-        ai_model=model,
+        ai_model=config.model,
         scanned_at_utc=utc_now(),
-        card_name=payload.card_name,
-        card_number=payload.card_number,
-        set_name=final_set_name,
-        rarity=payload.rarity,
-        language=_normalize_language(payload.language),
-        confidence=_clamp_confidence(payload.confidence),
-        reasoning_summary=payload.reasoning_summary,
-        detected_text=payload.detected_text,
-        raw_model_response=str(raw_text) if raw_text else None,
+        card_name=match.card_name,
+        card_number=match.card_number,
+        set_name=match.set_name,
+        rarity=match.rarity,
+        language=match.language,
+        error_message=match.error_message,
+        detected=detection.attributes,
+        derived=derivation.attributes,
     )
 
 
-def _create_failure_result(
+def _stage_failure_result(
     photo_id: str,
     source_file_name: str,
     model: str,
-    error_message: str,
-    raw_model_response: str | None = None,
+    stage_result: AttributeStageResult,
     *,
-    is_transport_failure: bool = False,
+    detected: AttributeMap | None = None,
+    verified: VerifiedMatch | None = None,
 ) -> CardAnalysisResult:
     return CardAnalysisResult(
         photo_id=photo_id,
@@ -248,35 +288,10 @@ def _create_failure_result(
         source_file_name=source_file_name,
         ai_model=model,
         scanned_at_utc=utc_now(),
-        error_message=error_message,
-        raw_model_response=raw_model_response,
-        is_transport_failure=is_transport_failure,
+        set_name=verified.set_name if verified else None,
+        card_number=verified.card_number if verified else None,
+        error_message=stage_result.error_message,
+        raw_model_response=stage_result.raw_model_response,
+        is_transport_failure=stage_result.is_transport_failure,
+        detected=dict(detected) if detected is not None else {},
     )
-
-
-def _normalize_status(status: str | None, confidence: float) -> str:
-    if status is not None and status.lower() == AnalysisStatuses.FAILED:
-        return AnalysisStatuses.FAILED
-
-    if (status is not None and status.lower() == AnalysisStatuses.UNCERTAIN) or confidence < _LOW_CONFIDENCE_THRESHOLD:
-        return AnalysisStatuses.UNCERTAIN
-
-    return AnalysisStatuses.OK
-
-
-def _normalize_language(language: str | None) -> str:
-    if language is not None:
-        lowered = language.lower()
-        for known in (Languages.GERMAN, Languages.ENGLISH, Languages.POLISH):
-            if lowered == known:
-                return known
-    return Languages.UNKNOWN
-
-
-def _clamp_confidence(value: float) -> float:
-    try:
-        if value != value or value in (float("inf"), float("-inf")):  # NaN check
-            return 0.0
-    except TypeError:
-        return 0.0
-    return max(0.0, min(1.0, value))

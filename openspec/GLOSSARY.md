@@ -89,6 +89,18 @@ photos in a directory to the Gemini analysis pipeline, writing a **Sidecar**
 for each and reporting a summary of processed/skipped/uncertain/failed
 counts.
 
+A person can also request it for a single stored photo on demand
+(**Re-analysis**, the Review page's "Neu analysieren" button).
+
+### Re-analysis
+An on-demand **AI Analysis** of one already-stored **Card Photo**
+(`ReanalyzePhoto`), replacing the **Sidecar**'s previous analysis result
+regardless of its **Analysis Status**. Never changes **Review Status**, and
+a `verified` photo keeps its **Series Name** and card number. If Gemini
+can't be reached the existing **Sidecar** is left untouched rather than
+overwritten with `failed`. Hand-edited values on a photo that isn't
+`verified` are replaced by the new result.
+
 ### Analysis Status
 The machine-produced outcome of an **AI Analysis** for a card photo: `ok`,
 `uncertain` (low confidence or model-reported), or `failed`, set

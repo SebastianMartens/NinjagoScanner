@@ -43,6 +43,8 @@
             "cwd": "${workspaceFolder}/picture_service",
             "python": "${workspaceFolder}/picture_service/.venv/Scripts/python.exe",
             "preLaunchTask": "picture-service: gen-proto",
+            // Git-ignored file with GEMINI_API_KEY=... (one KEY=value per line).
+            "envFile": "${workspaceFolder}/picture_service/.env",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/picture_service/src",
                 // Port 8080 is commonly taken locally (e.g. by other Docker containers) - use 8090 instead.

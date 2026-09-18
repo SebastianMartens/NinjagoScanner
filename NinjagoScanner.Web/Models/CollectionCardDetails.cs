@@ -30,9 +30,7 @@ public sealed class CollectionCardSidecarData
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
     public string? Language { get; init; }
-    public double Confidence { get; init; }
-    public string? ReasoningSummary { get; init; }
-    public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
+    public string? AttributesJson { get; init; }
     public DateTimeOffset? ScannedAtUtc { get; init; }
     public string? ErrorMessage { get; init; }
     public string? ReviewStatus { get; init; }
@@ -46,9 +44,6 @@ public sealed class CollectionCardSidecarUpdate
     public string? SetName { get; init; }
     public string? Rarity { get; init; }
     public string? Language { get; init; }
-    public double Confidence { get; init; }
-    public string? ReasoningSummary { get; init; }
-    public IReadOnlyList<string> DetectedText { get; init; } = Array.Empty<string>();
     public string? ErrorMessage { get; init; }
     public string? ReviewStatus { get; init; }
 }

@@ -16,7 +16,8 @@ package pictureservice;
 // for resolving a single photo_id a caller has in hand without a ListCards result (e.g. right
 // after UploadPhoto). CardEntry only carries the fields every list/grid view needs for every row;
 // GetCardDetails resolves the rest for one photo_id at a time, for callers showing a single card's
-// full details (an expanded review tile, the collection detail pane). MigrateSidecars is the one
+// full details (an expanded review tile, the collection detail pane). ReanalyzePhoto re-runs AI
+// Analysis on a single stored photo on demand (the Review page's re-analysis button). MigrateSidecars is the one
 // exception: a global, unscoped maintenance RPC that repairs legacy sidecar records across all
 // collections, not a per-user product path.
 service CardPictureService {
@@ -32,6 +33,7 @@ service CardPictureService {
   rpc UpdateReviewStatus (UpdateReviewStatusRequest) returns (UpdateReviewStatusResponse);
   rpc MigrateSidecars (MigrateSidecarsRequest) returns (MigrateSidecarsResponse);
   rpc DeletePhoto (DeletePhotoRequest) returns (DeletePhotoResponse);
+  rpc ReanalyzePhoto (ReanalyzePhotoRequest) returns (ReanalyzePhotoResponse);
 }
 
 // Bulk backfill: analyzes every photo in S3 that has no sidecar record yet (or all of them, if
@@ -84,14 +86,18 @@ message ListCardsResponse {
 }
 
 // Sidecar fields only shown for a single selected/expanded card, resolved on demand via
-// GetCardDetails rather than carried on every ListCards entry.
+// GetCardDetails rather than carried on every ListCards entry. `confidence`/`reasoning_summary`/
+// `detected_text` (the single-call pipeline's payload fields) are retired - nothing in the
+// staged analysis pipeline populates them anymore (see picture-service-staged-analysis-pipeline);
+// `attributes_json` replaces them with the pipeline's actual Detected/Derived output, for
+// debugging/quality checks.
 message CardDetails {
   string photo_id = 1;
-  double confidence = 2;
-  string reasoning_summary = 3;
-  repeated string detected_text = 4;
+  reserved 2, 3, 4;
+  reserved "confidence", "reasoning_summary", "detected_text";
   string scanned_at_utc = 5;
   string error_message = 6;
+  string attributes_json = 7;
 }
 
 message GetCardDetailsRequest {
@@ -144,9 +150,8 @@ message UpdateSidecarRequest {
   string card_number = 5;
   string set_name = 6;
   string rarity = 7;
-  double confidence = 8;
-  string reasoning_summary = 9;
-  repeated string detected_text = 10;
+  reserved 8, 9, 10;
+  reserved "confidence", "reasoning_summary", "detected_text";
   string error_message = 11;
   string review_status = 12;
   string language = 13;
@@ -216,4 +221,16 @@ message DeletePhotoRequest {
 
 message DeletePhotoResponse {
   bool success = 1;
+}
+
+// Re-runs AI Analysis on one already-stored photo and replaces its sidecar's analysis result. The
+// photo's review_status is preserved and a verified photo's series/card number stay pinned. A
+// transport-level Gemini failure aborts with UNAVAILABLE and leaves the sidecar untouched.
+message ReanalyzePhotoRequest {
+  string photo_id = 1;
+  string collection_id = 2;
+}
+
+message ReanalyzePhotoResponse {
+  CardEntry card = 1;
 }

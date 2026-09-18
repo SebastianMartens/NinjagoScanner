@@ -206,12 +206,9 @@ internal sealed class PictureServiceClient
             SetName = update.SetName ?? string.Empty,
             Rarity = update.Rarity ?? string.Empty,
             Language = update.Language ?? string.Empty,
-            Confidence = update.Confidence,
-            ReasoningSummary = update.ReasoningSummary ?? string.Empty,
             ErrorMessage = update.ErrorMessage ?? string.Empty,
             ReviewStatus = update.ReviewStatus ?? string.Empty
         };
-        request.DetectedText.AddRange(update.DetectedText.Where(text => !string.IsNullOrWhiteSpace(text)).Select(text => text.Trim()));
 
         await client.UpdateSidecarAsync(request, cancellationToken: cancellationToken);
     }
@@ -234,6 +231,26 @@ internal sealed class PictureServiceClient
         await client.DeletePhotoAsync(
             new DeletePhotoRequest { PhotoId = photoId, CollectionId = collectionId },
             cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Asks PictureService to re-run AI Analysis on one already-stored photo and returns the
+    /// updated card. The call runs the full analysis synchronously (two Gemini calls), so it
+    /// takes seconds; throws <see cref="Grpc.Core.RpcException"/> when the analysis couldn't be
+    /// run (e.g. <c>Unavailable</c> if Gemini or CatalogService can't be reached), in which case
+    /// the photo's stored analysis is left untouched. The returned item has no
+    /// <see cref="CardListItem.ImageUrl"/> - callers reload their lists for that.
+    /// </summary>
+    public async Task<CardListItem> ReanalyzePhotoAsync(string photoId, CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
+
+        var response = await client.ReanalyzePhotoAsync(
+            new ReanalyzePhotoRequest { PhotoId = photoId, CollectionId = collectionId },
+            cancellationToken: cancellationToken);
+
+        return ToCardListItem(response.Card);
     }
 
     public async Task UpdateSetNameAsync(string photoId, string? setName, CancellationToken cancellationToken = default)
@@ -302,11 +319,9 @@ internal sealed class PictureServiceClient
     {
         return new CardDetailsItem
         {
-            Confidence = details.Confidence,
-            ReasoningSummary = NormalizeNullable(details.ReasoningSummary),
-            DetectedText = details.DetectedText.ToArray(),
             ScannedAtUtc = ParseScannedAtUtc(details.ScannedAtUtc),
-            ErrorMessage = NormalizeNullable(details.ErrorMessage)
+            ErrorMessage = NormalizeNullable(details.ErrorMessage),
+            AttributesJson = NormalizeNullable(details.AttributesJson)
         };
     }
 

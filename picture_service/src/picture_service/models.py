@@ -27,9 +27,32 @@ class Languages:
     DEFAULT = GERMAN
 
 
+AttributeValue = str | float | bool
+AttributeMap = dict[str, AttributeValue]
+
+# The catalog's fixed card-class set (see catalog-service-card-class). A derived `class`
+# attribute outside this set is treated as absent (picture-service-derived-attributes' "Derived
+# class is one of the catalog's fixed class values").
+CARD_CLASSES = frozenset({"character", "action", "vehicle", "puzzle-piece", "trap", "limited edition", "art"})
+
+
+@dataclass(frozen=True)
+class VerifiedMatch:
+    """The series and card number a human already confirmed for a photo (its sidecar's Review
+    Status is `verified`). Re-analysis must not re-judge these - see
+    picture-service-catalog-matching's "Verified series and card number survive re-analysis"."""
+
+    set_name: str
+    card_number: str
+
+
 @dataclass(frozen=True)
 class CardAnalysisResult:
-    """Produced only by AI Analysis (see gemini_service.py)."""
+    """Produced only by AI Analysis (see gemini_service.py). `detected`/`derived` hold the
+    staged pipeline's stage 1/2 generic key-value output (see picture-service-attribute-detection,
+    picture-service-derived-attributes); the remaining fields are the pipeline's judged output
+    (picture-service-catalog-matching) - the sidecar's Judged section (picture-service-sidecar-sections).
+    """
 
     photo_id: str
     analysis_status: str
@@ -52,6 +75,8 @@ class CardAnalysisResult:
     # content-level failure from a response Gemini did return. Only meaningful when
     # analysis_status is FAILED.
     is_transport_failure: bool = False
+    detected: AttributeMap = field(default_factory=dict)
+    derived: AttributeMap = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -76,6 +101,13 @@ class SidecarRecord:
     source_file_name: str | None = None
     ai_model: str | None = None
     raw_model_response: str | None = None
+    # Stage 1/2 output (picture-service-sidecar-sections' Detected/Derived sections). `None`
+    # means "never written by the staged pipeline" - a pre-existing flat record (see
+    # picture-service-sidecar-sections' "Pre-existing flat sidecar records remain readable") or
+    # one not yet migrated - as distinct from `{}`, an explicit empty section. All other fields
+    # on this record are the Judged section.
+    detected: AttributeMap | None = None
+    derived: AttributeMap | None = None
 
     @staticmethod
     def from_analysis_result(result: CardAnalysisResult) -> SidecarRecord:
@@ -95,6 +127,8 @@ class SidecarRecord:
             source_file_name=result.source_file_name,
             ai_model=result.ai_model,
             raw_model_response=result.raw_model_response,
+            detected=dict(result.detected),
+            derived=dict(result.derived),
         )
 
 
@@ -111,3 +145,29 @@ class SeriesInfo:
     besonderheiten: tuple[str, ...] = field(default_factory=tuple)
     sondereditionen: tuple[str, ...] = field(default_factory=tuple)
     card_names: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class CatalogCardInfo:
+    """One card from the catalog (CatalogService's `ListAllCards`), as loaded via
+    catalog_client.py - used by stage 3 (picture-service-catalog-matching) to resolve a card
+    number within an already-resolved series.
+    """
+
+    series_name: str
+    card_number: str
+    card_name: str
+    category: str
+    # Populated once catalog-service-card-class ships and CatalogCardEntry carries a class
+    # field; until then this is always None, which stage 3 treats as "no narrowing signal"
+    # (see picture-service-staged-analysis-pipeline's design.md "Class-based narrowing is
+    # advisory, not required").
+    card_class: str | None = None
+
+
+@dataclass(frozen=True)
+class CatalogSnapshot:
+    """Everything stage 3 (catalog matching) needs from CatalogService for one analysis."""
+
+    series: tuple[SeriesInfo, ...] = field(default_factory=tuple)
+    cards: tuple[CatalogCardInfo, ...] = field(default_factory=tuple)

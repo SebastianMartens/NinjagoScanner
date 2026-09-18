@@ -27,6 +27,8 @@ EXPECTED_ANALYSIS_RESULT_FIELDS = {
     "raw_model_response",
     "review_status",
     "is_transport_failure",
+    "detected",
+    "derived",
 }
 
 EXPECTED_SIDECAR_RECORD_FIELDS = {
@@ -45,6 +47,8 @@ EXPECTED_SIDECAR_RECORD_FIELDS = {
     "source_file_name",
     "ai_model",
     "raw_model_response",
+    "detected",
+    "derived",
 }
 
 
@@ -69,6 +73,13 @@ def test_card_analysis_result_defaults():
     assert result.detected_text == ()
     assert result.review_status == ReviewStatuses.UNREVIEWED
     assert result.is_transport_failure is False
+    assert result.detected == {}
+    assert result.derived == {}
+
+
+def test_sidecar_record_defaults_detected_derived_to_none():
+    assert SidecarRecord().detected is None
+    assert SidecarRecord().derived is None
 
 
 def test_sidecar_record_from_analysis_result_round_trips_fields():
@@ -89,6 +100,8 @@ def test_sidecar_record_from_analysis_result_round_trips_fields():
         error_message=None,
         raw_model_response="{}",
         review_status=ReviewStatuses.VERIFIED,
+        detected={"number_top_left": "1"},
+        derived={"class": "character"},
     )
 
     record = SidecarRecord.from_analysis_result(result)
@@ -98,3 +111,5 @@ def test_sidecar_record_from_analysis_result_round_trips_fields():
     assert record.card_name == result.card_name
     assert record.detected_text == result.detected_text
     assert record.scanned_at_utc == result.scanned_at_utc
+    assert record.detected == {"number_top_left": "1"}
+    assert record.derived == {"class": "character"}

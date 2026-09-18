@@ -63,6 +63,20 @@ class does not block matching. This follows from the class taxonomy being a deli
 simplification (`catalog-service-card-class`'s design.md "best guess" rows) - treating it as a
 hard filter would let a wrong force-fit silently break matching for legitimately-matching cards.
 
+### Verified photos keep their series and card number on re-analysis
+A `verified` Review Status means a human confirmed series and card number, so re-analysis must not
+overturn them. Only `Scan` (with `overwrite_existing_sidecars`) analyzes a photo that already has
+a sidecar - `UploadPhoto` always creates a new photo - so `Scan` reads the existing sidecar and,
+when it is `verified` with both a series name and a card number, passes them to `analyze_card` as
+a `VerifiedMatch`. Stages 1 and 2 still run and replace `Detected`/`Derived`; stage 3 skips
+series/card-number resolution and returns the verified values, taking card name from the catalog
+entry for them (falling back to the derived guess), and rarity/language from the derived
+attributes as usual. Status is `ok` since a human already vouched for the match. If stage 1 or 2
+fails, the `failed` result still carries the verified series and card number, so a failed
+re-scan cannot wipe what a human confirmed. `Scan`'s unexpected-exception fallback does the same.
+The pin is passed in rather than read from the sidecar inside `analyze_card`, keeping the
+pipeline free of sidecar-store dependencies.
+
 ## Risks / Trade-offs
 
 - **[Risk] Two sequential Gemini calls instead of one roughly doubles LLM latency per photo** →

@@ -37,6 +37,8 @@ _STRING_ATTRS = {
 _CONFIDENCE_ATTR = "Confidence"
 _DETECTED_TEXT_ATTR = "DetectedText"
 _SCANNED_AT_UTC_ATTR = "ScannedAtUtc"
+_DETECTED_ATTR = "Detected"
+_DERIVED_ATTR = "Derived"
 
 
 class SidecarTable:
@@ -116,7 +118,24 @@ def _to_item(collection_id: str, photo_id: str, record: SidecarRecord) -> dict:
     if record.scanned_at_utc is not None:
         item[_SCANNED_AT_UTC_ATTR] = record.scanned_at_utc.isoformat()
 
+    # `None` (never written by the staged pipeline) omits the attribute entirely, distinct
+    # from `{}` (an explicit empty section, written once analyzed/migrated) - see
+    # SidecarRecord's `detected`/`derived` docstring.
+    if record.detected is not None:
+        item[_DETECTED_ATTR] = _encode_attribute_map(record.detected)
+    if record.derived is not None:
+        item[_DERIVED_ATTR] = _encode_attribute_map(record.derived)
+
     return item
+
+
+def _encode_attribute_map(attributes: dict) -> dict:
+    # DynamoDB's number type has no float representation (see the Confidence attribute above).
+    return {key: Decimal(str(value)) if isinstance(value, float) else value for key, value in attributes.items()}
+
+
+def _decode_attribute_map(attributes: dict) -> dict:
+    return {key: float(value) if isinstance(value, Decimal) else value for key, value in attributes.items()}
 
 
 def _from_item(item: dict) -> SidecarRecord:
@@ -131,6 +150,9 @@ def _from_item(item: dict) -> SidecarRecord:
     detected_text_raw = item.get(_DETECTED_TEXT_ATTR)
     confidence = item.get(_CONFIDENCE_ATTR, 0)
 
+    detected_raw = item.get(_DETECTED_ATTR)
+    derived_raw = item.get(_DERIVED_ATTR)
+
     return SidecarRecord(
         **{
             field_name: item.get(attr_name)
@@ -139,4 +161,6 @@ def _from_item(item: dict) -> SidecarRecord:
         confidence=float(confidence),
         detected_text=tuple(detected_text_raw) if detected_text_raw is not None else None,
         scanned_at_utc=scanned_at_utc,
+        detected=_decode_attribute_map(detected_raw) if detected_raw is not None else None,
+        derived=_decode_attribute_map(derived_raw) if derived_raw is not None else None,
     )

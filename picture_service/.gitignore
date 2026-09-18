@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 
+# Local secrets (GEMINI_API_KEY) loaded by the VS Code launch config via "envFile".
+.env
+
 # Generated gRPC stubs - regenerate with `uv run python scripts/gen_proto.py`.
 # The .proto files under NinjagoScanner.*Service/Protos/ are the source of truth.
 src/picture_service/_generated/
