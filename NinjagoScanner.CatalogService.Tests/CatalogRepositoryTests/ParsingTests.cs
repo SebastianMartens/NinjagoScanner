@@ -1,3 +1,4 @@
+using NinjagoScanner.CatalogService.Catalog;
 using NinjagoScanner.CatalogService.Tests.Fixtures;
 
 namespace NinjagoScanner.CatalogService.Tests.CatalogRepositoryTests;
@@ -14,9 +15,9 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Jahr": 2016,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
-              ]
+              ] }
             }
           }
         }
@@ -39,9 +40,9 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai", "en": "Fire Ninja"}}
-              ]
+              ] }
             }
           }
         }
@@ -60,9 +61,9 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"en": "Kai"}}
-              ]
+              ] }
             }
           }
         }
@@ -82,6 +83,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Villains": {
+                "Class": "character",
                 "Sub_Bosses": [
                   {"Karten-Nr.": 99, "Name": {"de": "Garmadon"}}
                 ]
@@ -103,7 +105,7 @@ public sealed class ParsingTests : IDisposable
     {
         directory.WriteFile("series_1.json", """
         {
-          "Serie_1": {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
+          "Serie_1": {"Class": "character", "Karten-Nr.": 1, "Name": {"de": "Kai"}}
         }
         """);
 
@@ -126,7 +128,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [ {{cardJson}} ]
+              "Good_Guys": { "Class": "character", "Karten": [ {{cardJson}} ] }
             }
           }
         }
@@ -148,9 +150,9 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "{{rawCategory}}": [
+              "{{rawCategory}}": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"} }
-              ]
+              ] }
             }
           }
         }
@@ -177,6 +179,7 @@ public sealed class ParsingTests : IDisposable
         directory.WriteFile("series_1.json", $$"""
         {
           "Serie_1": {
+            "Class": "character",
             "{{reservedKey}}": {
               "Karten-Nr.": 1,
               "Name": {"de": "Should not be extracted as a card of a category named '{{reservedKey}}'"}
@@ -204,9 +207,9 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_2": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Zane"}}
-              ]
+              ] }
             }
           }
         }
@@ -231,7 +234,7 @@ public sealed class ParsingTests : IDisposable
             "Besonderheiten": ["Highlight A", "Highlight B"],
             "Sondereditionen": ["Edition A"],
             "Kategorien": {
-              "Good_Guys": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]
+              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -256,7 +259,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Logo": 12345,
             "Kategorien": {
-              "Good_Guys": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]
+              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -271,6 +274,100 @@ public sealed class ParsingTests : IDisposable
         Assert.Null(metadata.Theme);
         Assert.Empty(metadata.Highlights);
         Assert.Empty(metadata.SpecialEditions);
+    }
+
+    [Fact]
+    public void GetSnapshot_PopulatesClass_FromTheCategoryThatDeclaresIt()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] },
+              "Trap_Cards": { "Class": "trap", "Karten": [ {"Karten-Nr.": 2, "Name": {"de": "Spike Pit"}} ] }
+            }
+          }
+        }
+        """);
+
+        var cards = directory.CreateRepository().GetSnapshot().Cards;
+
+        Assert.Equal(
+            [("Heroes", "character"), ("Trap Cards", "trap")],
+            cards.OrderBy(card => card.CardNumber).Select(card => (card.Category, card.Class)));
+    }
+
+    [Fact]
+    public void GetSnapshot_InheritsClass_ForNestedSubCategories_WithoutAddingKartenToTheLabel()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Puzzle_Cards": {
+                "Class": "puzzle-piece",
+                "Puzzle_One": [ {"Karten-Nr.": 1, "Name": {"de": "Piece A"}} ],
+                "Puzzle_Two": { "Karten": [ {"Karten-Nr.": 2, "Name": {"de": "Piece B"}} ] }
+              }
+            }
+          }
+        }
+        """);
+
+        var cards = directory.CreateRepository().GetSnapshot().Cards;
+
+        Assert.Equal(
+            [("Puzzle Cards / Puzzle One", "puzzle-piece"), ("Puzzle Cards / Puzzle Two", "puzzle-piece")],
+            cards.OrderBy(card => card.CardNumber).Select(card => (card.Category, card.Class)));
+    }
+
+    [Theory]
+    [InlineData("""{ "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
+    [InlineData("""[ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]""")]
+    [InlineData("""{ "Class": "  ", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
+    [InlineData("""{ "Class": 7, "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
+    public void GetSnapshot_FailsFast_NamingTheFile_WhenACategoryHasNoClass(string categoryJson)
+    {
+        directory.WriteFile("series_1.json", $$"""
+        {
+          "Serie_1": {
+            "Kategorien": {
+              "Heroes": {{categoryJson}}
+            }
+          }
+        }
+        """);
+        var repository = directory.CreateRepository();
+
+        var exception = Assert.Throws<CatalogDataException>(() => repository.GetSnapshot());
+
+        Assert.Contains("series_1.json", exception.Message);
+        Assert.Contains("Heroes", exception.Message);
+        Assert.Contains("Class", exception.Message);
+    }
+
+    [Fact]
+    public void GetSnapshot_FailsFast_EvenWhenOtherFilesAreValid()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] } }
+          }
+        }
+        """);
+        directory.WriteFile("series_2.json", """
+        {
+          "Serie_2": {
+            "Kategorien": { "Heroes": { "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Zane"}} ] } }
+          }
+        }
+        """);
+        var repository = directory.CreateRepository();
+
+        var exception = Assert.Throws<CatalogDataException>(() => repository.GetSnapshot());
+
+        Assert.Contains("series_2.json", exception.Message);
     }
 
     public void Dispose() => directory.Dispose();

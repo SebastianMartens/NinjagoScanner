@@ -24,10 +24,18 @@ public sealed class CatalogCardItem
 {
     public required string SeriesName { get; init; }
     public required string Category { get; init; }
+    public required string Class { get; init; }
     public required string CardNumber { get; init; }
     public required string CardName { get; init; }
     public int SortOrder { get; init; }
 }
+
+/// <summary>
+/// Thrown when catalog data is structurally valid JSON but violates the catalog data contract.
+/// Unlike malformed JSON (which is skipped per file), this fails catalog loading.
+/// </summary>
+public sealed class CatalogDataException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
 
 public sealed class SeriesMetadataItem
 {

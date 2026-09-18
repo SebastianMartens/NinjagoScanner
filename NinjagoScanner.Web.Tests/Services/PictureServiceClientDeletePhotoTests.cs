@@ -23,9 +23,9 @@ public sealed class PictureServiceClientDeletePhotoTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}}
-              ]
+              ] }
             }
           }
         }

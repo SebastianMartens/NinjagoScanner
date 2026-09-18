@@ -42,6 +42,18 @@ objects.
 `Karten` (not `Cards`) matches the file's existing German property naming (`Jahr`,
 `Besonderheiten`, `Sondereditionen`, `Kategorien`, `Karten-Nr.`).
 
+Categories that contain nested sub-categories instead of a direct card array (`Puzzle_Cards`,
+which holds one array per puzzle, and `Character_Cards`, which holds `Good_Guys`/`Villains`)
+declare `Class` once on that top-level category object and do **not** get a `Karten` wrapper:
+
+```json
+"Puzzle_Cards": { "Class": "puzzle-piece", "Puzzle_One": [ ... ], "Puzzle_Two": [ ... ] }
+```
+
+The parser passes the nearest enclosing `Class` down the walk, so every card below inherits it;
+a card reached with no enclosing `Class` fails loading (see "Fail-fast" below). The "same
+category → same class" invariant is therefore checked on the top-level category name.
+
 Both `Class` and `Karten` **must** be added to `ShouldTrackCategory`'s exclusion list. Without
 this, the walker treats `Class` as an empty nested category (harmless but pointless - its value is
 a string, so recursion yields nothing) and, critically, treats `Karten` as a real nested category

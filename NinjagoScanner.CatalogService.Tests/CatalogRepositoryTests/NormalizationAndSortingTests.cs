@@ -18,9 +18,9 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "{{rawNumber}}", "Name": {"de": "Kai"} }
-              ]
+              ] }
             }
           }
         }
@@ -39,7 +39,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "XXL2", "Name": {"de": "XXL Two"}},
                 {"Karten-Nr.": "OTHER1", "Name": {"de": "Other One"}},
                 {"Karten-Nr.": "10", "Name": {"de": "Ten"}},
@@ -47,7 +47,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
                 {"Karten-Nr.": "2", "Name": {"de": "Two"}},
                 {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
                 {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}}
-              ]
+              ] }
             }
           }
         }
@@ -69,12 +69,12 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}},
                 {"Karten-Nr.": "AB1", "Name": {"de": "AB One"}},
                 {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
                 {"Karten-Nr.": "1", "Name": {"de": "One"}}
-              ]
+              ] }
             }
           }
         }
@@ -95,11 +95,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}},
                 {"Karten-Nr.": "1A2B", "Name": {"de": "Non Conforming"}},
                 {"Karten-Nr.": "1", "Name": {"de": "One"}}
-              ]
+              ] }
             }
           }
         }
@@ -120,16 +120,16 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "B"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "B"}} ] } }
           },
           "Serie_1": {
             "SortOrder": 10,
             "Kategorien": {
-              "Villains": [ {"Karten-Nr.": "1", "Name": {"de": "V-One"}} ],
-              "Good_Guys": [
+              "Villains": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "V-One"}} ] },
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "2", "Name": {"de": "G-Two"}},
                 {"Karten-Nr.": "1", "Name": {"de": "A"}}
-              ]
+              ] }
             }
           }
         }
@@ -162,13 +162,13 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Action_Cards": [
+              "Action_Cards": { "Class": "action", "Karten": [
                 {"Karten-Nr.": 101, "Name": {"de": "First Action Card"}}
-              ],
-              "Heroes": [
+              ] },
+              "Heroes": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "First Hero"}},
                 {"Karten-Nr.": 2, "Name": {"de": "Second Hero"}}
-              ]
+              ] }
             }
           }
         }
@@ -189,11 +189,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -213,11 +213,11 @@ public sealed class NormalizationAndSortingTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -236,7 +236,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] } }
           }
         }
         """);
@@ -260,7 +260,7 @@ public sealed class NormalizationAndSortingTests : IDisposable
         directory.WriteFile("series_1.json", $$"""
         {
           "{{writtenName.Replace(' ', '_')}}": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"} } ] } }
           }
         }
         """);

@@ -82,7 +82,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 MetadataBySeriesKey = metadataBySeries
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not CatalogDataException)
         {
             logger.LogError(ex, "Failed to load catalog from {CatalogPath}", dataDirectoryPath);
             return new CatalogSnapshot
@@ -158,6 +158,12 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                     };
                 }
             }
+            catch (CatalogDataException ex)
+            {
+                // Structurally valid JSON that violates the catalog data contract (e.g. a card
+                // with no Class) must fail loading rather than being skipped or defaulted.
+                throw new CatalogDataException($"{Path.GetFileName(detailFilePath)}: {ex.Message}", ex);
+            }
             catch
             {
                 // Ignore malformed detail files and continue.
@@ -228,6 +234,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
             {
                 SeriesName = seriesName,
                 Category = category,
+                Class = entry.Class,
                 CardNumber = normalizedNumber,
                 CardName = cardName,
                 SortOrder = sortOrder
@@ -237,12 +244,22 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         return cards.ToArray();
     }
 
-    private static IEnumerable<(string CardNumber, string CardName, string Category)> EnumerateCardEntries(
+    private static IEnumerable<(string CardNumber, string CardName, string Category, string Class)> EnumerateCardEntries(
         JsonElement element,
-        IReadOnlyList<string> categoryPath)
+        IReadOnlyList<string> categoryPath,
+        string? categoryClass = null)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
+            // A category object declares its Class once; everything nested below it (its Karten
+            // array, or nested sub-categories such as Puzzle_Cards/*) inherits it.
+            if (element.TryGetProperty("Class", out var classProperty)
+                && classProperty.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(classProperty.GetString()))
+            {
+                categoryClass = classProperty.GetString()!.Trim();
+            }
+
             if (element.TryGetProperty("Karten-Nr.", out var numberProperty)
                 && element.TryGetProperty("Name", out var nameProperty)
                 && numberProperty.ValueKind != JsonValueKind.Object
@@ -258,7 +275,14 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 var name = ResolveCardName(nameProperty);
                 if (!string.IsNullOrWhiteSpace(number) && !string.IsNullOrWhiteSpace(name))
                 {
-                    yield return (number, name, BuildCategoryLabel(categoryPath));
+                    var categoryLabel = BuildCategoryLabel(categoryPath);
+                    if (categoryClass is null)
+                    {
+                        throw new CatalogDataException(
+                            $"Card '{name}' (number {number}) in category '{categoryLabel}' has no Class; every category must declare a \"Class\".");
+                    }
+
+                    yield return (number, name, categoryLabel, categoryClass);
                 }
             }
 
@@ -275,7 +299,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                     nextCategoryPath = [.. categoryPath, ToCategoryDisplayName(property.Name)];
                 }
 
-                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath))
+                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath, categoryClass))
                 {
                     yield return entry;
                 }
@@ -285,7 +309,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         {
             foreach (var item in element.EnumerateArray())
             {
-                foreach (var entry in EnumerateCardEntries(item, categoryPath))
+                foreach (var entry in EnumerateCardEntries(item, categoryPath, categoryClass))
                 {
                     yield return entry;
                 }
@@ -327,6 +351,8 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                && !normalized.Equals("Besonderheiten", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Sondereditionen", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Class", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Karten", StringComparison.OrdinalIgnoreCase)
                && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
     }
 

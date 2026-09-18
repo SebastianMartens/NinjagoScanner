@@ -23,11 +23,12 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
                 {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
-              ],
+              ] },
               "Puzzle_Cards": {
+                "Class": "puzzle-piece",
                 "Day_of_the_Departed": [
                   {"Karten-Nr.": 6, "Name": {"de": "Puzzle1"}}
                 ]
@@ -37,9 +38,9 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "Serie_10": {
             "SortOrder": 10,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
-              ]
+              ] }
             }
           }
         }

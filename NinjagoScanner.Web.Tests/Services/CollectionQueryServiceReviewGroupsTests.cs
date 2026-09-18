@@ -23,18 +23,18 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
                 {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
-              ]
+              ] }
             }
           },
           "Serie_10": {
             "SortOrder": 10,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
-              ]
+              ] }
             }
           }
         }
@@ -144,14 +144,14 @@ public sealed class CollectionQueryServiceReviewGroupsCardNumberOrderingTests : 
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 10, "Name": {"de": "Ten"}},
                 {"Karten-Nr.": 2, "Name": {"de": "Two"}}
-              ],
-              "Limited_Edition_Cards": [
+              ] },
+              "Limited_Edition_Cards": { "Class": "limited edition", "Karten": [
                 {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
                 {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}}
-              ]
+              ] }
             }
           }
         }

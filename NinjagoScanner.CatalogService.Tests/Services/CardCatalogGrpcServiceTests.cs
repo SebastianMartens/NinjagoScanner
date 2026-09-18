@@ -27,7 +27,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
             "Besonderheiten": ["Highlight A"],
             "Sondereditionen": ["Edition A"],
             "Kategorien": {
-              "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ]
+              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -58,11 +58,11 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -123,6 +123,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         var card = Assert.Single(response.Cards);
         Assert.Equal("Serie 1", card.SeriesName);
         Assert.Equal("Good Guys", card.Category);
+        Assert.Equal("character", card.Class);
         Assert.Equal("1", card.CardNumber);
         Assert.Equal("Kai", card.CardName);
         Assert.Equal(42, card.SortOrder);
@@ -135,11 +136,11 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -175,7 +176,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);

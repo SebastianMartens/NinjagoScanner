@@ -49,6 +49,7 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
             {
                 SeriesName = card.SeriesName,
                 Category = card.Category,
+                Class = card.Class,
                 CardNumber = card.CardNumber,
                 CardName = card.CardName,
                 SortOrder = card.SortOrder

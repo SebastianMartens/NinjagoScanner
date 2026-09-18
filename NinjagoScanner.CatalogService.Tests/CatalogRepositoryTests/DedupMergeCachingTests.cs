@@ -13,10 +13,10 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
                 {"Karten-Nr.": "01", "Name": {"de": "Kai"}}
-              ]
+              ] }
             }
           }
         }
@@ -34,10 +34,10 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": [
+              "Good_Guys": { "Class": "character", "Karten": [
                 {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
                 {"Karten-Nr.": "01", "Name": {"en": "Kai"}}
-              ]
+              ] }
             }
           }
         }
@@ -56,7 +56,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Jahr": 2016,
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -78,7 +78,7 @@ public sealed class DedupMergeCachingTests : IDisposable
             "Jahr": 2016,
             "Besonderheiten": ["Feature A"],
             "Sondereditionen": ["Edition A"],
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -99,7 +99,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -118,7 +118,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         var filePath = directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);

@@ -28,6 +28,19 @@ Category is descriptive/grouping metadata, not part of a card's identity —
 every card number is unique within its series regardless of category; see
 **Card**.
 
+### Card Class
+A coarse, catalog-wide depiction/physical-type label for a **Category**, drawn
+from a fixed set of seven values: `character`, `action`, `vehicle`,
+`puzzle-piece`, `trap`, `limited edition`, `art`. Each Category name maps to
+exactly one Class everywhere it appears across the catalog's series files
+(e.g. "Heroes" is always `character`), and a card takes the Class of its
+Category. Unlike Category (fine-grained, per-series, inconsistently named), Class
+is small and stable, so it can narrow catalog matching across series. Some
+Categories are a format or rarity tier layered on top of a depiction (e.g.
+"XXL_Cards", "Platinum_Cards"); those are force-fit into their closest Class,
+so Class is not a rarity or format indicator. Like Category, it is descriptive
+metadata and not part of a card's identity.
+
 ### Puzzle Sub-Group
 A **Category** whose cards are pieces of one image meant to be assembled
 together rather than distinct collectibles to identify individually — the

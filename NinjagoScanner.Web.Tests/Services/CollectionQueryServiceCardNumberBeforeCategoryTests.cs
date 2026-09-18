@@ -23,13 +23,13 @@ public sealed class CollectionQueryServiceCardNumberBeforeCategoryTests : IAsync
           "Serie_1": {
             "SortOrder": 1,
             "Kategorien": {
-              "Action_Cards": [
+              "Action_Cards": { "Class": "action", "Karten": [
                 {"Karten-Nr.": 101, "Name": {"de": "First Action Card"}}
-              ],
-              "Heroes": [
+              ] },
+              "Heroes": { "Class": "character", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "First Hero"}},
                 {"Karten-Nr.": 2, "Name": {"de": "Second Hero"}}
-              ]
+              ] }
             }
           }
         }
