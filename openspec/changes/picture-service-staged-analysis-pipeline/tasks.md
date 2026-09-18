@@ -49,3 +49,14 @@
 - [x] 9.2 Thread `verified` through `gemini_service.analyze_card`, including the stage 1/2 failure results, with tests in `test_gemini_service.py`
 - [x] 9.3 Have `Scan` build a `VerifiedMatch` from an existing `verified` sidecar (with both series and card number) and pass it to `analyze_card`, including in its unexpected-exception fallback, with tests in `test_picture_scanner_service.py` covering verified and non-verified re-scans
 - [x] 9.4 Re-run `uv run pytest` in `picture_service/` and verify all tests pass
+
+
+## 10. Stage 3 redesign: score cards across the whole catalog, derived attributes only
+
+- [x] 10.1 Drop rarity from stage 3 (detection is not implemented): `CatalogMatchResult` no longer carries it and `analyze_card` no longer sets it
+- [x] 10.2 Replace series resolution + card-number resolution in `card_analysis_stage_3.py` with `resolve_card`: score every catalog card on derived `card_number` (50), `class` (20), `card_name` (up to 30, by similarity); best unique card at >= 50 wins and yields the series; a number whose catalog class differs from the derived class earns nothing; `detected` is no longer passed to `match_catalog`
+- [x] 10.3 Rewrite `test_card_analysis_stage_3.py` for the new rules and move the pipeline fixtures (`test_gemini_service.py`, `test_picture_scanner_service.py`) to derived `card_number`/`card_name`
+- [x] 10.4 Update `picture-service-catalog-matching` (rewritten) and remove `picture-service-series-name-matching` in the change's delta specs, plus design.md/proposal.md
+- [x] 10.5 Run `uv run pytest` in `picture_service/` and verify all tests pass
+- [ ] 10.6 Follow-up: `catalog-service-card-class` must ship (and `catalog_client.py` read `class`) before class scoring and the class-mismatch rule have any effect; `load_series_catalog` is no longer used by stage 3 and could be dropped from `CatalogSnapshot`
+- [ ] 10.7 Follow-up: tune the score weights/thresholds against real photos

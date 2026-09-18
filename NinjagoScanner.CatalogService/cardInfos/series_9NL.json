@@ -205,7 +205,7 @@
       ],
       "Trap_Cards": [
         {"Karten-Nr.": 185, "Name": {"en": "Don't Let Go!"}},
-        {"Karten-Nr.": 186, "Name": {"en": "The Floor is Lava"}},
+        {"Karten-Nr.": 186, "Name": {"en": "The Floor is Lava", "de": "Der Boden ist Lava"}},
         {"Karten-Nr.": 187, "Name": {"en": "Hard Labour"}},
         {"Karten-Nr.": 188, "Name": {"en": "Pressed to the Floor"}},
         {"Karten-Nr.": 189, "Name": {"en": "Crusty Seamonster"}},

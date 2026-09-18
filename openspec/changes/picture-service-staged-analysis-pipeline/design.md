@@ -4,12 +4,12 @@ See proposal.md - Why/What Changes for motivation. Today, `gemini_service.analyz
 from exactly two places - `picture_scanner_service.py`'s `Scan` (batch) and `UploadPhoto` (single
 photo, client-streaming) RPCs - and both then build a `SidecarRecord` from the result and write it
 via `sidecar_table.py`. Both call sites need to move to the three-stage pipeline; there is no other
-caller. `series_catalog_service.py`'s `resolve_set_name`/`_find_series_by_evidence` already
-implement the exact-match/evidence-scoring/tie-breaks-to-null pattern this change reuses and
-extends to card numbers.
+caller. `card_analysis_stage_3.py` originally resolved a series by exact-match/evidence-scoring;
+stage 3 has since been redesigned to score catalog cards instead (see "Stage 3 scores cards, not
+series" under Decisions).
 
-This change depends on `catalog-service-card-class` for the per-card `Class` field used to narrow
-card-number candidates in stage 3, but does not require it to ship first (see Decisions).
+This change depends on `catalog-service-card-class` for the per-card `Class` field used in stage 3's
+class scoring, but does not require it to ship first (see Decisions).
 
 ## Goals / Non-Goals
 
@@ -27,6 +27,7 @@ card-number candidates in stage 3, but does not require it to ship first (see De
   be iterated on prompt-by-prompt once the pipeline exists, not designed up front (explicit user
   direction from the exploration that produced this change).
 - Pinning the exact format/rarity value set for derived attributes - same reason.
+- Rarity: stage 3 does not read or set it (detection is not implemented); it stays a manually edited Judged field.
 - Deciding, field by field, what surfaces on the Review page vs. stays internal - tracked as an
   explicit task (see tasks.md), not a design decision made here.
 - Changing photo storage, `AnalysisStatus`/`ReviewStatus` semantics, or `Scan`'s
@@ -35,12 +36,12 @@ card-number candidates in stage 3, but does not require it to ship first (see De
 ## Decisions
 
 ### Sequencing relative to catalog-service-card-class
-This change can be implemented before `catalog-service-card-class` ships: stage 3's card-number
-resolution treats an unavailable `Class` (empty/not-yet-present field from `CatalogService`) the
-same as a class that didn't narrow anything - evidence-scoring alone still runs. Once the other
-change ships, `catalog_client.py` starts returning real `Class` values and narrowing starts
-working without further code changes here, beyond making sure the gRPC message field is actually
-read.
+This change can be implemented before `catalog-service-card-class` ships: stage 3 treats an
+unavailable `Class` (empty/not-yet-present field from `CatalogService`) as no class signal - the
+number and name still score. Until it ships `catalog_client.py` always returns `card_class=None`,
+so the class points and the class-mismatch rule below are inert. Once the other change ships,
+`catalog_client.py` starts returning real `Class` values and they start working without further
+code changes here, beyond making sure the gRPC message field is actually read.
 
 ### Where stage 2's output lands relative to stage 3
 Stage 2 (derived attributes) always runs after a successful stage 1, and stage 3 always runs after
@@ -56,12 +57,29 @@ factor the existing retry loop in `gemini_service.analyze_card` into a shared he
 call, rather than duplicating the loop - this is an implementation detail, not a spec requirement,
 but worth noting since the current retry loop is currently written inline for the single call.
 
-### Class-based narrowing is advisory, not required
-Per `picture-service-catalog-matching`'s spec, class only *narrows* card-number candidates when it
-disambiguates a tie; it is never the sole basis for a match and a missing/unrecognized derived
-class does not block matching. This follows from the class taxonomy being a deliberate
-simplification (`catalog-service-card-class`'s design.md "best guess" rows) - treating it as a
-hard filter would let a wrong force-fit silently break matching for legitimately-matching cards.
+### Stage 3 scores cards, not series
+Series detection in stages 1/2 is unreliable or missing, whereas the derived `card_number` is
+reliable. Stage 3 therefore no longer resolves a series first: it scores every catalog card across
+all series against the *derived* attributes only, and the best card's series is the series.
+Score per card (max 100): card number equal 50, class equal 20, card name up to 30 (exact = 30,
+similar scaled by similarity, below 0.6 similarity nothing). A card needs 50 to be a candidate
+(so the number alone, or class + exact name, is enough; class + a partial name is not) and must be
+the single best - a tie between different series/numbers yields no match. The weights and
+thresholds are named constants in `card_analysis_stage_3.py`, meant to be tuned.
+
+If both classes are known and differ, the card number earns nothing for that card: a number that
+belongs to a card of another class means the number was misread or the class misjudged, and it
+should not back the wrong card. That card can still be found through its name, so one wrong signal
+does not make a correct card unmatchable. Class remains advisory in the sense that a missing or
+unrecognized derived class, or a catalog card without a class, is simply no signal - this follows
+from the class taxonomy being a deliberate simplification (`catalog-service-card-class`'s
+design.md "best guess" rows).
+
+Name similarity uses normalized-text equality (case/punctuation ignored) for an exact match,
+otherwise difflib's ratio, with a fragment contained in the real name counting as at least 0.8 -
+to tolerate a wrong-language or partially detected name. Detected attributes are not consulted
+for now; the series-name guess and the series-evidence scoring (symbol hint, year, known card
+names) are dropped, so `picture-service-series-name-matching` is removed.
 
 ### Verified photos keep their series and card number on re-analysis
 A `verified` Review Status means a human confirmed series and card number, so re-analysis must not
@@ -70,7 +88,7 @@ a sidecar - `UploadPhoto` always creates a new photo - so `Scan` reads the exist
 when it is `verified` with both a series name and a card number, passes them to `analyze_card` as
 a `VerifiedMatch`. Stages 1 and 2 still run and replace `Detected`/`Derived`; stage 3 skips
 series/card-number resolution and returns the verified values, taking card name from the catalog
-entry for them (falling back to the derived guess), and rarity/language from the derived
+entry for them (falling back to the derived guess), and language from the derived
 attributes as usual. Status is `ok` since a human already vouched for the match. If stage 1 or 2
 fails, the `failed` result still carries the verified series and card number, so a failed
 re-scan cannot wipe what a human confirmed. `Scan`'s unexpected-exception fallback does the same.
@@ -90,8 +108,11 @@ pipeline free of sidecar-store dependencies.
   author chose.
 - **[Trade-off] Card-number resolution is new, catalog-grounded behavior where today's pipeline
   had none** → Expected to occasionally reject a card number the model actually read correctly, if
-  evidence-scoring narrows to the wrong candidate or a tie. This is the intended trade (catalog-
-  grounded number, escalated to `failed`/reviewable, over blindly trusting free-form OCR).
+  scoring hits a tie (a number exists in every series, so without a usable name it stays
+  ambiguous) or the class check rejects it. This is the intended trade (catalog-grounded number,
+  escalated to `failed`/reviewable, over blindly trusting free-form OCR).
+- **[Risk] The scoring weights are unvalidated guesses** → tune against real photos; they are
+  constants, and `test_card_analysis_stage_3.py` pins the intended behavior (not the numbers).
 
 ## Migration Plan
 
@@ -102,9 +123,9 @@ pipeline free of sidecar-store dependencies.
    `test_gemini_service.py` fakes today's single call.
 3. Implement stage 2 (derived attributes), tested with plain golden `Detected` fixtures (no fake
    Gemini client needed beyond the same `ainvoke` fake pattern, now text-only).
-4. Extend `series_catalog_service.py`'s evidence-scoring to also resolve card number (reusing its
-   existing scoring primitives), tested with plain golden `Detected`+`Derived`+catalog-snapshot
-   fixtures - no AI or gRPC involved.
+4. Implement stage 3 in `card_analysis_stage_3.py` as card scoring across the whole catalog (see
+   Decisions), tested with plain golden `Derived`+catalog-snapshot fixtures - no AI or gRPC
+   involved.
 5. Wire the three stages together behind the same `analyze_card`-shaped entry point so `Scan` and
    `UploadPhoto` need a minimal call-site change.
 6. Switch `sidecar_table.py`'s write path to the three-section shape; keep the read path

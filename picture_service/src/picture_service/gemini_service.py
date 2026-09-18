@@ -13,7 +13,7 @@ Uses `langchain-google-genai`'s structured-output chat model call in place of a 
 HTTP request/manual-JSON-parse (see design.md's "Decisions" for why); LangChain's own generic
 retry isn't used since it doesn't implement this exact policy.
 
-Stage 3 (catalog matching) is deterministic, no LLM call - see series_catalog_service.py.
+Stage 3 (catalog matching) is deterministic, no LLM call - see card_analysis_stage_3.py.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from picture_service.models import (
     utc_now,
 )
 from picture_service.prompts import ATTRIBUTE_DETECTION_PROMPT, DERIVED_ATTRIBUTES_PROMPT
-from picture_service.series_catalog_service import match_catalog
+from picture_service.card_analysis_stage_3 import match_catalog
 
 _MIME_TYPES = {
     ".jpg": "image/jpeg",
@@ -254,7 +254,7 @@ async def analyze_card(
             photo_id, source_file_name, config.model, derivation, detected=detection.attributes, verified=verified
         )
 
-    match = match_catalog(detection.attributes, derivation.attributes, catalog, verified)
+    match = match_catalog(derivation.attributes, catalog, verified)
 
     return CardAnalysisResult(
         photo_id=photo_id,
@@ -265,7 +265,6 @@ async def analyze_card(
         card_name=match.card_name,
         card_number=match.card_number,
         set_name=match.set_name,
-        rarity=match.rarity,
         language=match.language,
         error_message=match.error_message,
         detected=detection.attributes,

@@ -23,10 +23,11 @@ and tested on its own, and makes card-number resolution catalog-grounded for the
      `class` value constrained to the catalog's fixed set (`character`, `action`, `vehicle`,
      `puzzle-piece`, `trap`, `limited edition`, `art` - see `catalog-service-card-class`) and a
      format/rarity attribute (exact value set deliberately left open - iterated on later).
-  3. **Catalog matching** - deterministic code, no LLM call. Extends the existing series
-     evidence-scoring pattern to also resolve card number, now using the catalog's per-card
-     `Class` (once `catalog-service-card-class` ships) to narrow candidates. Produces the final
-     judged series/card number/card name/rarity/language/status.
+  3. **Catalog matching** - deterministic code, no LLM call. Scores every catalog card (all
+     series) against stage 2's derived `card_number`, `class` and `card_name` (a number whose
+     catalog class differs from the derived class counts for nothing; names match by similarity);
+     the best card determines the series and card number. Produces the final judged series/card
+     number/card name/language/status.
 - The sidecar record is restructured from one flat set of fields into three sections: `Detected`
   (stage 1's generic map), `Derived` (stage 2's generic map), and `Judged` (stays a fixed/typed
   structure - the stable contract `NinjagoScanner.Web` already depends on: series name, card
@@ -50,9 +51,9 @@ and tested on its own, and makes card-number resolution catalog-grounded for the
 - `picture-service-derived-attributes`: the stage 2 Gemini call - text-only input (stage 1's
   output, no photo), retry/failure semantics, and the generic key-value output contract,
   including the constraint that `class` is always one of the catalog's fixed values.
-- `picture-service-catalog-matching`: stage 3's deterministic card-number resolution (extending
-  the existing series-matching pattern) and how the three stages' outputs combine into the
-  `Judged` section's analysis status.
+- `picture-service-catalog-matching`: stage 3's deterministic card scoring (card number, class,
+  card name) across the whole catalog, which determines the series and card number, and how the
+  three stages' outputs combine into the `Judged` section's analysis status.
 - `picture-service-sidecar-sections`: the sidecar record's three-section shape (`Detected`/
   `Derived` generic, `Judged` fixed/typed) and migration of pre-existing flat sidecar records.
 
@@ -63,14 +64,13 @@ and tested on its own, and makes card-number resolution catalog-grounded for the
   both LLM stages) and removes what no longer applies to a single call (the series-catalog
   prompt; confidence/status normalization and language detection, which move to
   `picture-service-catalog-matching` and `picture-service-derived-attributes` respectively).
-- `picture-service-series-name-matching`: evidence-based scoring now reads its evidence from the
-  stage 1/2 attribute maps instead of the retired `GeminiCardPayload`'s named fields (set name,
-  card name, reasoning summary, detected text); the matching algorithm itself (exact match wins,
-  evidence scoring, ties yield no match, empty catalog falls back to a raw guess) is unchanged.
+- `picture-service-series-name-matching`: removed entirely. Series detection in stages 1/2 is
+  unreliable, so a series is no longer resolved from a name guess or evidence text; it follows
+  from the card matched by `picture-service-catalog-matching`.
 
 ## Impact
 
-- **Code**: `picture_service/src/picture_service/{gemini_service.py, series_catalog_service.py,
+- **Code**: `picture_service/src/picture_service/{gemini_service.py, card_analysis_stage_3.py,
   models.py, sidecar_table.py, picture_scanner_service.py}`. `catalog_client.py` gains a
   dependency on `catalog-service-card-class`'s `Class` field.
 - **Storage**: DynamoDB sidecar item shape changes (see `picture-service-sidecar-sections`);

@@ -150,8 +150,8 @@ class SeriesInfo:
 @dataclass(frozen=True)
 class CatalogCardInfo:
     """One card from the catalog (CatalogService's `ListAllCards`), as loaded via
-    catalog_client.py - used by stage 3 (picture-service-catalog-matching) to resolve a card
-    number within an already-resolved series.
+    catalog_client.py - used by stage 3 (picture-service-catalog-matching), which scores every
+    card across all series against the derived attributes to find the card (and so its series).
     """
 
     series_name: str

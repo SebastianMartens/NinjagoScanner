@@ -230,7 +230,7 @@ def _build_model_factory(stage1_responses, stage2_responses=None):
 
 async def test_analyze_card_runs_all_three_stages_on_success():
     build_model, _, stage2_model = _build_model_factory(
-        [ok_raw_result({"card_number": "1"})], [ok_raw_result({"series_name": "Serie 1"})]
+        [ok_raw_result({"card_number": "1"})], [ok_raw_result({"card_number": "1"})]
     )
 
     result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data")
@@ -240,7 +240,7 @@ async def test_analyze_card_runs_all_three_stages_on_success():
     assert result.set_name == "Serie 1"
     assert result.card_number == "1"
     assert result.detected == {"card_number": "1"}
-    assert result.derived == {"series_name": "Serie 1"}
+    assert result.derived == {"card_number": "1"}
 
 
 async def test_analyze_card_stage2_does_not_run_when_stage1_fails():
@@ -272,7 +272,7 @@ VERIFIED = VerifiedMatch(set_name="Serie 1", card_number="1")
 
 async def test_analyze_card_reruns_stages_but_keeps_verified_series_and_number():
     build_model, stage1_model, stage2_model = _build_model_factory(
-        [ok_raw_result({"card_number": "7"})], [ok_raw_result({"series_name": "Serie 9", "rarity": "rare"})]
+        [ok_raw_result({"card_number": "7"})], [ok_raw_result({"card_number": "7", "rarity": "rare"})]
     )
 
     result = await analyze_card(build_model, make_config(), CATALOG, "p1", "card.jpg", b"data", VERIFIED)
@@ -283,9 +283,9 @@ async def test_analyze_card_reruns_stages_but_keeps_verified_series_and_number()
     assert result.set_name == "Serie 1"
     assert result.card_number == "1"
     assert result.card_name == "Kai"
-    assert result.rarity == "rare"
+    assert result.rarity is None
     assert result.detected == {"card_number": "7"}
-    assert result.derived == {"series_name": "Serie 9", "rarity": "rare"}
+    assert result.derived == {"card_number": "7", "rarity": "rare"}
 
 
 async def test_analyze_card_stage1_failure_keeps_verified_series_and_number():
