@@ -192,7 +192,7 @@
           {"Karten-Nr.": 157, "Name": {"en": "Wonders of Shintaro"}},
           {"Karten-Nr.": 158, "Name": {"en": "Fear of the dark"}},
           {"Karten-Nr.": 159, "Name": {"en": "King's Audience"}},
-          {"Karten-Nr.": 160, "Name": {"en": "Squabbler"}},
+          {"Karten-Nr.": 160, "Name": {"en": "Squabbler", "de": "Streithähne"}},
           {"Karten-Nr.": 161, "Name": {"en": "Gloomy Crystal"}},
           {"Karten-Nr.": 162, "Name": {"en": "Show"}},
           {"Karten-Nr.": 163, "Name": {"en": "Present"}},
@@ -229,7 +229,7 @@
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Covered in Leaves"}},
           {"Karten-Nr.": 191, "Name": {"en": "Abducted"}},
-          {"Karten-Nr.": 192, "Name": {"en": "Lair of the Skull Sorcerer"}},
+          {"Karten-Nr.": 192, "Name": {"en": "Lair of the Skull Sorcerer", "de": "Höhle des Totenkopfmagiers"}},
           {"Karten-Nr.": 193, "Name": {"en": "Imprisoned"}},
           {"Karten-Nr.": 194, "Name": {"en": "Cardboard Buddy"}},
           {"Karten-Nr.": 195, "Name": {"en": "Onslaught"}},

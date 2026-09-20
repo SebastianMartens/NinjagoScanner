@@ -48,7 +48,7 @@ A catalog card's score SHALL be the sum of: 50 points when the card number equal
 - **THEN** the card is not a match candidate
 
 ### Requirement: Card names are compared by similarity, not only equality
-The card-name component SHALL award the full 30 points only for a name that equals the derived card name after normalization (case, punctuation and surrounding whitespace ignored). A name that is merely similar - a different language, or a partially detected name such as a fragment of the real name - SHALL award a proportionally smaller amount, and a name below a minimum similarity SHALL award nothing, so an exact name always outranks a similar one.
+The card-name component SHALL award the full 30 points only for a name that equals a derived card name after normalization (case, punctuation and surrounding whitespace ignored). The derived card names are `card_name` and, when present, its English translation `card_name_en`; a catalog card's name SHALL be compared against each of them and the higher similarity SHALL count, because most catalog names exist in English only and a card in another language would otherwise never match. A name that is merely similar - a partially detected name such as a fragment of the real name - SHALL award a proportionally smaller amount, and a name below a minimum similarity SHALL award nothing, so an exact name always outranks a similar one. When no `card_name_en` is derived, only `card_name` SHALL be compared. Matching SHALL NOT call any language model.
 
 #### Scenario: Partially detected name
 - **WHEN** the derived card name is a fragment of a catalog card's name (e.g. "Jay Z" for "Jay ZX")
@@ -57,6 +57,22 @@ The card-name component SHALL award the full 30 points only for a name that equa
 #### Scenario: Unrelated name
 - **WHEN** the derived card name is unrelated to a catalog card's name
 - **THEN** the name contributes no points for that card
+
+#### Scenario: Card in another language matched through its English name
+- **WHEN** the derived card name is "Feuer-Drache", the derived `card_name_en` is "Fire Dragon", and the catalog only holds the English name "Fire Dragon" for a card of the derived class
+- **THEN** that card receives the full name score and is the match
+
+#### Scenario: No English name derived
+- **WHEN** the derived card name is in another language than the catalog's and no `card_name_en` is derived
+- **THEN** the card name is compared as before and, being dissimilar, contributes no points
+
+#### Scenario: Catalog holds the original-language name
+- **WHEN** a catalog card's name equals the derived `card_name` exactly, even though `card_name_en` differs from it
+- **THEN** that card receives the full name score
+
+#### Scenario: Translation does not override the class rule
+- **WHEN** a card's number matches but its class differs from the derived class, and its name matches only through `card_name_en`
+- **THEN** the card number still earns nothing, as for any class mismatch
 
 ### Requirement: A card number with a different class is inconsistent
 When the derived class and a catalog card's class are both known and differ, a card number equal to the derived one SHALL earn no points for that card, because a number that belongs to a card of another class means the number was misread or the class was misjudged. Such a card can still be matched through its name, but never through its number.

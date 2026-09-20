@@ -240,3 +240,47 @@ def test_verified_match_not_in_catalog_falls_back_to_card_name_guess():
     assert result.set_name == "Serie 2"
     assert result.card_number == "99"
     assert result.card_name == "Zane"
+
+
+# --- Names in another language (catalog names are mostly English-only) ---
+
+ENGLISH_ONLY_CARDS = [
+    card("Serie 5", "40", "Fire Dragon", "character"),
+    card("Serie 6", "40", "Ice Emperor", "character"),
+    card("Serie 7", "40", "Golden Weapons", "action", "Action_Cards"),
+]
+
+
+def test_german_name_is_matched_through_its_english_translation():
+    derived = {"class": "character", "card_name": "Feuer-Drache", "card_name_en": "Fire Dragon", "language": "de"}
+
+    result = match_catalog(derived, snapshot(ENGLISH_ONLY_CARDS))
+
+    assert result.analysis_status == AnalysisStatuses.OK
+    assert (result.set_name, result.card_number, result.card_name) == ("Serie 5", "40", "Fire Dragon")
+    assert result.language == "de"
+
+
+def test_german_name_without_translation_does_not_match_an_english_only_catalog():
+    derived = {"class": "character", "card_name": "Feuer-Drache", "language": "de"}
+
+    result = match_catalog(derived, snapshot(ENGLISH_ONLY_CARDS))
+
+    assert result.analysis_status == AnalysisStatuses.FAILED
+
+
+def test_original_name_still_counts_when_the_catalog_has_the_german_name():
+    catalog = [card("Serie 3", "40", "Feuer-Drache", "character"), *ENGLISH_ONLY_CARDS]
+    derived = {"class": "character", "card_name": "Feuer-Drache", "card_name_en": "Fire Drake", "language": "de"}
+
+    result = match_catalog(derived, snapshot(catalog))
+
+    assert (result.set_name, result.card_name) == ("Serie 3", "Feuer-Drache")
+
+
+def test_translation_does_not_override_a_class_mismatch():
+    derived = {"class": "action", "card_number": "40", "card_name": "Feuer-Drache", "card_name_en": "Fire Dragon"}
+
+    result = match_catalog(derived, snapshot(ENGLISH_ONLY_CARDS))
+
+    assert result.set_name != "Serie 5"

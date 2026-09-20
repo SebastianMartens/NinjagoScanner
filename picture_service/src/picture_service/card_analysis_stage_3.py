@@ -11,9 +11,10 @@ Scoring, per catalog card (maximum 100):
   differ. That combination means something is wrong (the number was misread or the class
   was misjudged), so the number earns nothing rather than backing a card of the wrong class.
 - class equals the derived one: 20
-- card name: up to 30. An exact (normalized) match earns the full 30; a similar name (wrong
-  language, partially detected) earns 30 scaled by its similarity, and nothing below a
-  minimum similarity.
+- card name: up to 30. An exact (normalized) match earns the full 30; a similar name (partially
+  detected) earns 30 scaled by its similarity, and nothing below a minimum similarity. Most
+  catalog names exist in English only, so a card in another language is also compared by the
+  English name stage 2 derived for it (`card_name_en`); the better of the two similarities counts.
 
 A card must reach `_MIN_MATCH_SCORE` and be the single best candidate to be the match.
 """
@@ -71,10 +72,11 @@ def match_catalog(
     """Stage 3 entry point - see picture-service-catalog-matching. Runs no LLM call; consumes
     only stage 2's output and the catalog snapshot already loaded from CatalogService.
 
-    When `verified` is given, the human-confirmed series and card number are kept as-is instead
+    When review status `verified` is given, the human-confirmed series and card number are kept as-is instead
     of being resolved again; only the remaining Judged fields are recomputed."""
     card_number_guess = _read_card_number(derived.get("card_number"))
     card_name_guess = _read_string(derived.get("card_name"))
+    card_name_english_guess = _read_string(derived.get("card_name_en"))
     language = _read_string(derived.get("language"))
 
     if verified is not None:
@@ -89,7 +91,9 @@ def match_catalog(
     derived_class = derived.get("class")
     derived_class = derived_class if isinstance(derived_class, str) and derived_class in CARD_CLASSES else None
 
-    winner = resolve_card(card_number_guess, card_name_guess, derived_class, list(catalog.cards))
+    winner = resolve_card(
+        card_number_guess, card_name_guess, derived_class, list(catalog.cards), card_name_english_guess
+    )
 
     if winner is None:
         return CatalogMatchResult(
@@ -116,6 +120,7 @@ def resolve_card(
     card_name_guess: str | None,
     derived_class: str | None,
     catalog_cards: list[CatalogCardInfo],
+    card_name_english_guess: str | None = None,
 ) -> CatalogCardInfo | None:
     """The single best-scoring catalog card across all series, or None when no card reaches the
     minimum score or the best score is shared by cards that are not the same series + number."""
@@ -123,7 +128,7 @@ def resolve_card(
     best_cards: list[CatalogCardInfo] = []
 
     for card in catalog_cards:
-        score = _score_card(card, card_number_guess, card_name_guess, derived_class)
+        score = _score_card(card, card_number_guess, card_name_guess, derived_class, card_name_english_guess)
         if score < _MIN_MATCH_SCORE:
             continue
         if score > best_score:
@@ -147,6 +152,7 @@ def _score_card(
     card_number_guess: str | None,
     card_name_guess: str | None,
     derived_class: str | None,
+    card_name_english_guess: str | None = None,
 ) -> float:
     class_known = derived_class is not None and card.card_class is not None
     class_matches = class_known and card.card_class == derived_class
@@ -160,8 +166,9 @@ def _score_card(
     if class_matches:
         score += _CLASS_POINTS
 
-    if card_name_guess:
-        similarity = _name_similarity(card_name_guess, card.card_name)
+    name_guesses = [guess for guess in (card_name_guess, card_name_english_guess) if guess]
+    if name_guesses:
+        similarity = max(_name_similarity(guess, card.card_name) for guess in name_guesses)
         if similarity >= _MIN_NAME_SIMILARITY:
             score += _NAME_POINTS * similarity
 

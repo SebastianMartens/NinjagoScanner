@@ -87,7 +87,12 @@ In particular, derive:
   "puzzle-piece": puzzle-piece cards have the "puzzle-piece_card" detected as true. 
   Puzzle-piece cards and art cards typically have no card_name attribute.  
 - "card_number": take over card number from the detected attributes.
-- "card_name": take over card number from the detected attributes.
+- "card_name": take over card name from the detected attributes.
+- "card_name_en": the English name of the card, used to look the card up in an English-only
+  catalog. If the card name is already English, repeat it. If it is German or Polish, give the
+  official English Ninjago name of that card if you know it (e.g. "Feuer-Drache" -> "Fire Dragon"),
+  otherwise a faithful translation. Keep character names (Lloyd, Kai, Garmadon, ...) as they are.
+  Omit it when there is no card_name.
 - "language": the presumed language of the card text ("de", "en", "pl" or "unknown").
   Take texts from the following attributes into account to determine the language: 
   "card_name", "text_box_text".
