@@ -60,8 +60,13 @@ trap_tag: true if the card has the german text "Falle" (maybe translated, e.g. "
 action_tag: true if the card has the german text "Aktion" (maybe translated, e.g. "Action" for english cards) written
  vertically (written bottom-to-top) in the upper right corner of the card.
 
-card_number: the number of the card, 0 if not visible in the photo. Card numbers are always smaller than other numbers or text
-and shown in the lower left corner of the card. Puzzle cards may have the card number shown in the lower right corner.
+shiny_finish: true if the card has a shiny finish. False otherwise. Rare cards often have a 
+reflective or holographic surface. Glitter, sparkles and golden or silver shine.
+
+card_number: the number of the card, 0 if not visible in the photo. Card numbers are always smaller 
+than other numbers or text and shown in the lower left corner of the card. Additionally to a simple integer number, a card may have
+the prefix "LE" if it's a limited edition card (e.g. "LE6"). Puzzle cards may have the 
+card number shown in the lower right corner.
 
 card_found: true if the picture shows any trading card. False if you see something else.
 """
