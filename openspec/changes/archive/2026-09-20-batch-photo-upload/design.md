@@ -63,6 +63,10 @@ State is `total`, `processed`, `uploaded`, `skipped`, `failed`, plus `skippedNam
 
 The existing type/size checks (`EnsureUploadIsValid`) run per file; a failure is recorded and the loop continues. Only `InvalidOperationException` (validation) and transport/RPC errors are recorded per file; cancellation of the loop token ends the batch.
 
+### 8. Raise SignalR's incoming message limit for the file selection
+
+The `InputFile` change event delivers the descriptors of *all* selected files (name, size, type, timestamp; roughly 150–250 bytes each) to the server in a single SignalR message. The default `MaximumReceiveMessageSize` of 32 KB is exceeded at roughly 200–250 files, which makes the server close the circuit with an error before any upload starts (found on Fly with a 250-file selection; 50 files worked). `Program.cs` therefore sets it to 8 MB, which covers the 10,000-file limit with margin and still lets the page's own "too many files" error show for larger selections. File bytes are unaffected: they are read in small chunks per file.
+
 ## Risks / Trade-offs
 
 - **File-name collisions** → files are skipped although they are different photos (e.g. iOS captures often called `image.jpg`; two cameras both producing `IMG_0001.jpg`; the mobile-camera uploads share the same name space). Mitigation: skipped names are listed in the summary so the user can see and re-upload them via the single-photo input. Future hardening (out of scope): store the file size on the sidecar and compare name + size.

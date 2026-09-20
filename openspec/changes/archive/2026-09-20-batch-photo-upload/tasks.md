@@ -30,14 +30,16 @@
 
 ## 6. Web: upload page
 
-- [ ] 6.1 In `Upload.razor`, keep the single-photo input unchanged and add a separate batch input (`multiple`, no `capture`, optional folder selection attribute) reading up to 10,000 files via `GetMultipleFiles(10000)` and showing a German error above the limit; verify with a bUnit/component test or manual run that both inputs render and the limit error appears
-- [ ] 6.2 Wire the batch button to load existing names and run the loop from task 5.1, disabling the button and showing an in-progress label while running, and cancelling the loop on component dispose; verify by a manual run that the button is disabled during a batch and re-enabled afterwards
-- [ ] 6.3 Render the progress summary (processed of total, uploaded/skipped/failed counts, throttled re-rendering) with no per-file rows, and after completion the skipped names and failed names with reasons; verify by a manual run with a mixed set (new, already-uploaded, unsupported, oversized files) that counts and lists are correct
-- [ ] 6.4 Verify the single-photo upload path is unchanged (analysis inline, existing names not skipped, download URL fetched) with the existing upload tests plus a manual mobile-camera-style run
+- [x] 6.1 In `Upload.razor`, keep the single-photo input unchanged and add a separate batch input (`multiple`, no `capture`, optional folder selection attribute) reading up to 10,000 files via `GetMultipleFiles(10000)` and showing a German error above the limit; verify with a bUnit/component test or manual run that both inputs render and the limit error appears
+- [x] 6.2 Wire the batch button to load existing names and run the loop from task 5.1, disabling the button and showing an in-progress label while running, and cancelling the loop on component dispose; verify by a manual run that the button is disabled during a batch and re-enabled afterwards
+- [x] 6.3 Render the progress summary (processed of total, uploaded/skipped/failed counts, throttled re-rendering) with no per-file rows, and after completion the skipped names and failed names with reasons; verify by a manual run with a mixed set (new, already-uploaded, unsupported, oversized files) that counts and lists are correct
+- [x] 6.4 Verify the single-photo upload path is unchanged (analysis inline, existing names not skipped, download URL fetched) with the existing upload tests plus a manual mobile-camera-style run
+
+- [x] 6.5 Raise SignalR's `MaximumReceiveMessageSize` (8 MB, `Program.cs`) so selecting hundreds to 10,000 files doesn't close the circuit; verify on the deployed app by selecting ~250 and ~2,000 files and starting the batch
 
 ## 7. Integration and docs
 
-- [ ] 7.1 Manual end-to-end run against local CatalogService, picture_service and Web: batch-upload ~200 photos, interrupt mid-way (close the tab), re-select the same files, confirm only the remainder uploads; then confirm the photos show as "noch nicht analysiert" on Overview and that "Gemini-Suche starten" analyzes them and keeps their file names
+- [x] 7.1 Manual end-to-end run against local CatalogService, picture_service and Web: batch-upload ~200 photos, interrupt mid-way (close the tab), re-select the same files, confirm only the remainder uploads; then confirm the photos show as "noch nicht analysiert" on Overview and that "Gemini-Suche starten" analyzes them and keeps their file names
 - [x] 7.2 Run `dotnet test NinjagoScanner.slnx` and `uv run pytest` in `picture_service/`, and verify both are green
 - [x] 7.3 Run `openspec validate batch-photo-upload --strict` and verify no errors
 - [x] 7.4 Invoke `openspec-update-glossary` if the change introduced terms worth recording (e.g. "Batch Upload"), and verify `openspec/GLOSSARY.md` is consistent
