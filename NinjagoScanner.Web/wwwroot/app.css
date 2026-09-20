@@ -785,6 +785,40 @@ h1:focus {
     color: var(--cv-status-failed-fg);
 }
 
+.upload-card + .upload-card {
+    margin-top: 1.5rem;
+}
+
+.upload-card h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.upload-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--cv-text-muted);
+}
+
+.upload-progress {
+    margin: 0;
+    font-weight: 700;
+}
+
+.upload-result-list {
+    text-align: left;
+    color: var(--cv-text-muted);
+}
+
+.upload-result-list ul {
+    margin: 0.35rem 0 0;
+    padding-left: 1.25rem;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
 /* ===== About page ===== */
 
 .about-section {

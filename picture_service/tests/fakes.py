@@ -30,6 +30,12 @@ class FakeSidecarTable:
             if cid == collection_id:
                 yield pid, record
 
+    async def list_source_file_names(self, collection_id: str) -> AsyncIterator[str]:
+        # Like the real table, yields one entry per record that has a name (not de-duplicated).
+        for (cid, _), record in list(self.items.items()):
+            if cid == collection_id and record.source_file_name:
+                yield record.source_file_name
+
     async def list_all(self) -> AsyncIterator[tuple[str, str, SidecarRecord]]:
         for (cid, pid), record in list(self.items.items()):
             yield cid, pid, record
@@ -38,23 +44,28 @@ class FakeSidecarTable:
 class FakePhotoStore:
     def __init__(self) -> None:
         self.bytes_by_key: dict[tuple[str, str], bytes] = {}
+        self.calls: list[str] = []
 
     async def put_bytes(self, collection_id: str, photo_id: str, data: bytes) -> None:
         self.bytes_by_key[(collection_id, photo_id)] = data
 
     async def get_bytes(self, collection_id: str, photo_id: str) -> bytes:
+        self.calls.append("get_bytes")
         return self.bytes_by_key[(collection_id, photo_id)]
 
     async def exists(self, collection_id: str, photo_id: str) -> bool:
+        self.calls.append("exists")
         return (collection_id, photo_id) in self.bytes_by_key
 
     async def delete(self, collection_id: str, photo_id: str) -> None:
         self.bytes_by_key.pop((collection_id, photo_id), None)
 
     async def create_download_url(self, collection_id: str, photo_id: str) -> str:
+        self.calls.append("create_download_url")
         return f"https://example.test/{collection_id}/{photo_id}"
 
     async def list_photo_ids(self, collection_id: str) -> AsyncIterator[str]:
+        self.calls.append("list_photo_ids")
         for cid, pid in list(self.bytes_by_key.keys()):
             if cid == collection_id:
                 yield pid

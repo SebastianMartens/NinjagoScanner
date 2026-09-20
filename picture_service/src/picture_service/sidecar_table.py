@@ -83,6 +83,30 @@ class SidecarTable:
             if last_evaluated_key is None:
                 break
 
+    async def list_source_file_names(self, collection_id: str) -> AsyncIterator[str]:
+        """Yields the SourceFileName of every sidecar in one collection (once per record that
+        has one) from a paginated, projected query. The projection shrinks the payload but not
+        the consumed read capacity, which DynamoDB bills on full item size."""
+        table = await self._table()
+        source_file_name_attr = _STRING_ATTRS["source_file_name"]
+        last_evaluated_key = None
+        while True:
+            kwargs = {
+                "KeyConditionExpression": "CollectionId = :cid",
+                "ExpressionAttributeValues": {":cid": collection_id},
+                "ProjectionExpression": source_file_name_attr,
+            }
+            if last_evaluated_key is not None:
+                kwargs["ExclusiveStartKey"] = last_evaluated_key
+            response = await table.query(**kwargs)
+            for item in response.get("Items", []):
+                name = item.get(source_file_name_attr)
+                if name:
+                    yield name
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if last_evaluated_key is None:
+                break
+
     async def list_all(self) -> AsyncIterator[tuple[str, str, SidecarRecord]]:
         table = await self._table()
         last_evaluated_key = None

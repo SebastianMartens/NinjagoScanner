@@ -34,6 +34,7 @@ service CardPictureService {
   rpc MigrateSidecars (MigrateSidecarsRequest) returns (MigrateSidecarsResponse);
   rpc DeletePhoto (DeletePhotoRequest) returns (DeletePhotoResponse);
   rpc ReanalyzePhoto (ReanalyzePhotoRequest) returns (ReanalyzePhotoResponse);
+  rpc ListSourceFileNames (ListSourceFileNamesRequest) returns (ListSourceFileNamesResponse);
 }
 
 // Bulk backfill: analyzes every photo in S3 that has no sidecar record yet (or all of them, if
@@ -128,10 +129,25 @@ message UploadPhotoMetadata {
   optional int32 max_attempts = 6;
   optional int32 timeout_seconds = 7;
   string collection_id = 8;
+  // When set, the photo is stored and given a notAnalyzed sidecar (carrying source_file_name) but
+  // not analyzed - so neither a Gemini API key nor CatalogService is needed. Used by batch upload;
+  // analysis happens later via Scan.
+  optional bool skip_analysis = 9;
 }
 
 message UploadPhotoResponse {
   CardEntry card = 1;
+}
+
+// Lean listing of the source file names recorded for a collection's photos, so a caller can tell
+// which files were already uploaded. Unlike ListCards it mints no download URLs and reads no photo
+// objects. Names are de-duplicated; photos without a recorded name contribute nothing.
+message ListSourceFileNamesRequest {
+  string collection_id = 1;
+}
+
+message ListSourceFileNamesResponse {
+  repeated string source_file_names = 1;
 }
 
 message GetPhotoDownloadUrlRequest {

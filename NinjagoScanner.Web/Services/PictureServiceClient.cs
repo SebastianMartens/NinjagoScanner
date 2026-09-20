@@ -115,16 +115,47 @@ internal sealed class PictureServiceClient
         Stream content,
         CancellationToken cancellationToken = default)
     {
+        var card = await StreamUploadAsync(sourceFileName, fileSizeBytes, content, skipAnalysis: false, cancellationToken);
+
+        var downloadUrl = await GetDownloadUrlAsync(card.PhotoId, cancellationToken);
+        card.DownloadUrl = downloadUrl;
+        return ToCardListItem(card);
+    }
+
+    /// <summary>
+    /// Batch variant of <see cref="UploadPhotoAsync"/>: stores the photo without analyzing it
+    /// (analysis happens later via <see cref="ScanAsync"/>) and, since a batch only needs
+    /// success/failure, does not fetch a download URL. Same up-front validation.
+    /// </summary>
+    public async Task UploadPhotoForBatchAsync(
+        string sourceFileName,
+        long fileSizeBytes,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        await StreamUploadAsync(sourceFileName, fileSizeBytes, content, skipAnalysis: true, cancellationToken);
+    }
+
+    private async Task<CardEntry> StreamUploadAsync(
+        string sourceFileName,
+        long fileSizeBytes,
+        Stream content,
+        bool skipAnalysis,
+        CancellationToken cancellationToken)
+    {
         EnsureUploadIsValid(sourceFileName, fileSizeBytes);
 
         var client = new CardPictureService.CardPictureServiceClient(channel);
         var collectionId = await GetCollectionIdAsync(cancellationToken);
         using var call = client.UploadPhoto(cancellationToken: cancellationToken);
 
-        await call.RequestStream.WriteAsync(new UploadPhotoRequest
+        var metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName, CollectionId = collectionId };
+        if (skipAnalysis)
         {
-            Metadata = new UploadPhotoMetadata { SourceFileName = sourceFileName, CollectionId = collectionId }
-        });
+            metadata.SkipAnalysis = true;
+        }
+
+        await call.RequestStream.WriteAsync(new UploadPhotoRequest { Metadata = metadata });
 
         var buffer = new byte[81920];
         int bytesRead;
@@ -138,10 +169,23 @@ internal sealed class PictureServiceClient
 
         await call.RequestStream.CompleteAsync();
         var response = await call;
+        return response.Card;
+    }
 
-        var downloadUrl = await GetDownloadUrlAsync(response.Card.PhotoId, cancellationToken);
-        response.Card.DownloadUrl = downloadUrl;
-        return ToCardListItem(response.Card);
+    /// <summary>
+    /// The source file names of every photo already in the collection, as an ordinal
+    /// (case-sensitive) set - the batch upload's skip-if-filename-exists lookup. Cheap compared
+    /// to <see cref="GetCardsAsync"/>: no download URL is created per photo.
+    /// </summary>
+    public async Task<HashSet<string>> ListSourceFileNamesAsync(CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
+        var response = await client.ListSourceFileNamesAsync(
+            new ListSourceFileNamesRequest { CollectionId = collectionId },
+            cancellationToken: cancellationToken);
+
+        return new HashSet<string>(response.SourceFileNames, StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)

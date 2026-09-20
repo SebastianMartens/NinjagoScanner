@@ -85,6 +85,62 @@ async def test_list_by_collection_returns_only_that_collection(sidecar_table: Si
     assert photo_ids == ["p1", "p2"]
 
 
+async def test_list_source_file_names_returns_only_that_collections_names(sidecar_table: SidecarTable):
+    await sidecar_table.put("col-a", "p1", SidecarRecord(source_file_name="a.jpg"))
+    await sidecar_table.put("col-a", "p2", SidecarRecord(source_file_name="b.png"))
+    await sidecar_table.put("col-b", "p3", SidecarRecord(source_file_name="other.jpg"))
+
+    names = sorted([name async for name in sidecar_table.list_source_file_names("col-a")])
+
+    assert names == ["a.jpg", "b.png"]
+
+
+async def test_list_source_file_names_omits_records_without_a_name(sidecar_table: SidecarTable):
+    await sidecar_table.put("col-a", "p1", SidecarRecord(source_file_name="a.jpg"))
+    await sidecar_table.put("col-a", "p2", SidecarRecord(analysis_status="ok"))
+
+    names = [name async for name in sidecar_table.list_source_file_names("col-a")]
+
+    assert names == ["a.jpg"]
+
+
+class _PagedDynamoDb:
+    """A DynamoDB resource whose table.query() serves scripted pages, to prove pagination is
+    followed and the query is projected - moto only pages at 1 MB of data."""
+
+    def __init__(self, pages: list[list[dict]]) -> None:
+        self._pages = pages
+        self.query_kwargs: list[dict] = []
+
+    async def Table(self, name: str):
+        return self
+
+    async def query(self, **kwargs):
+        self.query_kwargs.append(dict(kwargs))
+        index = 0 if "ExclusiveStartKey" not in kwargs else kwargs["ExclusiveStartKey"]["page"]
+        response = {"Items": self._pages[index]}
+        if index + 1 < len(self._pages):
+            response["LastEvaluatedKey"] = {"page": index + 1}
+        return response
+
+
+async def test_list_source_file_names_follows_every_page_with_a_projected_query():
+    dynamodb = _PagedDynamoDb(
+        [
+            [{"SourceFileName": "a.jpg"}, {"SourceFileName": "b.jpg"}],
+            [{}, {"SourceFileName": "c.jpg"}],
+            [{"SourceFileName": "d.jpg"}],
+        ]
+    )
+
+    names = [name async for name in SidecarTable(dynamodb, TABLE_NAME).list_source_file_names("col-a")]
+
+    assert names == ["a.jpg", "b.jpg", "c.jpg", "d.jpg"]
+    assert len(dynamodb.query_kwargs) == 3
+    assert all(kwargs["ProjectionExpression"] == "SourceFileName" for kwargs in dynamodb.query_kwargs)
+    assert all(kwargs["ExpressionAttributeValues"] == {":cid": "col-a"} for kwargs in dynamodb.query_kwargs)
+
+
 async def test_list_all_returns_every_collection(sidecar_table: SidecarTable):
     await sidecar_table.put("col-a", "p1", SidecarRecord(analysis_status="ok"))
     await sidecar_table.put("col-b", "p2", SidecarRecord(analysis_status="ok"))

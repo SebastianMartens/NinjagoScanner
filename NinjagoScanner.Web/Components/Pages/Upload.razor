@@ -1,5 +1,7 @@
 @page "/upload"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IDisposable
+@using System.Globalization
 @inject PictureServiceClient PictureServiceClient
 
 <PageTitle>Foto-Upload</PageTitle>
@@ -50,6 +52,95 @@
             <p class="upload-error">@errorMessage</p>
         }
     </section>
+
+    <section class="upload-card">
+        <h2>Viele Fotos auf einmal hochladen</h2>
+        <p class="upload-limit">
+            Die Fotos werden nur gespeichert, nicht analysiert &ndash; die Analyse startest du danach auf der
+            Uebersicht mit &bdquo;Gemini-Suche starten&ldquo;. Dateien, deren Name in der Sammlung schon vorkommt,
+            werden uebersprungen; nach einem Abbruch kannst du dieselbe Auswahl einfach erneut hochladen.
+            Der Tab muss waehrenddessen geoeffnet bleiben.
+        </p>
+
+        <label class="upload-check">
+            <input type="checkbox" checked="@selectFolder" disabled="@isBatchRunning" @onchange="OnSelectFolderChanged" />
+            <span>Ganzen Ordner auswaehlen</span>
+        </label>
+
+        <label class="upload-field">
+            <span>Fotos (max. @MaxBatchFiles.ToString("N0", German) pro Auswahl)</span>
+            @* @key: a fresh input clears the browser's selection, so the same files can be picked again (retry) after a run or a folder-mode toggle. *@
+            <InputFile @key="batchInputKey" OnChange="OnBatchFilesChanged" @attributes="batchInputAttributes" disabled="@isBatchRunning" />
+        </label>
+
+        @if (batchFiles.Count > 0 && batchUpload is null)
+        {
+            <p class="upload-selection">
+                Ausgewaehlt: <strong>@batchFiles.Count.ToString("N0", German)</strong> Dateien
+            </p>
+        }
+
+        <div class="upload-actions">
+            <button class="btn btn-primary" type="button" @onclick="StartBatchUploadAsync" disabled="@(isBatchRunning || batchFiles.Count == 0)">
+                @(isBatchRunning ? "Batch-Upload laeuft..." : "Fotos hochladen")
+            </button>
+        </div>
+
+        @if (batchUpload is not null)
+        {
+            <p class="upload-progress">
+                @batchUpload.Processed.ToString("N0", German) von @batchUpload.Total.ToString("N0", German) verarbeitet
+            </p>
+            <p class="upload-selection">
+                Hochgeladen: @batchUpload.Uploaded.ToString("N0", German) &middot;
+                Uebersprungen: @batchUpload.Skipped.ToString("N0", German) &middot;
+                Fehlgeschlagen: @batchUpload.Failed.ToString("N0", German)
+            </p>
+
+            @if (!isBatchRunning)
+            {
+                @if (batchUpload.WasCancelled)
+                {
+                    <p class="upload-error">Der Upload wurde abgebrochen.</p>
+                }
+                else
+                {
+                    <p class="upload-success">Batch-Upload abgeschlossen.</p>
+                }
+
+                @if (batchUpload.Skipped > 0)
+                {
+                    <details class="upload-result-list">
+                        <summary>Uebersprungen (Dateiname bereits vorhanden): @batchUpload.Skipped.ToString("N0", German)</summary>
+                        <ul>
+                            @foreach (var name in batchUpload.SkippedNames)
+                            {
+                                <li>@name</li>
+                            }
+                        </ul>
+                    </details>
+                }
+
+                @if (batchUpload.Failed > 0)
+                {
+                    <details class="upload-result-list" open>
+                        <summary>Fehlgeschlagen: @batchUpload.Failed.ToString("N0", German)</summary>
+                        <ul>
+                            @foreach (var failure in batchUpload.FailedItems)
+                            {
+                                <li>@failure.FileName &ndash; @failure.Reason</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            }
+        }
+
+        @if (!string.IsNullOrWhiteSpace(batchErrorMessage))
+        {
+            <p class="upload-error">@batchErrorMessage</p>
+        }
+    </section>
 </div>
 
 @code {
@@ -57,6 +148,28 @@
     {
         ["capture"] = "environment"
     };
+
+    private const int MaxBatchFiles = 10_000;
+    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
+    private static readonly TimeSpan RenderInterval = TimeSpan.FromMilliseconds(250);
+
+    // No capture hint: the batch input is for picking existing files, not for taking a photo.
+    private readonly Dictionary<string, object> batchInputAttributes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["multiple"] = true,
+        ["accept"] = "image/*"
+    };
+
+    private readonly CancellationTokenSource disposeCancellation = new();
+
+    private IReadOnlyList<IBrowserFile> batchFiles = [];
+    private BatchUpload? batchUpload;
+    private bool isBatchRunning;
+    private int batchInputKey;
+    private bool selectFolder;
+    private bool isDisposed;
+    private string? batchErrorMessage;
+    private DateTime lastRenderUtc;
 
     private IBrowserFile? selectedFile;
     private bool isUploading;
@@ -74,6 +187,111 @@
         selectedFile = eventArgs.FileCount > 0 ? eventArgs.File : null;
         successMessage = null;
         errorMessage = null;
+    }
+
+    private void OnSelectFolderChanged(ChangeEventArgs eventArgs)
+    {
+        selectFolder = eventArgs.Value is true;
+        batchInputKey++;
+        batchInputAttributes.Remove("webkitdirectory");
+        if (selectFolder)
+        {
+            batchInputAttributes["webkitdirectory"] = true;
+        }
+
+        batchFiles = [];
+        batchUpload = null;
+        batchErrorMessage = null;
+    }
+
+    private void OnBatchFilesChanged(InputFileChangeEventArgs eventArgs)
+    {
+        batchUpload = null;
+        batchErrorMessage = null;
+
+        if (eventArgs.FileCount > MaxBatchFiles)
+        {
+            batchFiles = [];
+            batchErrorMessage = $"Zu viele Dateien ausgewaehlt: maximal {MaxBatchFiles.ToString("N0", German)} pro Batch-Upload.";
+            return;
+        }
+
+        batchFiles = eventArgs.GetMultipleFiles(MaxBatchFiles);
+    }
+
+    private async Task StartBatchUploadAsync()
+    {
+        if (batchFiles.Count == 0 || isBatchRunning)
+        {
+            return;
+        }
+
+        var cancellationToken = disposeCancellation.Token;
+        isBatchRunning = true;
+        batchErrorMessage = null;
+        batchUpload = null;
+
+        try
+        {
+            // Looked up once, before the first upload: a batch that couldn't learn which names
+            // already exist would re-upload (duplicate) everything, so it doesn't start at all.
+            var existingNames = await PictureServiceClient.ListSourceFileNamesAsync(cancellationToken);
+
+            var files = batchFiles.Select(file => new BatchUploadFile(file.Name, async token =>
+            {
+                // A file above the limit must reach PictureServiceClient's German size check
+                // rather than fail inside OpenReadStream, so the stream is opened with at least
+                // the file's own size; nothing is read until the client has validated it.
+                await using var stream = file.OpenReadStream(Math.Max(maxUploadBytes, file.Size), token);
+                await PictureServiceClient.UploadPhotoForBatchAsync(file.Name, file.Size, stream, token);
+            })).ToList();
+
+            var upload = new BatchUpload(files, existingNames);
+            upload.Changed += OnBatchProgressChanged;
+            batchUpload = upload;
+            lastRenderUtc = DateTime.UtcNow;
+
+            await upload.RunAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The circuit is going away; nothing left to show.
+        }
+        catch (Exception exception)
+        {
+            batchErrorMessage = $"Batch-Upload konnte nicht gestartet werden: {exception.Message}";
+        }
+        finally
+        {
+            isBatchRunning = false;
+            if (batchUpload is not null)
+            {
+                batchUpload.Changed -= OnBatchProgressChanged;
+            }
+
+            // The picked files were consumed (or failed); a new run needs a new pick.
+            batchInputKey++;
+            batchFiles = [];
+        }
+    }
+
+    // A 10,000-file batch would otherwise push 10,000 renders over the SignalR circuit.
+    private void OnBatchProgressChanged()
+    {
+        if (isDisposed || DateTime.UtcNow - lastRenderUtc < RenderInterval)
+        {
+            return;
+        }
+
+        lastRenderUtc = DateTime.UtcNow;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        isDisposed = true;
+        disposeCancellation.Cancel();
+        disposeCancellation.Dispose();
     }
 
     private async Task UploadSelectedFileAsync()

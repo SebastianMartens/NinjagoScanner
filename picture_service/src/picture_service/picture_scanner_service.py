@@ -189,6 +189,18 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         image_bytes = bytes(chunks)
         await self._photo_store.put_bytes(metadata.collection_id, photo_id, image_bytes)
 
+        if metadata.skip_analysis:
+            # Batch upload: only the file name is recorded, so a later Scan (which retries anything
+            # not ok/uncertain) picks the photo up. Deliberately before ScannerConfig/catalog are
+            # touched - no Gemini key or CatalogService is needed for this path.
+            await self._sidecar_cache.set_record(
+                metadata.collection_id,
+                photo_id,
+                SidecarRecord(source_file_name=source_file_name, analysis_status=AnalysisStatuses.NOT_ANALYZED),
+            )
+            record = await self._sidecar_cache.get(metadata.collection_id, photo_id)
+            return pb2.UploadPhotoResponse(card=_to_card_entry(photo_id, record))
+
         config = ScannerConfig.load_for_upload(
             api_key=metadata.api_key if metadata.HasField("api_key") else None,
             model=metadata.model if metadata.HasField("model") else None,
@@ -316,6 +328,14 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             response.cards.append(_to_card_entry(photo_id, record, download_url))
 
         return response
+
+    async def ListSourceFileNames(
+        self, request: pb2.ListSourceFileNamesRequest, context: grpc.aio.ServicerContext
+    ) -> pb2.ListSourceFileNamesResponse:
+        await _ensure_collection_id(request.collection_id, context)
+
+        names = {name async for name in self._sidecar_cache.list_source_file_names(request.collection_id)}
+        return pb2.ListSourceFileNamesResponse(source_file_names=sorted(names))
 
     async def GetCardDetails(
         self, request: pb2.GetCardDetailsRequest, context: grpc.aio.ServicerContext

@@ -28,6 +28,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
     private readonly InMemoryPhotoStore photoStore = new();
     private readonly InMemorySidecarStore sidecarStore = new();
     private readonly ReanalysisSettings reanalysisSettings = new();
+    private readonly CallLog callLog = new();
 
     private WebApplication? app;
 
@@ -54,6 +55,12 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         reanalysisSettings.CardNumber = cardNumber;
         reanalysisSettings.SetName = setName;
     }
+
+    /// <summary>Every <c>UploadPhoto</c> call received, in order, with whether it set <c>skip_analysis</c>.</summary>
+    public IReadOnlyList<RecordedUpload> Uploads => callLog.Uploads.ToArray();
+
+    /// <summary>How many <c>GetPhotoDownloadUrl</c> calls were received.</summary>
+    public int DownloadUrlCallCount => callLog.DownloadUrlCallCount;
 
     public void WritePhoto(string photoId, string? sidecarJson = null, string? collectionId = null)
     {
@@ -83,6 +90,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         builder.Services.AddSingleton(photoStore);
         builder.Services.AddSingleton(sidecarStore);
         builder.Services.AddSingleton(reanalysisSettings);
+        builder.Services.AddSingleton(callLog);
         builder.Services.AddScoped<FakeCardPictureService>();
 
         app = builder.Build();
@@ -147,6 +155,19 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         }
     }
 
+    public sealed record RecordedUpload(string SourceFileName, bool SkipAnalysis);
+
+    private sealed class CallLog
+    {
+        private int downloadUrlCallCount;
+
+        public ConcurrentQueue<RecordedUpload> Uploads { get; } = new();
+
+        public int DownloadUrlCallCount => Volatile.Read(ref downloadUrlCallCount);
+
+        public void RecordDownloadUrlCall() => Interlocked.Increment(ref downloadUrlCallCount);
+    }
+
     private sealed class ReanalysisSettings
     {
         public StatusCode? FailureStatusCode { get; set; }
@@ -182,12 +203,18 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         private readonly InMemoryPhotoStore photoStore;
         private readonly InMemorySidecarStore sidecarStore;
         private readonly ReanalysisSettings reanalysisSettings;
+        private readonly CallLog callLog;
 
-        public FakeCardPictureService(InMemoryPhotoStore photoStore, InMemorySidecarStore sidecarStore, ReanalysisSettings reanalysisSettings)
+        public FakeCardPictureService(
+            InMemoryPhotoStore photoStore,
+            InMemorySidecarStore sidecarStore,
+            ReanalysisSettings reanalysisSettings,
+            CallLog callLog)
         {
             this.photoStore = photoStore;
             this.sidecarStore = sidecarStore;
             this.reanalysisSettings = reanalysisSettings;
+            this.callLog = callLog;
         }
 
         public override Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
@@ -242,9 +269,11 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             var photoId = Guid.NewGuid().ToString("n");
             photoStore.Put(metadata.CollectionId, photoId, buffer.ToArray());
 
+            callLog.Uploads.Enqueue(new RecordedUpload(metadata.SourceFileName, metadata.SkipAnalysis));
+
             var record = new FakeSidecarRecord
             {
-                AnalysisStatus = "ok",
+                AnalysisStatus = metadata.SkipAnalysis ? "notAnalyzed" : "ok",
                 SourceFileName = metadata.SourceFileName
             };
             sidecarStore.Put(metadata.CollectionId, photoId, record);
@@ -254,6 +283,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
         public override Task<GetPhotoDownloadUrlResponse> GetPhotoDownloadUrl(GetPhotoDownloadUrlRequest request, ServerCallContext context)
         {
+            callLog.RecordDownloadUrlCall();
             EnsureCollectionId(request.CollectionId);
 
             if (!photoStore.Exists(request.CollectionId, request.PhotoId))
@@ -277,6 +307,20 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 var record = sidecarStore.Get(request.CollectionId, photoId);
                 response.Cards.Add(ToCardEntry(photoId, record, photoStore.CreateDownloadUrl(request.CollectionId, photoId)));
             }
+
+            return Task.FromResult(response);
+        }
+
+        public override Task<ListSourceFileNamesResponse> ListSourceFileNames(ListSourceFileNamesRequest request, ServerCallContext context)
+        {
+            EnsureCollectionId(request.CollectionId);
+
+            var response = new ListSourceFileNamesResponse();
+            response.SourceFileNames.AddRange(sidecarStore.ListByCollection(request.CollectionId)
+                .Select(entry => entry.Record.SourceFileName)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)!);
 
             return Task.FromResult(response);
         }

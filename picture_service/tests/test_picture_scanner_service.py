@@ -265,6 +265,185 @@ async def test_two_uploads_with_same_file_name_get_distinct_ids():
     assert r1.card.photo_id != r2.card.photo_id
 
 
+# --- UploadPhoto with skip_analysis ---
+
+
+def _skip_analysis_upload(file_name="a.jpg", collection_id="col-a", chunks=(b"data",)):
+    metadata = pb2.UploadPhotoMetadata(source_file_name=file_name, collection_id=collection_id, skip_analysis=True)
+    return _FakeRequestIterator(
+        [pb2.UploadPhotoRequest(metadata=metadata), *(pb2.UploadPhotoRequest(chunk=chunk) for chunk in chunks)]
+    )
+
+
+def _forbidden_build_model(config, schema):
+    raise AssertionError("the model must not be built for a skip-analysis upload")
+
+
+async def test_upload_photo_skip_analysis_stores_bytes_and_not_analyzed_sidecar_without_analysis(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "key")
+    service, table, photo_store = make_service(build_model=_forbidden_build_model)
+
+    response = await service.UploadPhoto(_skip_analysis_upload(chunks=(b"hello ", b"world")), FakeServicerContext())
+
+    photo_id = response.card.photo_id
+    assert photo_id
+    assert photo_store.bytes_by_key[("col-a", photo_id)] == b"hello world"
+    sidecar = table.items[("col-a", photo_id)]
+    assert sidecar.source_file_name == "a.jpg"
+    assert sidecar.analysis_status == AnalysisStatuses.NOT_ANALYZED
+    assert response.card.source_file_name == "a.jpg"
+    assert response.card.analysis_status == AnalysisStatuses.NOT_ANALYZED
+
+
+async def test_upload_photo_skip_analysis_succeeds_without_a_gemini_api_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    service, _, _ = make_service(build_model=_forbidden_build_model)
+
+    response = await service.UploadPhoto(_skip_analysis_upload(), FakeServicerContext())
+
+    assert response.card.analysis_status == AnalysisStatuses.NOT_ANALYZED
+
+
+async def test_upload_photo_skip_analysis_succeeds_when_the_catalog_is_unreachable(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "key")
+    service, _, _ = make_service(catalog_error=ConnectionError("catalog down"), build_model=_forbidden_build_model)
+
+    response = await service.UploadPhoto(_skip_analysis_upload(), FakeServicerContext())
+
+    assert response.card.analysis_status == AnalysisStatuses.NOT_ANALYZED
+
+
+@pytest.mark.parametrize(
+    ("file_name", "collection_id", "chunks"),
+    [
+        ("a.gif", "col-a", (b"data",)),
+        ("a.jpg", "col-a", ()),
+        ("a.jpg", "", (b"data",)),
+    ],
+    ids=["unsupported-extension", "empty-content", "missing-collection-id"],
+)
+async def test_upload_photo_skip_analysis_still_validates(file_name, collection_id, chunks):
+    service, table, photo_store = make_service()
+
+    with pytest.raises(AbortCalled) as exc_info:
+        await service.UploadPhoto(_skip_analysis_upload(file_name, collection_id, chunks), FakeServicerContext())
+
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
+    assert not photo_store.bytes_by_key
+    assert not table.items
+
+
+async def test_two_skip_analysis_uploads_with_same_file_name_get_distinct_ids():
+    service, table, photo_store = make_service()
+
+    r1 = await service.UploadPhoto(_skip_analysis_upload(), FakeServicerContext())
+    r2 = await service.UploadPhoto(_skip_analysis_upload(), FakeServicerContext())
+
+    assert r1.card.photo_id != r2.card.photo_id
+    assert len(photo_store.bytes_by_key) == 2
+    assert [record.source_file_name for record in table.items.values()] == ["a.jpg", "a.jpg"]
+
+
+async def test_scan_analyzes_a_skip_analysis_photo_and_keeps_its_source_file_name():
+    service, table, _ = make_service()
+    uploaded = await service.UploadPhoto(_skip_analysis_upload(file_name="IMG_0001.jpg"), FakeServicerContext())
+
+    summary = await service.Scan(pb2.ScanRequest(collection_id="col-a", api_key="key"), FakeServicerContext())
+
+    assert summary.processed == 1
+    assert summary.skipped == 0
+    sidecar = table.items[("col-a", uploaded.card.photo_id)]
+    assert sidecar.analysis_status == AnalysisStatuses.OK
+    assert sidecar.source_file_name == "IMG_0001.jpg"
+
+
+# --- ListSourceFileNames ---
+
+
+def _list_source_file_names(service, collection_id="col-a"):
+    return service.ListSourceFileNames(
+        pb2.ListSourceFileNamesRequest(collection_id=collection_id), FakeServicerContext()
+    )
+
+
+@pytest.mark.parametrize("collection_id", ["", "   "])
+async def test_list_source_file_names_requires_collection_id(collection_id):
+    service, _, _ = make_service()
+
+    with pytest.raises(AbortCalled) as exc_info:
+        await _list_source_file_names(service, collection_id)
+
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
+
+
+async def test_list_source_file_names_of_an_empty_collection_is_empty():
+    service, _, _ = make_service()
+
+    response = await _list_source_file_names(service)
+
+    assert list(response.source_file_names) == []
+
+
+async def test_list_source_file_names_reports_each_name():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(source_file_name="a.jpg")
+    table.items[("col-a", "p2")] = SidecarRecord(source_file_name="b.png")
+    table.items[("col-a", "p3")] = SidecarRecord(source_file_name="c.webp")
+
+    response = await _list_source_file_names(service)
+
+    assert sorted(response.source_file_names) == ["a.jpg", "b.png", "c.webp"]
+
+
+async def test_list_source_file_names_reports_a_shared_name_once():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(source_file_name="IMG_0001.jpg")
+    table.items[("col-a", "p2")] = SidecarRecord(source_file_name="IMG_0001.jpg")
+
+    response = await _list_source_file_names(service)
+
+    assert list(response.source_file_names) == ["IMG_0001.jpg"]
+
+
+async def test_list_source_file_names_omits_photos_without_a_name():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(source_file_name="a.jpg")
+    table.items[("col-a", "p2")] = SidecarRecord(analysis_status="ok")
+
+    response = await _list_source_file_names(service)
+
+    assert list(response.source_file_names) == ["a.jpg"]
+
+
+async def test_list_source_file_names_excludes_other_collections():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(source_file_name="mine.jpg")
+    table.items[("col-b", "p2")] = SidecarRecord(source_file_name="theirs.jpg")
+
+    response = await _list_source_file_names(service)
+
+    assert list(response.source_file_names) == ["mine.jpg"]
+
+
+async def test_list_source_file_names_includes_a_name_written_by_a_skip_analysis_upload():
+    service, _, _ = make_service()
+    await service.UploadPhoto(_skip_analysis_upload(file_name="IMG_0042.jpg"), FakeServicerContext())
+
+    response = await _list_source_file_names(service)
+
+    assert list(response.source_file_names) == ["IMG_0042.jpg"]
+
+
+async def test_list_source_file_names_does_not_touch_the_photo_store():
+    service, table, photo_store = make_service()
+    photo_store.bytes_by_key[("col-a", "p1")] = b"data"
+    table.items[("col-a", "p1")] = SidecarRecord(source_file_name="a.jpg")
+
+    await _list_source_file_names(service)
+
+    assert photo_store.calls == []
+
+
 # --- Sidecar editing ---
 
 

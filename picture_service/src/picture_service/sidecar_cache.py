@@ -64,6 +64,13 @@ class SidecarCache:
         async for photo_id, record in self._sidecar_table.list_by_collection(collection_id):
             self._entries.setdefault((collection_id, photo_id), record)
 
+    async def list_source_file_names(self, collection_id: str) -> AsyncIterator[str]:
+        """Passes straight through to the store's names-only query: it neither reads nor fills
+        the cache, since a name listing doesn't need full records (and the store is
+        authoritative - every write goes through set_record, which persists synchronously)."""
+        async for name in self._sidecar_table.list_source_file_names(collection_id):
+            yield name
+
     async def list_all(self) -> AsyncIterator[tuple[str, str, SidecarRecord]]:
         """Enumerates every sidecar record across every collection, populating the cache along
         the way. Used only by the global MigrateSidecars maintenance RPC (see

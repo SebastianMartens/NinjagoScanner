@@ -114,13 +114,25 @@ can't be reached the existing **Sidecar** is left untouched rather than
 overwritten with `failed`. Hand-edited values on a photo that isn't
 `verified` are replaced by the new result.
 
+### Batch Upload
+Uploading many **Card Photo**s at once through the `/upload` page's separate
+multi-file input (not the single-photo camera input) — decided by which input
+is used, never by file count. The **Web App** sends the files one at a time;
+**Picture Service** stores each photo with a **Sidecar** that records only its
+source file name and an **Analysis Status** of `notAnalyzed`, so no **AI
+Analysis** happens during the upload — it is started later from the
+**Overview**. A file is skipped when its exact (case-sensitive) file name
+already exists in the collection, so re-selecting the same files after an
+interruption resumes the batch; files that fail (unsupported type, too large,
+transport error) are reported without stopping it.
+
 ### Analysis Status
 The machine-produced outcome of an **AI Analysis** for a card photo: `ok`,
 `uncertain` (low confidence or model-reported), or `failed`, set
 automatically by the pipeline, never by a human. `notAnalyzed` is the
 default/fallback reported for any card photo that hasn't gone through
-**AI Analysis** yet — no **Sidecar** at all, or one that exists only
-because of a manual edit — and for any other value that doesn't match one
+**AI Analysis** yet — no **Sidecar** at all, one that exists only
+because of a manual edit, or one written by a **Batch Upload** — and for any other value that doesn't match one
 of the above.
 
 ### Confidence
