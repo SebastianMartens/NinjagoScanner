@@ -24,7 +24,11 @@ AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    // The batch upload input reports every selected file (name, size, type, timestamp - roughly
+    // 150-250 bytes each, up to 10,000 files) to the server in ONE SignalR message. The 32 KB
+    // default closes the circuit at ~250 files ("Server returned an error on close").
+    .AddHubOptions(options => options.MaximumReceiveMessageSize = 8 * 1024 * 1024);
 
 builder.Services.AddRazorPages();
 
