@@ -46,7 +46,7 @@ message ScanRequest {
   optional string catalog_service_address = 3;
   optional bool overwrite_existing_sidecars = 4;
   optional int32 delay_between_requests_ms = 5;
-  optional int32 retry_delay_ms = 6;
+  optional int32 retry_delay_ms = 6 [deprecated = true]; // Ignored: the Gemini SDK owns retry backoff.
   optional int32 max_attempts = 7;
   optional int32 timeout_seconds = 8;
   string collection_id = 9;
@@ -125,7 +125,7 @@ message UploadPhotoMetadata {
   optional string api_key = 2;
   optional string model = 3;
   optional string catalog_service_address = 4;
-  optional int32 retry_delay_ms = 5;
+  optional int32 retry_delay_ms = 5 [deprecated = true]; // Ignored: the Gemini SDK owns retry backoff.
   optional int32 max_attempts = 6;
   optional int32 timeout_seconds = 7;
   string collection_id = 8;

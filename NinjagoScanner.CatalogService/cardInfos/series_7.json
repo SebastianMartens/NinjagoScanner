@@ -76,7 +76,7 @@
           {"Karten-Nr.": 70, "Name": {"en": "Ninjago City Team Kaito & Eileen"}},
           {"Karten-Nr.": 71, "Name": {"en": "Ninjago City Team Hai & Mei"}},
           {"Karten-Nr.": 72, "Name": {"en": "Ninjago City Team Tito & Scoop"}},
-          {"Karten-Nr.": 73, "Name": {"en": "Team Citizens"}}
+          {"Karten-Nr.": 73, "Name": {"en": "Team Citizens", "de": "Team Stadtbewohner"}}
         ]
       },
       "Ultra_Double_Cards": {

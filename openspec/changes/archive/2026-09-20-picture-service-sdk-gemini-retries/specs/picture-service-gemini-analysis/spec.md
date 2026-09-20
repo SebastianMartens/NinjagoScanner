@@ -1,10 +1,4 @@
-# picture-service-gemini-analysis Specification
-
-## Purpose
-
-Defines the contract of the outbound call to the Gemini API used to analyze a single card photo: what is sent, how transient failures are retried, and how the response is turned into an analysis result.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Transient HTTP failures are retried with increasing delay
 If a Gemini API call in the analysis pipeline fails with a transient condition — HTTP 408, 429 or a 5xx status, or a transient connection or timeout error — that call SHALL be retried until it has been attempted the configured maximum number of times in total (the original request counts as the first attempt). The wait before each retry SHALL grow exponentially with each further retry, with random jitter, starting at about 1 second and capped at 60 seconds; the delay is not configurable. Each individual attempt SHALL be bounded by the configured `timeout_seconds`. Any other failure SHALL fail immediately without retrying. This policy applies to each Gemini call in the pipeline individually (see `picture-service-attribute-detection` and `picture-service-derived-attributes`), not to the pipeline as a whole, and is the only retry policy applied to a call: attempts are not multiplied by any additional retry layer.
@@ -51,14 +45,3 @@ Every failed result from a Gemini call in the pipeline SHALL indicate whether th
 #### Scenario: Model reports failed status
 - **WHEN** a Gemini API call responds successfully (2xx) and the model payload's status is `failed`
 - **THEN** that call's failure result is marked as a content-level failure, not a transport-level failure
-
-### Requirement: Malformed or empty model output is treated as a failure
-If a Gemini API call in the pipeline succeeds but the response contains no usable text, or the text is not valid JSON matching that call's expected payload shape, the result SHALL be a failure with a descriptive error message, not a crash or a successful result.
-
-#### Scenario: Empty candidate text
-- **WHEN** a Gemini API call responds successfully but no candidate/part contains non-empty text
-- **THEN** that call's result is a failure with a message stating no JSON result was returned
-
-#### Scenario: Invalid JSON in model output
-- **WHEN** the extracted model text cannot be parsed as that call's expected JSON payload
-- **THEN** that call's result is a failure with a message describing the JSON parse failure, and the raw model text is preserved for diagnostics

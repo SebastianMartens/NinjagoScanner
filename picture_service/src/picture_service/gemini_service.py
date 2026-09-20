@@ -4,26 +4,26 @@ Stage 1 (attribute detection, see picture-service-attribute-detection) is a visi
 only, no series catalog - a generic, open-ended key-value map of what's visible. Stage 2
 (derived attributes, see picture-service-derived-attributes) is a text-only call reasoning over
 stage 1's output, also a generic key-value map, plus a `class` value constrained to the
-catalog's fixed set. Both calls share the same transport/content failure classification and
-retry policy (retry only on 429/5xx-equivalent conditions, `retry_delay_ms * attempt` backoff,
-immediate failure otherwise - see picture-service-gemini-analysis), factored into
-`_invoke_with_retry` below rather than duplicated per stage.
+catalog's fixed set. Both calls share the same transport/content failure classification,
+factored into `_invoke_model` below rather than duplicated per stage.
 
 Uses `langchain-google-genai`'s structured-output chat model call in place of a hand-rolled
-HTTP request/manual-JSON-parse (see design.md's "Decisions" for why); LangChain's own generic
-retry isn't used since it doesn't implement this exact policy.
+HTTP request/manual-JSON-parse (see design.md's "Decisions" for why). Retries are owned entirely
+by the Gemini SDK underneath it (see picture-service-gemini-analysis and the
+picture-service-sdk-gemini-retries change): this module makes one call per stage and classifies
+whatever the SDK finally raises.
 
 Stage 3 (catalog matching) is deterministic, no LLM call - see card_analysis_stage_3.py.
 """
 
 from __future__ import annotations
 
-import asyncio
 import base64
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from langchain_core.exceptions import ModelError, ModelNotFoundError
+from opentelemetry import trace
 
 from picture_service.config import ScannerConfig
 from picture_service.models import (
@@ -37,6 +37,8 @@ from picture_service.models import (
 )
 from picture_service.prompts import ATTRIBUTE_DETECTION_PROMPT, DERIVED_ATTRIBUTES_PROMPT
 from picture_service.card_analysis_stage_3 import match_catalog
+
+_tracer = trace.get_tracer("picture_service.gemini")
 
 _MIME_TYPES = {
     ".jpg": "image/jpeg",
@@ -70,7 +72,18 @@ def build_chat_model(config: ScannerConfig, schema: dict[str, Any]) -> Structure
     use different schemas, so each stage calls this with its own (see analyze_card)."""
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    model = ChatGoogleGenerativeAI(model=config.model, api_key=config.api_key, temperature=0.2)
+    # The Gemini SDK owns retries: max_retries is the *total* attempt count including the first
+    # request (1 = no retries; 0 would mean the SDK's own default of 5, which max_attempts >= 1
+    # from ScannerConfig rules out). timeout bounds one attempt, so a hung request is abandoned
+    # and retried like any other transient failure. Backoff shape (~1s doubling, jittered, capped
+    # at 60s) is the SDK's and isn't configurable through LangChain.
+    model = ChatGoogleGenerativeAI(
+        model=config.model,
+        api_key=config.api_key,
+        temperature=0.2,
+        timeout=config.timeout_seconds,
+        max_retries=config.max_attempts,
+    )
     return model.with_structured_output(schema, include_raw=True)
 
 
@@ -130,27 +143,20 @@ def _failure_message(exception: ModelError, model: str) -> str:
     return f"Gemini API Fehler: {exception}"
 
 
-async def _invoke_with_retry(model: StructuredModel, config: ScannerConfig, messages: list[dict]) -> _InvokeOutcome:
-    """Retries only on conditions LangChain classifies as retryable (rate limits, server
-    errors, connection/timeout issues - see langchain_core.exceptions.ModelError.is_retryable),
-    the provider-agnostic equivalent of the original HTTP 429/5xx-only policy. Any other
-    exception (not a ModelError at all) propagates uncaught, mirroring the single-call version,
-    where an exception raised while attempting the call was never retried in this loop - only
-    the RPC handler's outer try/except classified it as a transport failure.
+async def _invoke_model(model: StructuredModel, config: ScannerConfig, messages: list[dict]) -> _InvokeOutcome:
+    """One call to Gemini; any retrying happened inside the SDK before an exception reached
+    here. A `ModelError` (what LangChain raises for the HTTP errors it recognizes, once the SDK
+    has given up or the error wasn't retryable) becomes a failure outcome. Any other exception
+    propagates uncaught, and only the RPC handler's outer try/except classifies it as a
+    transport failure.
     """
-    for attempt in range(1, config.max_attempts + 1):
-        try:
+    try:
+        with _tracer.start_as_current_span("gemini.invoke", attributes={"gemini.model": config.model}):
             raw_result = await model.ainvoke(messages)
-        except ModelError as exception:
-            if exception.is_retryable and attempt < config.max_attempts:
-                await asyncio.sleep(config.retry_delay_ms * attempt / 1000)
-                continue
+    except ModelError as exception:
+        return _InvokeOutcome(raw_result=None, failure_message=_failure_message(exception, config.model))
 
-            return _InvokeOutcome(raw_result=None, failure_message=_failure_message(exception, config.model))
-
-        return _InvokeOutcome(raw_result=raw_result, failure_message=None)
-
-    return _InvokeOutcome(raw_result=None, failure_message="Unbekannter API-Fehler.")
+    return _InvokeOutcome(raw_result=raw_result, failure_message=None)
 
 
 def _parse_attribute_map(raw_result: dict[str, Any]) -> tuple[AttributeMap | None, str | None, str | None]:
@@ -187,8 +193,9 @@ async def detect_attributes(
     model: StructuredModel, config: ScannerConfig, source_file_name: str, image_bytes: bytes
 ) -> AttributeStageResult:
     """Stage 1 - see picture-service-attribute-detection."""
-    messages = build_attribute_detection_messages(source_file_name, image_bytes)
-    outcome = await _invoke_with_retry(model, config, messages)
+    with _tracer.start_as_current_span("gemini.stage1_detect_attributes", attributes={"image.bytes": len(image_bytes)}):
+        messages = build_attribute_detection_messages(source_file_name, image_bytes)
+        outcome = await _invoke_model(model, config, messages)
 
     if outcome.raw_result is None:
         return AttributeStageResult(success=False, error_message=outcome.failure_message, is_transport_failure=True)
@@ -204,8 +211,9 @@ async def compute_derived_attributes(
     model: StructuredModel, config: ScannerConfig, detected_attributes: AttributeMap
 ) -> AttributeStageResult:
     """Stage 2 - see picture-service-derived-attributes."""
-    messages = build_derived_attributes_messages(detected_attributes)
-    outcome = await _invoke_with_retry(model, config, messages)
+    with _tracer.start_as_current_span("gemini.stage2_derive_attributes"):
+        messages = build_derived_attributes_messages(detected_attributes)
+        outcome = await _invoke_model(model, config, messages)
 
     if outcome.raw_result is None:
         return AttributeStageResult(success=False, error_message=outcome.failure_message, is_transport_failure=True)
@@ -254,7 +262,8 @@ async def analyze_card(
             photo_id, source_file_name, config.model, derivation, detected=detection.attributes, verified=verified
         )
 
-    match = match_catalog(derivation.attributes, catalog, verified)
+    with _tracer.start_as_current_span("catalog.match"):
+        match = match_catalog(derivation.attributes, catalog, verified)
 
     return CardAnalysisResult(
         photo_id=photo_id,

@@ -19,7 +19,9 @@ import grpc
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.grpc import GrpcAioInstrumentorServer
+from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
+from opentelemetry.instrumentation.grpc import GrpcAioInstrumentorClient, GrpcAioInstrumentorServer
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -56,6 +58,12 @@ def _configure_tracing(resource: Resource) -> None:
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)
     GrpcAioInstrumentorServer().instrument()
+    # Outbound calls: the Gemini SDK's HTTP requests (aiohttp when installed, else httpx - one
+    # span per request, so SDK-internal retries and slow responses are visible under
+    # gemini.invoke) and the CatalogService gRPC client.
+    AioHttpClientInstrumentor().instrument()
+    HTTPXClientInstrumentor().instrument()
+    GrpcAioInstrumentorClient().instrument()
 
 
 def _configure_logging(resource: Resource) -> None:

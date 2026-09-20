@@ -1,3 +1,4 @@
+import pytest
 from langchain_core.exceptions import ModelAPIError, ModelInvalidRequestError, ModelNotFoundError, ModelRateLimitError
 
 from picture_service.config import ScannerConfig
@@ -5,6 +6,7 @@ from picture_service.gemini_service import (
     ATTRIBUTE_DETECTION_SCHEMA,
     analyze_card,
     build_attribute_detection_messages,
+    build_chat_model,
     build_derived_attributes_messages,
     compute_derived_attributes,
     detect_attributes,
@@ -16,7 +18,6 @@ def make_config(**overrides) -> ScannerConfig:
     return ScannerConfig.load_for_scan(
         api_key="key",
         model="gemini-test",
-        retry_delay_ms=overrides.pop("retry_delay_ms", 1),
         max_attempts=overrides.pop("max_attempts", 3),
         **overrides,
     )
@@ -89,22 +90,16 @@ async def test_attribute_detection_drops_nested_values():
     assert result.attributes == {"number_top_left": "1"}
 
 
-# --- Stage 1: retry policy ---
+# --- Stage 1: failure classification (retrying itself happens inside the SDK, see
+# picture-service-sdk-gemini-retries: an error reaching us is already final) ---
 
 
-async def test_attribute_detection_rate_limited_then_succeeds():
-    model = FakeModel([ModelRateLimitError("rate limited"), ok_raw_result({"a": "b"})])
+@pytest.mark.parametrize("error", [ModelRateLimitError("rate limited"), ModelAPIError("boom")])
+async def test_attribute_detection_error_from_sdk_is_transport_failure_after_one_call(error):
+    model = FakeModel([error, ok_raw_result({"a": "b"})])
     result = await detect_attributes(model, make_config(max_attempts=3), "card.jpg", b"data")
 
-    assert model.call_count == 2
-    assert result.success is True
-
-
-async def test_attribute_detection_retries_exhausted_is_transport_failure():
-    model = FakeModel([ModelAPIError("boom")] * 3)
-    result = await detect_attributes(model, make_config(max_attempts=3), "card.jpg", b"data")
-
-    assert model.call_count == 3
+    assert model.call_count == 1
     assert result.success is False
     assert result.is_transport_failure is True
 
@@ -183,21 +178,15 @@ async def test_derived_attributes_unrecognized_class_is_dropped():
     assert result.attributes["series_name"] == "Serie 1"
 
 
-# --- Stage 2: retry/failure semantics (same policy as stage 1) ---
+# --- Stage 2: failure classification (same as stage 1) ---
 
 
-async def test_derived_attributes_rate_limited_then_succeeds():
-    model = FakeModel([ModelRateLimitError("x"), ok_raw_result({"class": "art"})])
+@pytest.mark.parametrize("error", [ModelRateLimitError("x"), ModelAPIError("boom")])
+async def test_derived_attributes_error_from_sdk_is_transport_failure_after_one_call(error):
+    model = FakeModel([error, ok_raw_result({"class": "art"})])
     result = await compute_derived_attributes(model, make_config(max_attempts=3), {})
 
-    assert model.call_count == 2
-    assert result.success is True
-
-
-async def test_derived_attributes_retries_exhausted_is_transport_failure():
-    model = FakeModel([ModelAPIError("boom")] * 3)
-    result = await compute_derived_attributes(model, make_config(max_attempts=3), {})
-
+    assert model.call_count == 1
     assert result.success is False
     assert result.is_transport_failure is True
 
@@ -208,6 +197,29 @@ async def test_derived_attributes_non_retryable_fails_immediately():
 
     assert model.call_count == 1
     assert result.is_transport_failure is True
+
+
+# --- build_chat_model: the SDK's retry/timeout are configured from ScannerConfig ---
+
+
+def test_build_chat_model_hands_attempts_and_timeout_to_the_sdk(monkeypatch):
+    captured = {}
+
+    class RecordingChatModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def with_structured_output(self, schema, include_raw):
+            return ("structured", schema, include_raw)
+
+    monkeypatch.setattr("langchain_google_genai.ChatGoogleGenerativeAI", RecordingChatModel)
+
+    built = build_chat_model(make_config(max_attempts=4, timeout_seconds=45), ATTRIBUTE_DETECTION_SCHEMA)
+
+    assert captured["max_retries"] == 4
+    assert captured["timeout"] == 45
+    assert captured["model"] == "gemini-test"
+    assert built == ("structured", ATTRIBUTE_DETECTION_SCHEMA, True)
 
 
 # --- analyze_card: sequential wiring across all three stages ---

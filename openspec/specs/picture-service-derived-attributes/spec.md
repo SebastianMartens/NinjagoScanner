@@ -36,15 +36,19 @@ When the derived attributes include a `class` value, it SHALL be one of the cata
 - **THEN** the derived class is treated as absent rather than storing the unrecognized value
 
 ### Requirement: Transient failures are retried with increasing delay
-If the Gemini API call underlying derived-attribute computation fails with a retryable condition (rate limiting or a server error), the call SHALL be retried up to the configured maximum number of attempts, waiting `retry_delay_ms * attempt` between attempts. A non-retryable failure SHALL fail immediately without retrying.
+If the Gemini API call underlying derived-attribute computation fails with a transient condition (rate limiting, a server error, or a transient connection or timeout error), the call SHALL be retried under the retry policy defined in `picture-service-gemini-analysis`: up to the configured maximum number of attempts in total, waiting an exponentially growing, jittered delay between attempts. A non-transient failure SHALL fail immediately without retrying.
 
 #### Scenario: Rate limited then succeeds
 - **WHEN** the underlying call is rate-limited on an early attempt and succeeds on a later attempt within the configured attempt limit
-- **THEN** the call is retried after waiting `retry_delay_ms * attempt` and the eventual successful response is used
+- **THEN** the call is retried after an exponentially growing, jittered wait and the eventual successful response is used
 
 #### Scenario: Retries exhausted
-- **WHEN** the underlying call fails with a retryable condition on every attempt up to the configured maximum
+- **WHEN** the underlying call fails with a transient condition on every attempt up to the configured maximum
 - **THEN** derived-attribute computation fails with a transport-level failure and no further attempts are made
+
+#### Scenario: Non-retryable failure
+- **WHEN** the underlying call fails with a condition that is not transient
+- **THEN** derived-attribute computation fails immediately with a transport-level failure, without retrying
 
 ### Requirement: A failure result indicates whether Gemini evaluated the input
 Every failed derived-attributes result SHALL indicate whether the failure is transport-level (Gemini never produced a response) or content-level (Gemini returned a response, but it was unusable or malformed).

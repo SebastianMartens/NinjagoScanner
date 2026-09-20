@@ -11,7 +11,6 @@ ENV_KEYS = (
     "CATALOG_SERVICE_ADDRESS",
     "OVERWRITE_SIDECARS",
     "DELAY_BETWEEN_REQUESTS_MS",
-    "RETRY_DELAY_MS",
     "MAX_ATTEMPTS",
     "HTTP_TIMEOUT_SECONDS",
     "PHOTOS_BUCKET_NAME",
@@ -35,8 +34,7 @@ def test_load_for_scan_uses_defaults_when_nothing_else_set(monkeypatch):
     assert config.model == "gemini-3.1-flash-lite"
     assert config.catalog_service_address == "http://localhost:5073"
     assert config.overwrite_existing_sidecars is False
-    assert config.delay_between_requests_ms == 1000
-    assert config.retry_delay_ms == 3000
+    assert config.delay_between_requests_ms == 0
     assert config.max_attempts == 3
     assert config.timeout_seconds == 90
 
@@ -48,7 +46,6 @@ def test_load_for_scan_uses_env_vars_when_no_override_given(monkeypatch):
     monkeypatch.setenv("CATALOG_SERVICE_ADDRESS", "http://env:1234")
     monkeypatch.setenv("OVERWRITE_SIDECARS", "true")
     monkeypatch.setenv("DELAY_BETWEEN_REQUESTS_MS", "500")
-    monkeypatch.setenv("RETRY_DELAY_MS", "2000")
     monkeypatch.setenv("MAX_ATTEMPTS", "5")
     monkeypatch.setenv("HTTP_TIMEOUT_SECONDS", "120")
 
@@ -59,7 +56,6 @@ def test_load_for_scan_uses_env_vars_when_no_override_given(monkeypatch):
     assert config.catalog_service_address == "http://env:1234"
     assert config.overwrite_existing_sidecars is True
     assert config.delay_between_requests_ms == 500
-    assert config.retry_delay_ms == 2000
     assert config.max_attempts == 5
     assert config.timeout_seconds == 120
 
@@ -97,11 +93,11 @@ def test_load_for_upload_forces_overwrite_and_zero_delay(monkeypatch):
 
 def test_load_for_upload_override_wins_over_env(monkeypatch):
     _clear_env(monkeypatch)
-    monkeypatch.setenv("RETRY_DELAY_MS", "1")
+    monkeypatch.setenv("MAX_ATTEMPTS", "1")
 
-    config = ScannerConfig.load_for_upload(retry_delay_ms=42)
+    config = ScannerConfig.load_for_upload(max_attempts=42)
 
-    assert config.retry_delay_ms == 42
+    assert config.max_attempts == 42
 
 
 def test_load_for_upload_uses_default_when_neither_override_nor_env(monkeypatch):
@@ -109,7 +105,6 @@ def test_load_for_upload_uses_default_when_neither_override_nor_env(monkeypatch)
 
     config = ScannerConfig.load_for_upload()
 
-    assert config.retry_delay_ms == 3000
     assert config.max_attempts == 3
     assert config.timeout_seconds == 90
 

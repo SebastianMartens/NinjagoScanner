@@ -14,8 +14,7 @@ SUPPORTED_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".bmp", ".webp"})
 
 _DEFAULT_MODEL = "gemini-3.1-flash-lite"
 _DEFAULT_CATALOG_SERVICE_ADDRESS = "http://localhost:5073"
-_DEFAULT_DELAY_BETWEEN_REQUESTS_MS = 1000
-_DEFAULT_RETRY_DELAY_MS = 3000
+_DEFAULT_DELAY_BETWEEN_REQUESTS_MS = 0
 _DEFAULT_MAX_ATTEMPTS = 3
 _DEFAULT_TIMEOUT_SECONDS = 90
 
@@ -48,7 +47,6 @@ class ScannerConfig:
     catalog_service_address: str
     overwrite_existing_sidecars: bool
     delay_between_requests_ms: int
-    retry_delay_ms: int
     max_attempts: int
     timeout_seconds: int
 
@@ -60,7 +58,6 @@ class ScannerConfig:
         catalog_service_address: str | None = None,
         overwrite_existing_sidecars: bool | None = None,
         delay_between_requests_ms: int | None = None,
-        retry_delay_ms: int | None = None,
         max_attempts: int | None = None,
         timeout_seconds: int | None = None,
     ) -> ScannerConfig:
@@ -79,11 +76,6 @@ class ScannerConfig:
                 delay_between_requests_ms
                 if delay_between_requests_ms is not None
                 else _try_parse_int(_env("DELAY_BETWEEN_REQUESTS_MS"), _DEFAULT_DELAY_BETWEEN_REQUESTS_MS)
-            ),
-            retry_delay_ms=(
-                retry_delay_ms
-                if retry_delay_ms is not None
-                else _try_parse_int(_env("RETRY_DELAY_MS"), _DEFAULT_RETRY_DELAY_MS)
             ),
             max_attempts=max(
                 1,
@@ -105,7 +97,6 @@ class ScannerConfig:
         api_key: str | None = None,
         model: str | None = None,
         catalog_service_address: str | None = None,
-        retry_delay_ms: int | None = None,
         max_attempts: int | None = None,
         timeout_seconds: int | None = None,
     ) -> ScannerConfig:
@@ -117,11 +108,6 @@ class ScannerConfig:
             or _DEFAULT_CATALOG_SERVICE_ADDRESS,
             overwrite_existing_sidecars=True,
             delay_between_requests_ms=0,
-            retry_delay_ms=(
-                retry_delay_ms
-                if retry_delay_ms is not None
-                else _try_parse_int(_env("RETRY_DELAY_MS"), _DEFAULT_RETRY_DELAY_MS)
-            ),
             max_attempts=max(
                 1,
                 max_attempts

@@ -10,6 +10,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 import grpc
+from opentelemetry import trace
 
 from picture_service import catalog_client, gemini_service
 from picture_service._generated import picture_service_pb2 as pb2
@@ -29,6 +30,7 @@ from picture_service.photo_store import PhotoStore
 from picture_service.sidecar_cache import SidecarCache
 
 logger = logging.getLogger("picture_service")
+_tracer = trace.get_tracer("picture_service.scan")
 
 ModelFactory = Callable[[ScannerConfig, dict], gemini_service.StructuredModel]
 CatalogLoader = Callable[[str], Awaitable[CatalogSnapshot]]
@@ -60,7 +62,6 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             catalog_service_address=request.catalog_service_address if request.HasField("catalog_service_address") else None,
             overwrite_existing_sidecars=request.overwrite_existing_sidecars if request.HasField("overwrite_existing_sidecars") else None,
             delay_between_requests_ms=request.delay_between_requests_ms if request.HasField("delay_between_requests_ms") else None,
-            retry_delay_ms=request.retry_delay_ms if request.HasField("retry_delay_ms") else None,
             max_attempts=request.max_attempts if request.HasField("max_attempts") else None,
             timeout_seconds=request.timeout_seconds if request.HasField("timeout_seconds") else None,
         )
@@ -69,7 +70,8 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             return pb2.ScanSummary(has_configuration_error=True, message="GEMINI_API_KEY ist nicht gesetzt.")
 
         try:
-            catalog = await self._load_catalog_snapshot(config.catalog_service_address)
+            with _tracer.start_as_current_span("catalog.load_snapshot"):
+                catalog = await self._load_catalog_snapshot(config.catalog_service_address)
         except Exception:
             logger.exception("Katalog-Service unter %s nicht erreichbar", config.catalog_service_address)
             return pb2.ScanSummary(
@@ -80,7 +82,19 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         if not catalog.series:
             return pb2.ScanSummary(has_configuration_error=True, message="Der CatalogService hat keine Seriendaten geliefert.")
 
-        photo_ids = sorted([photo_id async for photo_id in self._photo_store.list_photo_ids(request.collection_id)])
+        with _tracer.start_as_current_span("photo_store.list_photo_ids"):
+            photo_ids = sorted([photo_id async for photo_id in self._photo_store.list_photo_ids(request.collection_id)])
+
+        trace.get_current_span().set_attributes(
+            {
+                "scan.total_images": len(photo_ids),
+                "scan.model": config.model,
+                "scan.overwrite_existing": config.overwrite_existing_sidecars,
+                "scan.delay_between_requests_ms": config.delay_between_requests_ms,
+                "scan.max_attempts": config.max_attempts,
+                "scan.timeout_seconds": config.timeout_seconds,
+            }
+        )
 
         if not photo_ids:
             return pb2.ScanSummary(total_images=0, message="Im Foto-Bucket wurden keine Kartenbilder gefunden.")
@@ -92,56 +106,65 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         stopped_early = False
 
         for index, photo_id in enumerate(photo_ids):
-            existing = await self._sidecar_cache.get(request.collection_id, photo_id)
+            with _tracer.start_as_current_span(
+                "scan.photo", attributes={"photo.id": photo_id, "photo.index": index}
+            ) as photo_span:
+                existing = await self._sidecar_cache.get(request.collection_id, photo_id)
 
-            if _should_skip_existing_sidecar(existing, config.overwrite_existing_sidecars):
-                skipped_count += 1
-                continue
+                if _should_skip_existing_sidecar(existing, config.overwrite_existing_sidecars):
+                    photo_span.set_attribute("scan.outcome", "skipped")
+                    skipped_count += 1
+                    continue
 
-            source_file_name = existing.source_file_name if existing and existing.source_file_name else photo_id
-            verified = _verified_match(existing)
+                source_file_name = existing.source_file_name if existing and existing.source_file_name else photo_id
+                verified = _verified_match(existing)
 
-            try:
-                image_bytes = await self._photo_store.get_bytes(request.collection_id, photo_id)
-                result = await gemini_service.analyze_card(
-                    self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
-                )
-            except Exception as exception:
-                logger.exception("Unerwarteter Fehler bei der Analyse von %s", photo_id)
-                result = CardAnalysisResult(
-                    photo_id=photo_id,
-                    analysis_status=AnalysisStatuses.FAILED,
-                    source_file_name=source_file_name,
-                    ai_model=config.model,
-                    scanned_at_utc=utc_now(),
-                    set_name=verified.set_name if verified else None,
-                    card_number=verified.card_number if verified else None,
-                    error_message=f"Unerwarteter Fehler: {exception}",
-                    is_transport_failure=True,
-                )
+                try:
+                    with _tracer.start_as_current_span("photo_store.get_bytes") as fetch_span:
+                        image_bytes = await self._photo_store.get_bytes(request.collection_id, photo_id)
+                        fetch_span.set_attribute("image.bytes", len(image_bytes))
+                    result = await gemini_service.analyze_card(
+                        self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
+                    )
+                except Exception as exception:
+                    logger.exception("Unerwarteter Fehler bei der Analyse von %s", photo_id)
+                    result = CardAnalysisResult(
+                        photo_id=photo_id,
+                        analysis_status=AnalysisStatuses.FAILED,
+                        source_file_name=source_file_name,
+                        ai_model=config.model,
+                        scanned_at_utc=utc_now(),
+                        set_name=verified.set_name if verified else None,
+                        card_number=verified.card_number if verified else None,
+                        error_message=f"Unerwarteter Fehler: {exception}",
+                        is_transport_failure=True,
+                    )
 
-            if existing is not None and existing.review_status:
-                result = dataclasses.replace(result, review_status=existing.review_status)
+                if existing is not None and existing.review_status:
+                    result = dataclasses.replace(result, review_status=existing.review_status)
 
-            await self._sidecar_cache.set_from_analysis_result(request.collection_id, photo_id, result)
+                with _tracer.start_as_current_span("sidecar.set_from_analysis_result"):
+                    await self._sidecar_cache.set_from_analysis_result(request.collection_id, photo_id, result)
 
-            processed_count += 1
-            if result.analysis_status.lower() == AnalysisStatuses.FAILED:
-                failed_count += 1
-            elif result.analysis_status.lower() == AnalysisStatuses.UNCERTAIN:
-                uncertain_count += 1
+                photo_span.set_attribute("scan.outcome", result.analysis_status.lower())
+                processed_count += 1
+                if result.analysis_status.lower() == AnalysisStatuses.FAILED:
+                    failed_count += 1
+                elif result.analysis_status.lower() == AnalysisStatuses.UNCERTAIN:
+                    uncertain_count += 1
 
-            if result.is_transport_failure:
-                stopped_early = True
-                logger.warning(
-                    "Scan wird nach %s abgebrochen: Gemini war ueber die Transportebene nicht erreichbar (%s)",
-                    photo_id,
-                    result.error_message,
-                )
-                break
+                if result.is_transport_failure:
+                    stopped_early = True
+                    logger.warning(
+                        "Scan wird nach %s abgebrochen: Gemini war ueber die Transportebene nicht erreichbar (%s)",
+                        photo_id,
+                        result.error_message,
+                    )
+                    break
 
             if index < len(photo_ids) - 1 and config.delay_between_requests_ms > 0:
-                await asyncio.sleep(config.delay_between_requests_ms / 1000)
+                with _tracer.start_as_current_span("scan.delay_between_requests"):
+                    await asyncio.sleep(config.delay_between_requests_ms / 1000)
 
         return pb2.ScanSummary(
             total_images=len(photo_ids),
@@ -205,7 +228,6 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             api_key=metadata.api_key if metadata.HasField("api_key") else None,
             model=metadata.model if metadata.HasField("model") else None,
             catalog_service_address=metadata.catalog_service_address if metadata.HasField("catalog_service_address") else None,
-            retry_delay_ms=metadata.retry_delay_ms if metadata.HasField("retry_delay_ms") else None,
             max_attempts=metadata.max_attempts if metadata.HasField("max_attempts") else None,
             timeout_seconds=metadata.timeout_seconds if metadata.HasField("timeout_seconds") else None,
         )
@@ -234,7 +256,8 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, "GEMINI_API_KEY ist nicht gesetzt.")
 
         try:
-            catalog = await self._load_catalog_snapshot(config.catalog_service_address)
+            with _tracer.start_as_current_span("catalog.load_snapshot"):
+                catalog = await self._load_catalog_snapshot(config.catalog_service_address)
         except Exception:
             logger.exception("Katalog-Service unter %s nicht erreichbar", config.catalog_service_address)
             await context.abort(
@@ -242,9 +265,10 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             )
 
         try:
-            return await gemini_service.analyze_card(
-                self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
-            )
+            with _tracer.start_as_current_span("analyze_stored_photo", attributes={"photo.id": photo_id}):
+                return await gemini_service.analyze_card(
+                    self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
+                )
         except Exception as exception:
             logger.exception("Unerwarteter Fehler bei der Analyse von %s", photo_id)
             return CardAnalysisResult(
