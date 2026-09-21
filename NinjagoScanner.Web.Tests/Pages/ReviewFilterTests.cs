@@ -1,4 +1,4 @@
-using System.Reflection;
+using NinjagoScanner.Web.Services;
 using NinjagoScanner.Web.Components.Pages;
 using NinjagoScanner.Web.Models;
 
@@ -9,9 +9,7 @@ public sealed class ReviewFilterTests
     [Fact]
     public void ReviewStatusFilter_DefaultsToUnreviewed()
     {
-        var field = typeof(Review).GetField("reviewStatusFilter", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-        var defaultValue = (string?)field.GetValue(new Review());
+        var defaultValue = new ReviewSession(new ReviewSnapshot([], [])).ReviewStatusFilter;
 
         Assert.Equal(ReviewStatuses.Unreviewed, defaultValue);
     }
@@ -41,7 +39,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", reviewStatus: ReviewStatuses.Incorrect));
 
-        Assert.True(Review.MatchesReviewStatusFilter(group, "all"));
+        Assert.True(ReviewSession.MatchesReviewStatusFilter(group, "all"));
     }
 
     [Fact]
@@ -51,7 +49,7 @@ public sealed class ReviewFilterTests
             Photo("a", reviewStatus: ReviewStatuses.Unreviewed),
             Photo("b", reviewStatus: ReviewStatuses.Verified));
 
-        Assert.True(Review.MatchesReviewStatusFilter(group, ReviewStatuses.Verified));
+        Assert.True(ReviewSession.MatchesReviewStatusFilter(group, ReviewStatuses.Verified));
     }
 
     [Fact]
@@ -59,7 +57,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", reviewStatus: ReviewStatuses.Unreviewed));
 
-        Assert.False(Review.MatchesReviewStatusFilter(group, ReviewStatuses.Incorrect));
+        Assert.False(ReviewSession.MatchesReviewStatusFilter(group, ReviewStatuses.Incorrect));
     }
 
     [Fact]
@@ -67,7 +65,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", analysisStatus: AnalysisStatuses.Failed));
 
-        Assert.True(Review.MatchesAnalysisStatusFilter(group, "all"));
+        Assert.True(ReviewSession.MatchesAnalysisStatusFilter(group, "all"));
     }
 
     [Fact]
@@ -77,7 +75,7 @@ public sealed class ReviewFilterTests
             Photo("a", analysisStatus: AnalysisStatuses.Ok),
             Photo("b", analysisStatus: AnalysisStatuses.Uncertain));
 
-        Assert.True(Review.MatchesAnalysisStatusFilter(group, AnalysisStatuses.Uncertain));
+        Assert.True(ReviewSession.MatchesAnalysisStatusFilter(group, AnalysisStatuses.Uncertain));
     }
 
     [Fact]
@@ -85,7 +83,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", analysisStatus: AnalysisStatuses.Ok));
 
-        Assert.False(Review.MatchesAnalysisStatusFilter(group, AnalysisStatuses.NotAnalyzed));
+        Assert.False(ReviewSession.MatchesAnalysisStatusFilter(group, AnalysisStatuses.NotAnalyzed));
     }
 
     [Fact]
@@ -93,7 +91,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", cardName: "Kai", cardNumber: "4"));
 
-        Assert.True(Review.MatchesSearchFilter(group, string.Empty));
+        Assert.True(ReviewSession.MatchesSearchFilter(group, string.Empty));
     }
 
     [Fact]
@@ -101,7 +99,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", cardName: "Ultra Zane", cardNumber: "10"));
 
-        Assert.True(Review.MatchesSearchFilter(group, "zane"));
+        Assert.True(ReviewSession.MatchesSearchFilter(group, "zane"));
     }
 
     [Fact]
@@ -109,7 +107,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", cardName: "Kai", cardNumber: "LE12"));
 
-        Assert.True(Review.MatchesSearchFilter(group, "LE1"));
+        Assert.True(ReviewSession.MatchesSearchFilter(group, "LE1"));
     }
 
     [Fact]
@@ -117,7 +115,7 @@ public sealed class ReviewFilterTests
     {
         var group = Group(Photo("a", cardName: "Kai", cardNumber: "4"));
 
-        Assert.False(Review.MatchesSearchFilter(group, "zane"));
+        Assert.False(ReviewSession.MatchesSearchFilter(group, "zane"));
     }
 
     [Fact]
@@ -129,9 +127,9 @@ public sealed class ReviewFilterTests
 
         // No single photo is both Unreviewed AND Uncertain AND matches "zane" - but each
         // filter independently matches at least one photo in the group, so all three pass.
-        Assert.True(Review.MatchesFilters(group, ReviewStatuses.Unreviewed, AnalysisStatuses.Ok, "zane"));
+        Assert.True(ReviewSession.MatchesFilters(group, ReviewStatuses.Unreviewed, AnalysisStatuses.Ok, "zane"));
 
         // No photo has AnalysisStatus "failed", so the combined filter excludes the group.
-        Assert.False(Review.MatchesFilters(group, "all", AnalysisStatuses.Failed, string.Empty));
+        Assert.False(ReviewSession.MatchesFilters(group, "all", AnalysisStatuses.Failed, string.Empty));
     }
 }

@@ -15,12 +15,12 @@
 			<p class="lede">Vergleiche alle Fotos einer Karte, bestätige sie in einem Klick oder korrigiere die Serie.</p>
 		</div>
 
-		@if (!isLoading && groups.Count > 0)
+		@if (!isLoading && session.Groups.Count > 0)
 		{
 			<div class="review-nav">
 				<label class="review-filter">
 					<span>Status-Filter</span>
-					<select value="@reviewStatusFilter" @onchange="OnReviewStatusFilterChanged">
+					<select value="@session.ReviewStatusFilter" @onchange="OnReviewStatusFilterChanged">
 						<option value="@AllFilterValue">Alle</option>
 						<option value="@ReviewStatuses.Unreviewed">@GetReviewStatusLabel(ReviewStatuses.Unreviewed)</option>
 						<option value="@ReviewStatuses.Verified">@GetReviewStatusLabel(ReviewStatuses.Verified)</option>
@@ -29,7 +29,7 @@
 				</label>
 				<label class="review-filter">
 					<span>Analyse-Filter</span>
-					<select value="@analysisStatusFilter" @onchange="OnAnalysisStatusFilterChanged">
+					<select value="@session.AnalysisStatusFilter" @onchange="OnAnalysisStatusFilterChanged">
 						<option value="@AllFilterValue">Alle</option>
 						<option value="@AnalysisStatuses.Ok">@GetAnalysisStatusLabel(AnalysisStatuses.Ok)</option>
 						<option value="@AnalysisStatuses.Uncertain">@GetAnalysisStatusLabel(AnalysisStatuses.Uncertain)</option>
@@ -39,11 +39,11 @@
 				</label>
 				<label class="review-filter">
 					<span>Suche</span>
-					<input value="@searchText" placeholder="Kartennummer oder Kartenname" @oninput="OnSearchTextChanged" />
+					<input value="@session.SearchText" placeholder="Kartennummer oder Kartenname" @oninput="OnSearchTextChanged" />
 				</label>
-				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : currentIndex + 1) / @FilteredGroups.Count</span>
-				<button class="review-btn" type="button" disabled="@(currentIndex <= 0)" @onclick="GoToPrevious">← Zurueck</button>
-				<button class="review-btn" type="button" disabled="@(currentIndex >= FilteredGroups.Count - 1)" @onclick="GoToNext">Weiter →</button>
+				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : session.CurrentIndex + 1) / @FilteredGroups.Count</span>
+				<button class="review-btn" type="button" disabled="@(session.CurrentIndex <= 0)" @onclick="session.GoToPrevious">← Zurueck</button>
+				<button class="review-btn" type="button" disabled="@(session.CurrentIndex >= FilteredGroups.Count - 1)" @onclick="session.GoToNext">Weiter →</button>
 			</div>
 		}
 	</header>
@@ -52,7 +52,7 @@
 	{
 		<p>Lade Karten...</p>
 	}
-	else if (groups.Count == 0)
+	else if (session.Groups.Count == 0)
 	{
 		<div class="empty-state">
 			<h2>Keine Fotos vorhanden</h2>
@@ -64,7 +64,7 @@
 		<div class="empty-state">
 			<h2>Alle Karten geprüft</h2>
 			<p>Du hast das Ende der Liste erreicht.</p>
-			<button class="review-btn" type="button" @onclick="RestartFromBeginning">Von vorne beginnen</button>
+			<button class="review-btn" type="button" @onclick="RestartFromBeginningAsync">Von vorne beginnen</button>
 		</div>
 	}
 	else
@@ -212,7 +212,7 @@
 }
 
 @code {
-	private const string AllFilterValue = "all";
+	private const string AllFilterValue = ReviewSession.AllFilterValue;
 	internal const int MaxDisplayedPhotosPerGroup = 18;
 
 	private static readonly Dictionary<string, (string ImageFile, string Caption)> SeriesLogos = new(StringComparer.Ordinal)
@@ -235,12 +235,10 @@
 		["Serie 11"] = ("Series11_klein.jpg", "Dragon Storm Logo")
 	};
 
-	private IReadOnlyList<CardReviewGroup> groups = Array.Empty<CardReviewGroup>();
 	private IReadOnlyList<string> knownSeries = Array.Empty<string>();
-	private string reviewStatusFilter = ReviewStatuses.Unreviewed;
-	private string analysisStatusFilter = AllFilterValue;
-	private string searchText = string.Empty;
-	private int currentIndex;
+	// Loaded once (and again only via "Von vorne beginnen"); every photo change is applied to it
+	// locally instead of re-fetching the collection.
+	private ReviewSession session = new(new ReviewSnapshot([], []));
 	private bool isLoading = true;
 	private bool isConfirmingAll;
 	private string? busyPhotoId;
@@ -250,65 +248,20 @@
 	private readonly Dictionary<string, string> reanalysisErrors = new(StringComparer.Ordinal);
 	private CardListItem? photoPendingDeletion;
 	private readonly HashSet<string> expandedPhotos = new(StringComparer.Ordinal);
+	// Unsaved card-number edits, by photo. A photo without an entry shows its own CardNumber, so
+	// dropping the entry (after a save, a re-analysis or a delete) is how a tile is re-synced.
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, CardDetailsItem> photoDetails = new(StringComparer.Ordinal);
 
-	private IReadOnlyList<CardReviewGroup> FilteredGroups =>
-		groups.Where(group => MatchesFilters(group, reviewStatusFilter, analysisStatusFilter, searchText)).ToArray();
+	private IReadOnlyList<CardReviewGroup> FilteredGroups => session.FilteredGroups;
 
-	internal static bool MatchesFilters(CardReviewGroup group, string reviewStatusFilter, string analysisStatusFilter, string searchText)
-	{
-		return MatchesReviewStatusFilter(group, reviewStatusFilter)
-			&& MatchesAnalysisStatusFilter(group, analysisStatusFilter)
-			&& MatchesSearchFilter(group, searchText);
-	}
-
-	internal static bool MatchesReviewStatusFilter(CardReviewGroup group, string reviewStatusFilter)
-	{
-		return string.Equals(reviewStatusFilter, AllFilterValue, StringComparison.Ordinal)
-			|| group.Photos.Any(photo => string.Equals(photo.ReviewStatus, reviewStatusFilter, StringComparison.OrdinalIgnoreCase));
-	}
-
-	internal static bool MatchesAnalysisStatusFilter(CardReviewGroup group, string analysisStatusFilter)
-	{
-		return string.Equals(analysisStatusFilter, AllFilterValue, StringComparison.Ordinal)
-			|| group.Photos.Any(photo => string.Equals(photo.AnalysisStatus, analysisStatusFilter, StringComparison.OrdinalIgnoreCase));
-	}
-
-	internal static bool MatchesSearchFilter(CardReviewGroup group, string searchText)
-	{
-		if (string.IsNullOrWhiteSpace(searchText))
-		{
-			return true;
-		}
-
-		var term = searchText.Trim();
-		return group.Photos.Any(photo =>
-			(photo.CardName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
-			|| (photo.CardNumber?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
-	}
-
-	private CardReviewGroup? CurrentGroup => currentIndex >= 0 && currentIndex < FilteredGroups.Count ? FilteredGroups[currentIndex] : null;
+	private CardReviewGroup? CurrentGroup => session.CurrentGroup;
 
 	protected override async Task OnInitializedAsync()
 	{
 		knownSeries = await CatalogServiceClient.GetKnownSeriesAsync();
-		groups = await CollectionQueryService.GetReviewGroupsAsync();
-		SyncCardNumberDrafts();
-		currentIndex = 0;
+		session = new ReviewSession(await CollectionQueryService.GetReviewSnapshotAsync());
 		isLoading = false;
-	}
-
-	private void SyncCardNumberDrafts()
-	{
-		cardNumberDrafts.Clear();
-		foreach (var group in groups)
-		{
-			foreach (var photo in group.Photos)
-			{
-				cardNumberDrafts[photo.PhotoId] = photo.CardNumber ?? string.Empty;
-			}
-		}
 	}
 
 	private string GetCardNumberDraft(CardListItem photo)
@@ -376,59 +329,59 @@
 		}
 	}
 
-	private void GoToPrevious()
+	/// <summary>
+	/// The one path back to the server after the initial load: re-fetches the collection (picking up
+	/// changes made elsewhere), keeps the active filters, and returns to the first matching group.
+	/// </summary>
+	private async Task RestartFromBeginningAsync()
 	{
-		if (currentIndex > 0)
-		{
-			currentIndex--;
-		}
-	}
-
-	private void GoToNext()
-	{
-		if (currentIndex < FilteredGroups.Count - 1)
-		{
-			currentIndex++;
-		}
-	}
-
-	private void RestartFromBeginning()
-	{
-		currentIndex = 0;
+		session.Reload(await CollectionQueryService.GetReviewSnapshotAsync());
+		cardNumberDrafts.Clear();
+		photoDetails.Clear();
 	}
 
 	private void OnReviewStatusFilterChanged(ChangeEventArgs e)
 	{
-		reviewStatusFilter = e.Value?.ToString() ?? AllFilterValue;
-		currentIndex = 0;
+		session.SetReviewStatusFilter(e.Value?.ToString() ?? AllFilterValue);
 	}
 
 	private void OnAnalysisStatusFilterChanged(ChangeEventArgs e)
 	{
-		analysisStatusFilter = e.Value?.ToString() ?? AllFilterValue;
-		currentIndex = 0;
+		session.SetAnalysisStatusFilter(e.Value?.ToString() ?? AllFilterValue);
 	}
 
 	private void OnSearchTextChanged(ChangeEventArgs e)
 	{
-		searchText = e.Value?.ToString() ?? string.Empty;
-		currentIndex = 0;
+		session.SetSearchText(e.Value?.ToString() ?? string.Empty);
 	}
 
 	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
 	{
-		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus));
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus),
+			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithReviewStatus(current, reviewStatus)));
 	}
 
 	private async Task SaveCardNumberAsync(CardListItem photo)
 	{
 		var cardNumber = GetCardNumberDraft(photo);
-		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateCardNumberAsync(photo.PhotoId, cardNumber));
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.UpdateCardNumberAsync(photo.PhotoId, cardNumber),
+			() =>
+			{
+				session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithCardNumber(current, cardNumber));
+				cardNumberDrafts.Remove(photo.PhotoId);
+			});
 	}
 
 	private async Task SaveLanguageAsync(CardListItem photo, string? language)
 	{
-		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateCardLanguageAsync(photo.PhotoId, language));
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.UpdateCardLanguageAsync(photo.PhotoId, language),
+			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithLanguage(current, language)));
 	}
 
 	private static string GetSegmentClass(CardListItem photo, string reviewStatus)
@@ -463,36 +416,24 @@
 		_ => "Fehler"
 	};
 
-	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> action)
+	/// <summary>
+	/// Saves one photo change and, only once the save has succeeded, applies it to the in-memory
+	/// session (which regroups and keeps the current position where possible). A failed save throws
+	/// before <paramref name="applyLocally"/> runs, so the tile keeps showing what is stored.
+	/// </summary>
+	private async Task RunPhotoActionAsync(CardListItem photo, Func<Task> save, Action applyLocally)
 	{
 		busyPhotoId = photo.PhotoId;
 
 		try
 		{
-			await action();
-			await ReloadGroupsKeepingPositionAsync();
+			await save();
+			applyLocally();
 		}
 		finally
 		{
 			busyPhotoId = null;
 		}
-	}
-
-	/// <summary>
-	/// Reloads the group list and stays on the group currently shown if it still exists,
-	/// otherwise on the group now at (or, past the end, nearest to) the same position.
-	/// </summary>
-	private async Task ReloadGroupsKeepingPositionAsync()
-	{
-		var previousIndex = currentIndex;
-		var key = CurrentGroup?.Key;
-
-		groups = await CollectionQueryService.GetReviewGroupsAsync();
-		SyncCardNumberDrafts();
-
-		currentIndex = key is not null && TryFindGroupIndex(key, out var index)
-			? index
-			: Math.Min(previousIndex, Math.Max(FilteredGroups.Count - 1, 0));
 	}
 
 	private async Task ReanalyzeAsync(CardListItem photo)
@@ -506,9 +447,10 @@
 
 		try
 		{
+			CardListItem reanalyzed;
 			try
 			{
-				await PictureServiceClient.ReanalyzePhotoAsync(photo.PhotoId);
+				reanalyzed = await PictureServiceClient.ReanalyzePhotoAsync(photo.PhotoId);
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -524,7 +466,10 @@
 				photoDetails[photo.PhotoId] = await PictureServiceClient.GetCardDetailsAsync(photo.PhotoId);
 			}
 
-			await ReloadGroupsKeepingPositionAsync();
+			// The reanalysis response carries no image URL; keep the one the tile already shows
+			// (which also spares the browser re-downloading the photo).
+			session.ReplacePhoto(photo.PhotoId, previous => reanalyzed with { ImageUrl = previous.ImageUrl });
+			cardNumberDrafts.Remove(photo.PhotoId);
 		}
 		finally
 		{
@@ -557,7 +502,16 @@
 			return;
 		}
 
-		await RunPhotoActionAsync(photo, () => PictureServiceClient.DeletePhotoAsync(photo.PhotoId));
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.DeletePhotoAsync(photo.PhotoId),
+			() =>
+			{
+				session.RemovePhoto(photo.PhotoId);
+				cardNumberDrafts.Remove(photo.PhotoId);
+				photoDetails.Remove(photo.PhotoId);
+				expandedPhotos.Remove(photo.PhotoId);
+			});
 		photoPendingDeletion = null;
 	}
 
@@ -568,7 +522,10 @@
 
 	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)
 	{
-		await RunPhotoActionAsync(photo, () => PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName));
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName),
+			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithSetName(current, seriesName)));
 	}
 
 	private async Task ConfirmAllAsync()
@@ -580,66 +537,16 @@
 		}
 
 		isConfirmingAll = true;
-		var confirmedKey = group.Key;
 
 		try
 		{
-			foreach (var photo in DisplayedPhotos(group))
-			{
-				await PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, ReviewStatuses.Verified);
-			}
-
-			groups = await CollectionQueryService.GetReviewGroupsAsync();
-			SyncCardNumberDrafts();
-			currentIndex = FindNextFilteredIndexAfter(confirmedKey);
+			await session.ConfirmAsync(
+				DisplayedPhotos(group),
+				photoId => PictureServiceClient.UpdateReviewStatusAsync(photoId, ReviewStatuses.Verified));
 		}
 		finally
 		{
 			isConfirmingAll = false;
 		}
-	}
-
-	private int FindNextFilteredIndexAfter(string confirmedKey)
-	{
-		var confirmedSeen = false;
-		var matchCountBeforeTarget = 0;
-
-		foreach (var candidate in groups)
-		{
-			var matches = MatchesFilters(candidate, reviewStatusFilter, analysisStatusFilter, searchText);
-
-			if (confirmedSeen && matches)
-			{
-				return matchCountBeforeTarget;
-			}
-
-			if (matches)
-			{
-				matchCountBeforeTarget++;
-			}
-
-			if (string.Equals(candidate.Key, confirmedKey, StringComparison.Ordinal))
-			{
-				confirmedSeen = true;
-			}
-		}
-
-		return matchCountBeforeTarget;
-	}
-
-	private bool TryFindGroupIndex(string key, out int index)
-	{
-		var filtered = FilteredGroups;
-		for (var i = 0; i < filtered.Count; i++)
-		{
-			if (string.Equals(filtered[i].Key, key, StringComparison.Ordinal))
-			{
-				index = i;
-				return true;
-			}
-		}
-
-		index = -1;
-		return false;
 	}
 }

@@ -3,9 +3,10 @@ namespace NinjagoScanner.Web.Models;
 /// <summary>
 /// A single scanned card photo and its sidecar data. Identified by <see cref="PhotoId"/> (the
 /// generated identity PictureService assigns at upload time) rather than by file name;
-/// <see cref="SourceFileName"/> is retained only for display.
+/// <see cref="SourceFileName"/> is retained only for display. A record so a changed photo can be
+/// produced with <c>with</c> while every unchanged field (notably <see cref="ImageUrl"/>) is kept.
 /// </summary>
-public sealed class CardListItem
+public sealed record CardListItem
 {
     public required string PhotoId { get; init; }
     public required string SourceFileName { get; init; }

@@ -191,7 +191,32 @@ internal sealed class CollectionQueryService(
 
     public async Task<IReadOnlyList<CardReviewGroup>> GetReviewGroupsAsync(CancellationToken cancellationToken = default)
     {
+        var snapshot = await GetReviewSnapshotAsync(cancellationToken);
+        return BuildReviewGroups(snapshot.Catalog, snapshot.Photos);
+    }
+
+    /// <summary>
+    /// The network half of building the review groups: the catalog's cards and every photo in the
+    /// collection. The /review page fetches this once and afterwards applies photo changes to it
+    /// locally, regrouping with <see cref="BuildReviewGroups"/> instead of fetching again.
+    /// </summary>
+    public async Task<ReviewSnapshot> GetReviewSnapshotAsync(CancellationToken cancellationToken = default)
+    {
         var cardsFromCatalog = await catalogServiceClient.ListCatalogCardsAsync(cancellationToken);
+        var photos = await pictureServiceClient.GetCardsAsync(cancellationToken);
+        return new ReviewSnapshot(cardsFromCatalog, photos);
+    }
+
+    /// <summary>
+    /// The pure half: groups photos by the catalog card their SetName/CardNumber resolve to,
+    /// orders the groups by catalog series then card number, and appends the catch-all group for
+    /// unresolved photos. Makes no service calls and reuses the given <see cref="CardListItem"/>
+    /// instances, so regrouping after a local change leaves every unchanged photo untouched.
+    /// </summary>
+    internal static IReadOnlyList<CardReviewGroup> BuildReviewGroups(
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> cardsFromCatalog,
+        IReadOnlyList<CardListItem> photos)
+    {
         var catalogByKey = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder)>(StringComparer.Ordinal);
         foreach (var card in cardsFromCatalog)
         {
@@ -203,8 +228,6 @@ internal sealed class CollectionQueryService(
 
             catalogByKey.TryAdd(key, (card.Series, card.CardNumber, card.CardName, card.SortOrder));
         }
-
-        var photos = await pictureServiceClient.GetCardsAsync(cancellationToken);
 
         var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder, List<CardListItem> Photos)>(StringComparer.Ordinal);
         var catchAll = new List<CardListItem>();
