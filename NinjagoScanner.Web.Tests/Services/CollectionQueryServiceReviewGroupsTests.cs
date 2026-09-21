@@ -94,7 +94,7 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
 
         Assert.Equal(4, groups.Count);
 
-        var cole = groups[0];
+        var cole = groups[1];
         Assert.False(cole.IsCatchAll);
         Assert.Equal("Serie 2", cole.SeriesName);
         Assert.Equal("4", cole.CardNumber);
@@ -103,20 +103,20 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
         Assert.Contains(cole.Photos, photo => photo.PhotoId == "photo-1");
         Assert.Contains(cole.Photos, photo => photo.PhotoId == "photo-2");
 
-        var zane = groups[1];
+        var zane = groups[2];
         Assert.False(zane.IsCatchAll);
         Assert.Equal("Serie 2", zane.SeriesName);
         Assert.Equal("5", zane.CardNumber);
         Assert.Equal("Zane", zane.CardName);
         Assert.Single(zane.Photos);
 
-        var kai = groups[2];
+        var kai = groups[3];
         Assert.False(kai.IsCatchAll);
         Assert.Equal("Serie 10", kai.SeriesName);
         Assert.Equal("Kai", kai.CardName);
         Assert.Single(kai.Photos);
 
-        var catchAll = groups[3];
+        var catchAll = groups[0];
         Assert.True(catchAll.IsCatchAll);
         Assert.Null(catchAll.CardName);
         Assert.Equal(3, catchAll.Photos.Count);

@@ -47,6 +47,21 @@ public sealed class ReviewSessionTests
     }
 
     [Fact]
+    public void NewSession_StartsOnTheCatchAllGroup_AndNextMovesToTheFirstMatchedGroup()
+    {
+        var session = Session(
+            Photo("p-2", "Serie 2", "2"),
+            Photo("p-stray", "Unknown Series", "1"));
+
+        Assert.True(session.CurrentGroup!.IsCatchAll);
+
+        session.GoToNext();
+
+        Assert.False(session.CurrentGroup!.IsCatchAll);
+        Assert.Equal("2", session.CurrentGroup.CardNumber);
+    }
+
+    [Fact]
     public void ReplacePhoto_LeavesEveryOtherPhotoInstanceUntouched()
     {
         var changed = Photo("p-1", "Serie 2", "2");

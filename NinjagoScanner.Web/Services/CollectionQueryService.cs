@@ -209,8 +209,8 @@ internal sealed class CollectionQueryService(
 
     /// <summary>
     /// The pure half: groups photos by the catalog card their SetName/CardNumber resolve to,
-    /// orders the groups by catalog series then card number, and appends the catch-all group for
-    /// unresolved photos. Makes no service calls and reuses the given <see cref="CardListItem"/>
+    /// orders the groups by catalog series then card number, and puts the catch-all group for
+    /// unresolved photos first. Makes no service calls and reuses the given <see cref="CardListItem"/>
     /// instances, so regrouping after a local change leaves every unchanged photo untouched.
     /// </summary>
     internal static IReadOnlyList<CardReviewGroup> BuildReviewGroups(
@@ -266,7 +266,7 @@ internal sealed class CollectionQueryService(
 
         if (catchAll.Count > 0)
         {
-            groups.Add(new CardReviewGroup
+            groups.Insert(0, new CardReviewGroup
             {
                 IsCatchAll = true,
                 Photos = catchAll.OrderBy(photo => photo.PhotoId, StringComparer.OrdinalIgnoreCase).ToArray()

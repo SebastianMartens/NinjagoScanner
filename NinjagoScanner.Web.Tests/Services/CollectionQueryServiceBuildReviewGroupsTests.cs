@@ -25,7 +25,7 @@ public sealed class CollectionQueryServiceBuildReviewGroupsTests
     };
 
     [Fact]
-    public void BuildReviewGroups_OrdersBySeriesThenCardNumber_AndPutsCatchAllLast()
+    public void BuildReviewGroups_OrdersBySeriesThenCardNumber_AndPutsCatchAllFirst()
     {
         var photos = new[]
         {
@@ -38,10 +38,26 @@ public sealed class CollectionQueryServiceBuildReviewGroupsTests
 
         var groups = CollectionQueryService.BuildReviewGroups(Catalog, photos);
 
-        string?[] expected = ["2", "10", "LE1", "1", null];
+        string?[] expected = [null, "2", "10", "LE1", "1"];
         Assert.Equal(expected, groups.Select(group => group.CardNumber).ToArray());
-        Assert.True(groups[^1].IsCatchAll);
-        Assert.Equal("p-unknown", Assert.Single(groups[^1].Photos).PhotoId);
+        Assert.True(groups[0].IsCatchAll);
+        Assert.Equal("p-unknown", Assert.Single(groups[0].Photos).PhotoId);
+    }
+
+    [Fact]
+    public void BuildReviewGroups_WithoutUnresolvedPhotos_HasNoCatchAllGroup()
+    {
+        var photos = new[]
+        {
+            Photo("p-kai", "Serie 10", "1"),
+            Photo("p-10", "Serie 2", "10"),
+            Photo("p-2", "Serie 2", "2")
+        };
+
+        var groups = CollectionQueryService.BuildReviewGroups(Catalog, photos);
+
+        Assert.DoesNotContain(groups, group => group.IsCatchAll);
+        Assert.Equal("2", groups[0].CardNumber);
     }
 
     [Fact]
@@ -52,8 +68,8 @@ public sealed class CollectionQueryServiceBuildReviewGroupsTests
 
         var groups = CollectionQueryService.BuildReviewGroups(Catalog, [photo, stray]);
 
-        Assert.Same(photo, groups[0].Photos[0]);
-        Assert.Same(stray, groups[1].Photos[0]);
+        Assert.Same(stray, groups[0].Photos[0]);
+        Assert.Same(photo, groups[1].Photos[0]);
     }
 
     [Fact]
