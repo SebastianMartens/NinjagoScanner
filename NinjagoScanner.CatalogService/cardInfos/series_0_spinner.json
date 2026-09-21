@@ -1,0 +1,19 @@
+{
+  "Serie_1": {
+    "Jahr": 2011,
+    "SortOrder": 0,
+    "Logo": "Kein Logo",
+    "Thema": "Sehr frühe Ninjago-Serie. Verkauft mit Ninjago Spinner Sets",
+    "Besonderheiten": [
+      
+    ],
+    "Kategorien": {
+      "Heroes": {
+        "Class": "character",
+        "Karten": [
+          {"Karten-Nr.": 1, "Name": {"en": "Beispiel"}}
+        ]
+      }
+    }
+  }
+}
