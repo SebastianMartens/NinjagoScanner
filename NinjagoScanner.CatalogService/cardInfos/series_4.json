@@ -115,7 +115,7 @@
           {"Karten-Nr.": 110, "Name": {"en": "Chew Toy"}},
           {"Karten-Nr.": 111, "Name": {"en": "Angry Chew Toy"}},
           {"Karten-Nr.": 112, "Name": {"en": "Evil Chew Toy"}},
-          {"Karten-Nr.": 113, "Name": {"en": "Angry Great Devourer"}},
+          {"Karten-Nr.": 113, "Name": {"en": "Angry Great Devourer", "de": "Wütender Großer Schlangenmeister"}},
           {"Karten-Nr.": 114, "Name": {"en": "Angry Pythor"}},
           {"Karten-Nr.": 115, "Name": {"en": "Evil Pythor"}},
           {"Karten-Nr.": 116, "Name": {"en": "Angry Skales"}},

@@ -271,7 +271,7 @@
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Classic Kai"}},
           {"Karten-Nr.": "LE2", "Name": {"en": "Classic Jay"}},
-          {"Karten-Nr.": "LE3", "Name": {"en": "Classic Lloyd"}},
+          {"Karten-Nr.": "LE3", "Name": {"en": "Classic Lloyd", "de": "Legendärer Lloyd"}},
           {"Karten-Nr.": "LE4", "Name": {"en": "Classic Cole"}},
           {"Karten-Nr.": "LE5", "Name": {"en": "Classic Zane"}},
           {"Karten-Nr.": "LE6", "Name": {"en": "Classic Nya"}},
