@@ -104,7 +104,7 @@ that card (by series and card number), and SHALL show a placeholder tile
 containing the card's name if no photo is matched. Placeholder tiles SHALL occupy
 the same grid position and size as photo tiles, so section layouts are unaffected
 by ownership. This requirement applies to non-puzzle categories; puzzle sub-group
-tiles follow the "Puzzle Tiles Show Only the Photo or Placeholder Graphic"
+tiles follow the "Puzzle Tiles Show No Caption or Card Name"
 requirement instead, which overrides the placeholder's fallback content and
 removes the caption entirely.
 
@@ -128,8 +128,7 @@ Each non-puzzle Gallery card tile that shows a matched photo SHALL display a
 small badge in the tile's upper-right corner containing the number of photos
 matched to that card (`OwnedCopies`, as also used on the Collection page).
 Placeholder tiles (no matched photo) SHALL NOT show this badge. Tiles within
-a puzzle sub-group SHALL NOT show this badge, per the "Puzzle Tiles Show
-Only the Photo or Placeholder Graphic" requirement.
+a puzzle sub-group SHALL NOT show this badge, per the "Puzzle Tiles Show No Caption or Card Name" requirement.
 
 #### Scenario: Card has exactly one matched photo
 - **WHEN** a non-puzzle card tile shows a photo because exactly one photo is
@@ -152,16 +151,37 @@ Only the Photo or Placeholder Graphic" requirement.
 - **THEN** the tile shows no badge, regardless of how many photos are
   matched to that card
 
-### Requirement: Puzzle Tiles Show Only the Photo or Placeholder Graphic
+### Requirement: Gallery Is Reachable From Navigation
+The main navigation SHALL include a link to the Gallery page.
+
+#### Scenario: Navigating to the Gallery page
+- **WHEN** the user selects the Gallery entry in the main navigation
+- **THEN** the system displays the Gallery page
+
+### Requirement: Tile Click Opens the Card in the Review Page
+Clicking or tapping a card tile that shows a photo SHALL navigate to the Review page, opened on the group for that tile's card (its series and card number), so the user sees every photo scanned for that card and can review or correct them there. This applies to every category, puzzle sub-groups included. The Gallery page SHALL NOT open an in-place photo zoom or any other overlay for a tile. Placeholder tiles SHALL NOT be interactive.
+
+#### Scenario: Clicking a photo tile
+- **WHEN** the user clicks a card tile that shows a photo
+- **THEN** the system navigates to the Review page, showing the group for that tile's series and card number
+
+#### Scenario: Clicking a puzzle photo tile
+- **WHEN** the user clicks a tile within a puzzle sub-group that shows a photo
+- **THEN** the system navigates to the Review page, showing the group for that tile's series and card number, exactly as for a non-puzzle tile
+
+#### Scenario: Clicking a placeholder tile
+- **WHEN** the user clicks a card tile that shows a placeholder (no photo)
+- **THEN** the system does not navigate and takes no action
+
+### Requirement: Puzzle Tiles Show No Caption or Card Name
 Card tiles within a puzzle sub-group section SHALL show nothing but the
 matched photo (for photo tiles) or the placeholder graphic (for placeholder
 tiles) — no caption element of any kind, and no card name anywhere on the
 tile. A puzzle placeholder tile (no matched photo) SHALL show the card's
 number inside the placeholder graphic itself, not as a separate caption, so
-pieces remain distinguishable before they are scanned. This requirement does
-not change the lightbox opened by clicking a photo tile, which continues to
-caption the enlarged photo with the card's name per the "Tile Click Opens
-In-Place Photo Zoom" requirement.
+pieces remain distinguishable before they are scanned. Clicking a puzzle
+photo tile behaves as for every other photo tile, per the "Tile Click Opens
+the Card in the Review Page" requirement.
 
 #### Scenario: Puzzle photo tile
 - **WHEN** a card in a puzzle sub-group has a matched photo
@@ -174,59 +194,8 @@ In-Place Photo Zoom" requirement.
   number inside the graphic itself, with no separate caption element and no
   card name anywhere on the tile
 
-#### Scenario: Opening the lightbox from a puzzle photo tile
-- **WHEN** the user clicks a puzzle tile that shows a photo
-- **THEN** the system opens the in-place lightbox and captions it with the
-  card's name, unaffected by the tile itself showing no caption
-
-### Requirement: Tile Click Opens In-Place Photo Zoom
-Clicking or tapping a card tile that shows a photo SHALL open an in-place
-lightbox displaying that photo enlarged, captioned with the card's name, without
-navigating away from the Gallery page. Placeholder tiles SHALL NOT be
-interactive.
-
-#### Scenario: Clicking a photo tile
-- **WHEN** the user clicks a card tile that shows a photo
-- **THEN** the system opens an in-place lightbox showing the enlarged photo with
-  the card name as a caption, and the Gallery page underneath remains unchanged
-
-#### Scenario: Clicking a placeholder tile
-- **WHEN** the user clicks a card tile that shows a placeholder (no photo)
-- **THEN** the system does not open a lightbox and takes no action
-
-#### Scenario: Closing the lightbox
-- **WHEN** the user dismisses the open lightbox
-- **THEN** the system returns to the unchanged Gallery grid with no page
-  navigation having occurred
-
-### Requirement: Gallery Is Reachable From Navigation
-The main navigation SHALL include a link to the Gallery page.
-
-#### Scenario: Navigating to the Gallery page
-- **WHEN** the user selects the Gallery entry in the main navigation
-- **THEN** the system displays the Gallery page
-
-### Requirement: Card Tile With a Matched Photo Provides a Fehlerhaft Control
-Each Gallery card tile that shows a matched photo SHALL provide a way to set that photo's `ReviewStatus` to `incorrect` ("Fehlerhaft") without navigating away from the Gallery page. A non-puzzle tile SHALL show this as a "Fehlerhaft" control directly on the tile. A puzzle sub-group tile SHALL NOT show this control on the tile itself, consistent with the "Puzzle Tiles Show Only the Photo or Placeholder Graphic" requirement; instead, the lightbox opened for that tile SHALL provide the control, since opening the lightbox is that tile's existing "select this card" interaction. Placeholder tiles (no matched photo) SHALL NOT show this control anywhere - neither on the tile nor in a lightbox, since no lightbox can be opened for a tile with no photo.
-
-#### Scenario: Flagging a non-puzzle card's matched photo from its tile
-- **WHEN** a user activates the "Fehlerhaft" control on a non-puzzle card tile showing a matched photo
-- **THEN** that photo's `ReviewStatus` is set to `incorrect`, and the Gallery page underneath remains displayed
-
-#### Scenario: Placeholder tile has no Fehlerhaft control
-- **WHEN** a card tile shows a placeholder because no photo is matched to that card
-- **THEN** the tile does not show a "Fehlerhaft" control, and no lightbox is available to show one either
-
-#### Scenario: Puzzle tile has no Fehlerhaft control directly on the tile
-- **WHEN** a card tile within a puzzle sub-group shows a matched photo
-- **THEN** the tile itself does not show a "Fehlerhaft" control
-
-#### Scenario: Flagging a puzzle card's matched photo from its lightbox
-- **WHEN** a user opens the lightbox for a puzzle sub-group tile showing a matched photo and activates the "Fehlerhaft" control shown there
-- **THEN** that photo's `ReviewStatus` is set to `incorrect`
-
-### Requirement: Card Tile Reflects a Flagged Photo's Review Status
-A non-puzzle Gallery card tile whose matched photo currently has `ReviewStatus` `incorrect` SHALL visually indicate that flagged state on the tile. A puzzle sub-group tile SHALL NOT show this indicator on the tile itself, consistent with showing no Fehlerhaft control there; the lightbox opened for a puzzle tile SHALL instead indicate the flagged state on its own Fehlerhaft control.
+### Requirement: Non-Puzzle Card Tile Reflects a Flagged Photo's Review Status
+A non-puzzle Gallery card tile whose matched photo currently has `ReviewStatus` `incorrect` SHALL visually indicate that flagged state on the tile. The indicator is read-only: the Gallery page offers no way to change a photo's `ReviewStatus` (that happens on the Review page). A puzzle sub-group tile SHALL NOT show this indicator, consistent with puzzle tiles showing nothing but the photo.
 
 #### Scenario: Tile shows the flagged state
 - **WHEN** a non-puzzle card tile's matched photo has `ReviewStatus` `incorrect`
@@ -236,10 +205,6 @@ A non-puzzle Gallery card tile whose matched photo currently has `ReviewStatus` 
 - **WHEN** a card tile's matched photo has `ReviewStatus` `unreviewed` or `verified`
 - **THEN** the tile does not show the flagged-state indicator
 
-#### Scenario: Puzzle tile never shows the flagged-state indicator on the grid
+#### Scenario: Puzzle tile never shows the flagged-state indicator
 - **WHEN** a card tile within a puzzle sub-group has a matched photo, regardless of its `ReviewStatus`
 - **THEN** the tile does not show the flagged-state indicator
-
-#### Scenario: A puzzle card's lightbox indicates an already-flagged photo
-- **WHEN** a user opens the lightbox for a puzzle tile whose matched photo has `ReviewStatus` `incorrect`
-- **THEN** the lightbox's Fehlerhaft control indicates that the photo is already flagged

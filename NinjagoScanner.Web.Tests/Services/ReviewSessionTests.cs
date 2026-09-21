@@ -84,6 +84,84 @@ public sealed class ReviewSessionTests
         Assert.Same(photo, session.Groups.Single().Photos.Single());
     }
 
+    // --- Showing a specific card ---
+
+    [Fact]
+    public void TryShowCard_ShowsAFullyVerifiedGroupAndClearsEveryFilter()
+    {
+        var session = Session(
+            Photo("p-2", "Serie 2", "2"),
+            Photo("p-10", "Serie 2", "10", ReviewStatuses.Verified));
+        session.SetAnalysisStatusFilter(AnalysisStatuses.Failed);
+        session.SetSearchText("nothing");
+
+        var shown = session.TryShowCard("Serie 2", "10");
+
+        Assert.True(shown);
+        Assert.Equal("10", session.CurrentGroup!.CardNumber);
+        Assert.Equal(ReviewSession.AllFilterValue, session.ReviewStatusFilter);
+        Assert.Equal(ReviewSession.AllFilterValue, session.AnalysisStatusFilter);
+        Assert.Equal(string.Empty, session.SearchText);
+    }
+
+    [Fact]
+    public void TryShowCard_MatchesLikeTheGroupingDoes()
+    {
+        var session = Session(
+            Photo("p-2", "Serie 2", "2"),
+            Photo("p-10", "Serie 2", "10"));
+
+        Assert.True(session.TryShowCard(" serie 2 ", "010"));
+
+        Assert.Equal("10", session.CurrentGroup!.CardNumber);
+    }
+
+    [Fact]
+    public void TryShowCard_KeepsAllPhotosOfTheGroup()
+    {
+        var session = Session(
+            Photo("p-a", "Serie 2", "2", ReviewStatuses.Verified),
+            Photo("p-b", "Serie 2", "2", ReviewStatuses.Incorrect));
+
+        session.TryShowCard("Serie 2", "2");
+
+        Assert.Equal(2, session.CurrentGroup!.Photos.Count);
+    }
+
+    [Fact]
+    public void TryShowCard_ThenNextAndPrevious_WalkTheClearedGroupList()
+    {
+        var session = Session(
+            Photo("p-2", "Serie 2", "2", ReviewStatuses.Verified),
+            Photo("p-10", "Serie 2", "10", ReviewStatuses.Verified),
+            Photo("p-kai", "Serie 10", "1", ReviewStatuses.Verified));
+
+        session.TryShowCard("Serie 2", "10");
+        session.GoToNext();
+        Assert.Equal("Serie 10", session.CurrentGroup!.SeriesName);
+
+        session.GoToPrevious();
+        session.GoToPrevious();
+        Assert.Equal("2", session.CurrentGroup!.CardNumber);
+    }
+
+    [Theory]
+    [InlineData("Serie 2", "10")]   // catalog card without any photo
+    [InlineData("Serie 99", "1")]   // unknown series
+    [InlineData("Serie 2", null)]
+    [InlineData(null, "2")]
+    [InlineData("", "")]
+    public void TryShowCard_WithoutAMatchingGroup_ChangesNothing(string? series, string? card)
+    {
+        var session = Session(Photo("p-2", "Serie 2", "2"));
+
+        var shown = session.TryShowCard(series, card);
+
+        Assert.False(shown);
+        Assert.Equal(ReviewStatuses.Unreviewed, session.ReviewStatusFilter);
+        Assert.Equal(0, session.CurrentIndex);
+    }
+
     // --- Position rules ---
 
     [Fact]

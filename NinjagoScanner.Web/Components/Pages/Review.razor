@@ -253,6 +253,13 @@
 	private readonly Dictionary<string, string> cardNumberDrafts = new(StringComparer.Ordinal);
 	private readonly Dictionary<string, CardDetailsItem> photoDetails = new(StringComparer.Ordinal);
 
+	// Set by links from the Gallery: open on this card's group instead of the default first one.
+	[SupplyParameterFromQuery(Name = "series")]
+	public string? SeriesQueryParameter { get; set; }
+
+	[SupplyParameterFromQuery(Name = "card")]
+	public string? CardQueryParameter { get; set; }
+
 	private IReadOnlyList<CardReviewGroup> FilteredGroups => session.FilteredGroups;
 
 	private CardReviewGroup? CurrentGroup => session.CurrentGroup;
@@ -261,6 +268,7 @@
 	{
 		knownSeries = await CatalogServiceClient.GetKnownSeriesAsync();
 		session = new ReviewSession(await CollectionQueryService.GetReviewSnapshotAsync());
+		session.TryShowCard(SeriesQueryParameter, CardQueryParameter);
 		isLoading = false;
 	}
 

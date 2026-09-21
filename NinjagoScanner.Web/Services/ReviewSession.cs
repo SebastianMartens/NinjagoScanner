@@ -84,6 +84,45 @@ internal sealed class ReviewSession
         }
     }
 
+    /// <summary>
+    /// Jumps to the group of the catalog card that <paramref name="seriesName"/> and
+    /// <paramref name="cardNumber"/> resolve to (matched like the grouping matches, so case and
+    /// whitespace differences are ignored). Clears every filter first, so the group is shown
+    /// whatever its photos' statuses are. Returns <c>false</c> and changes nothing when no such
+    /// group exists.
+    /// </summary>
+    public bool TryShowCard(string? seriesName, string? cardNumber)
+    {
+        var targetKey = CollectionQueryService.BuildOwnershipKey(seriesName, cardNumber);
+        if (string.IsNullOrEmpty(targetKey))
+        {
+            return false;
+        }
+
+        var index = -1;
+        for (var i = 0; i < groups.Count; i++)
+        {
+            if (!groups[i].IsCatchAll
+                && string.Equals(CollectionQueryService.BuildOwnershipKey(groups[i].SeriesName, groups[i].CardNumber), targetKey, StringComparison.Ordinal))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        reviewStatusFilter = AllFilterValue;
+        analysisStatusFilter = AllFilterValue;
+        searchText = string.Empty;
+        filteredGroups = null;
+        currentIndex = index; // no filter is active, so the filtered list is the full group list
+        return true;
+    }
+
     public void RestartFromBeginning()
     {
         currentIndex = 0;

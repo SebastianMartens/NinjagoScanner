@@ -376,7 +376,7 @@ internal sealed class CollectionQueryService(
         return ownership;
     }
 
-    private static string BuildOwnershipKey(string? series, string? cardNumber)
+    internal static string BuildOwnershipKey(string? series, string? cardNumber)
     {
         var seriesKey = NormalizeSeriesKey(series);
         var numberKey = NormalizeCardNumber(cardNumber);

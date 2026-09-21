@@ -1,7 +1,6 @@
 @page "/gallery"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject CatalogServiceClient CatalogServiceClient
-@inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
 
 <PageTitle>Galerie</PageTitle>
@@ -72,7 +71,7 @@
                         @if (card.ImageUrl is not null)
                         {
                             <div class="gallery-tile @(section.IsPuzzle ? "gallery-tile-puzzle" : "") gallery-tile-photo @(IsFehlerhaft(card) ? "gallery-tile-flagged" : "")">
-                                <button type="button" class="gallery-tile-media gallery-tile-media-button" @onclick="() => OpenLightbox(card)">
+                                <a class="gallery-tile-media gallery-tile-media-link" href="@ReviewUrl(card)">
                                     <img class="gallery-tile-image" src="@card.ImageUrl" alt="@card.CardName" loading="lazy" />
                                     @if (!section.IsPuzzle)
                                     {
@@ -82,7 +81,7 @@
                                     {
                                         <span class="gallery-tile-flag-badge">Fehlerhaft</span>
                                     }
-                                </button>
+                                </a>
                                 @if (!section.IsPuzzle)
                                 {
                                     <span class="gallery-tile-caption">Nr. @card.CardNumber &middot; @card.CardName</span>
@@ -95,9 +94,6 @@
                                             }
                                         </span>
                                     }
-                                    <button type="button" class="gallery-tile-fehlerhaft-btn" disabled="@(IsFehlerhaft(card) || IsMarkingFehlerhaft(card))" @onclick="() => MarkFehlerhaftAsync(card)">
-                                        @(IsFehlerhaft(card) ? "Als fehlerhaft markiert" : "Fehlerhaft")
-                                    </button>
                                 }
                             </div>
                         }
@@ -135,25 +131,6 @@
     }
 </div>
 
-@if (lightboxCard is not null)
-{
-    var openCard = lightboxCard;
-
-    <div class="gallery-lightbox-backdrop" @onclick="CloseLightbox">
-        <div class="gallery-lightbox-dialog" @onclick:stopPropagation="true">
-            <button type="button" class="gallery-lightbox-close" @onclick="CloseLightbox" aria-label="Vorschau schliessen">Schliessen</button>
-            <img class="gallery-lightbox-image" src="@openCard.ImageUrl" alt="@openCard.CardName" />
-            <div class="gallery-lightbox-caption">@openCard.CardName</div>
-            @if (IsPuzzleCategory(openCard.Category))
-            {
-                <button type="button" class="gallery-lightbox-fehlerhaft-btn" disabled="@(IsFehlerhaft(openCard) || IsMarkingFehlerhaft(openCard))" @onclick="() => MarkFehlerhaftAsync(openCard)">
-                    @(IsFehlerhaft(openCard) ? "Als fehlerhaft markiert" : "Fehlerhaft")
-                </button>
-            }
-        </div>
-    </div>
-}
-
 @code {
     private const string PuzzleCategoryPrefix = "Puzzle Cards";
 
@@ -165,8 +142,6 @@
     private string selectedSeries = string.Empty;
     private string selectedCategory = string.Empty;
     private List<GalleryCardItem> seriesCards = [];
-    private GalleryCardItem? lightboxCard;
-    private string? markingFehlerhaftPhotoId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -182,11 +157,7 @@
     private string SelectedCategory
     {
         get => selectedCategory;
-        set
-        {
-            lightboxCard = null;
-            selectedCategory = value;
-        }
+        set => selectedCategory = value;
     }
 
     private IEnumerable<string> AvailableCategories => seriesCards
@@ -234,7 +205,6 @@
     private async Task LoadSeriesCardsAsync()
     {
         isLoading = true;
-        lightboxCard = null;
         StateHasChanged();
 
         seriesCards = string.IsNullOrWhiteSpace(selectedSeries)
@@ -250,63 +220,12 @@
         isLoading = false;
     }
 
-    private void OpenLightbox(GalleryCardItem card)
-    {
-        if (card.ImageUrl is null)
-        {
-            return;
-        }
-
-        lightboxCard = card;
-    }
-
-    private void CloseLightbox()
-    {
-        lightboxCard = null;
-    }
+    private static string ReviewUrl(GalleryCardItem card) =>
+        $"/review?series={Uri.EscapeDataString(card.Series)}&card={Uri.EscapeDataString(card.CardNumber)}";
 
     private static bool IsFehlerhaft(GalleryCardItem card)
     {
         return string.Equals(card.ReviewStatus, ReviewStatuses.Incorrect, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private bool IsMarkingFehlerhaft(GalleryCardItem card)
-    {
-        return card.PhotoId is not null
-            && string.Equals(markingFehlerhaftPhotoId, card.PhotoId, StringComparison.Ordinal);
-    }
-
-    private async Task MarkFehlerhaftAsync(GalleryCardItem card)
-    {
-        if (card.PhotoId is null || IsFehlerhaft(card) || IsMarkingFehlerhaft(card))
-        {
-            return;
-        }
-
-        markingFehlerhaftPhotoId = card.PhotoId;
-
-        try
-        {
-            await PictureServiceClient.UpdateReviewStatusAsync(card.PhotoId, ReviewStatuses.Incorrect);
-            await ReloadSeriesCardsAsync();
-        }
-        finally
-        {
-            markingFehlerhaftPhotoId = null;
-        }
-    }
-
-    private async Task ReloadSeriesCardsAsync()
-    {
-        var openLightboxPhotoId = lightboxCard?.PhotoId;
-
-        seriesCards = string.IsNullOrWhiteSpace(selectedSeries)
-            ? []
-            : (await CollectionQueryService.GetGalleryCardsAsync(selectedSeries)).ToList();
-
-        lightboxCard = openLightboxPhotoId is null
-            ? null
-            : seriesCards.FirstOrDefault(card => string.Equals(card.PhotoId, openLightboxPhotoId, StringComparison.Ordinal));
     }
 
     private sealed record GallerySection(string Category, bool IsPuzzle, List<GalleryCardItem> Cards);
