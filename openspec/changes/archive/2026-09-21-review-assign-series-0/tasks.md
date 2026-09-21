@@ -10,7 +10,7 @@
 ## 2. Review page series grid
 
 - [x] 2.1 Add a Web test in `NinjagoScanner.Web.Tests/Services` that writes `Serie_0` and `Serie_1` files into `CatalogServiceTestHost` and asserts `CatalogServiceClient.GetKnownSeriesAsync` returns "Serie 0" then "Serie 1"; verify it passes.
-- [ ] 2.2 Run the app (`Launch All`), open `/review`, and confirm a text-only "Serie 0" button appears first in a photo tile's series grid, that clicking it saves `SetName` "Serie 0" without changing `ReviewStatus`, and that the photo then moves to its Series 0 card group when its card number matches (e.g. `5`), or stays in "Ohne bekannte Serie" when it doesn't. No `Review.razor` change is expected; if the button is missing, investigate before adding markup.
+- [x] 2.2 Run the app (`Launch All`), open `/review`, and confirm a text-only "Serie 0" button appears first in a photo tile's series grid, that clicking it saves `SetName` "Serie 0" without changing `ReviewStatus`, and that the photo then moves to its Series 0 card group when its card number matches (e.g. `5`), or stays in "Ohne bekannte Serie" when it doesn't. No `Review.razor` change is expected; if the button is missing, investigate before adding markup.
 
 ## 3. Final checks
 
