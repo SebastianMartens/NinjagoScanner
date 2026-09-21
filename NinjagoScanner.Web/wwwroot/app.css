@@ -608,11 +608,16 @@ h1:focus {
     font-size: 0.74rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--cv-text-muted);
+    color: var(--cv-text-soft);
     background: var(--cv-surface-3);
     position: sticky;
     top: 0;
     z-index: 2;
+}
+
+/* QuickGrid renders the header text inside a <button>, which otherwise gets the browser's default (black) button colour. */
+.collection-grid th .col-title {
+    color: inherit;
 }
 
 .collection-grid td {
@@ -691,7 +696,7 @@ h1:focus {
     font-size: 0.76rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--cv-text-muted);
+    color: var(--cv-text-soft);
     background: var(--cv-surface-3);
     position: sticky;
     top: 0;

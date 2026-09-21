@@ -197,7 +197,7 @@
           {"Karten-Nr.": 169, "Name": {"en": "Spider Delivery"}},
           {"Karten-Nr.": 170, "Name": {"en": "Smug"}},
           {"Karten-Nr.": 171, "Name": {"en": "Order Received"}},
-          {"Karten-Nr.": 172, "Name": {"en": "Wohoo!"}},
+          {"Karten-Nr.": 172, "Name": {"en": "Wohoo!", "de": "Juhu!"}},
           {"Karten-Nr.": 173, "Name": {"en": "Call to Action"}},
           {"Karten-Nr.": 174, "Name": {"en": "In Action"}},
           {"Karten-Nr.": 175, "Name": {"en": "On the Scene"}},
