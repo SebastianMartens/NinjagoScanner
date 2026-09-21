@@ -140,6 +140,14 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
 
                     var seriesName = ToSeriesDisplayName(property.Name);
                     var seriesKey = NormalizeLookupKey(seriesName);
+                    if (result.ContainsKey(seriesKey))
+                    {
+                        // Two series entries resolving to the same name would silently overwrite each
+                        // other (which of the two wins depends on file enumeration order).
+                        throw new CatalogDataException(
+                            $"Series '{seriesName}' is declared more than once; series names must be unique across series_*.json files.");
+                    }
+
                     var metadata = ExtractSeriesMetadata(seriesName, property.Value);
                     var cards = ExtractSeriesCards(seriesName, metadata.SortOrder ?? 0, property.Value);
                     var knownCardNames = cards

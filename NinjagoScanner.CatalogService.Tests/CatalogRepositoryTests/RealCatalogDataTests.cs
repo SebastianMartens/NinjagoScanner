@@ -33,6 +33,21 @@ public sealed class RealCatalogDataTests
     }
 
     [Fact]
+    public void GetSnapshot_ListsSeriesZeroBeforeSeriesOne_AndKeepsBothSeriesCards_AcrossShippedCatalogData()
+    {
+        var snapshot = ShippedCatalogData.CreateRepository().GetSnapshot();
+
+        var seriesNames = snapshot.Series.Select(series => series.SeriesName).ToList();
+        Assert.Contains("Serie 0", seriesNames);
+        Assert.Contains("Serie 1", seriesNames);
+        Assert.True(seriesNames.IndexOf("Serie 0") < seriesNames.IndexOf("Serie 1"));
+
+        // Series 0 ships its real cards; Series 1 must not lose any to the Series 0 file.
+        Assert.Equal(221, snapshot.Cards.Count(card => card.SeriesName == "Serie 0"));
+        Assert.Equal(200, snapshot.Cards.Count(card => card.SeriesName == "Serie 1"));
+    }
+
+    [Fact]
     public void GetSnapshot_GivesEveryCardAClassFromTheFixedSet_AcrossShippedCatalogData()
     {
         var cards = ShippedCatalogData.CreateRepository().GetSnapshot().Cards;

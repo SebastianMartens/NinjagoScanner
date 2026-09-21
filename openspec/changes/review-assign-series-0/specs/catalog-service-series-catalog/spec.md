@@ -20,7 +20,7 @@ The shipped catalog SHALL expose the early Spinner-set series as its own series 
 
 #### Scenario: Series 0 lists its real cards
 - **WHEN** a client lists all cards from the shipped catalog data
-- **THEN** "Serie 0" has 221 cards: Wave 1 numbers 1-81 and `LE1`-`LE9`, Wave 2 numbers `WB1`-`WB125`, `WBLE1`-`WBLE5` and `WBLE22`
+- **THEN** "Serie 0" has 221 cards: Wave 1 numbers 1-81 and `LE1`-`LE9`, Wave 2 numbers `WB1`-`WB125`, `WBLE1`-`WBLE6`
 
 #### Scenario: Series 1 keeps its cards
 - **WHEN** a client lists all cards from the shipped catalog data

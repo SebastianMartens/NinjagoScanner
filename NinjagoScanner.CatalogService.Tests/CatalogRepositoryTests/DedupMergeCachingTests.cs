@@ -1,3 +1,4 @@
+using NinjagoScanner.CatalogService.Catalog;
 using NinjagoScanner.CatalogService.Tests.Fixtures;
 
 namespace NinjagoScanner.CatalogService.Tests.CatalogRepositoryTests;
@@ -5,6 +6,59 @@ namespace NinjagoScanner.CatalogService.Tests.CatalogRepositoryTests;
 public sealed class DedupMergeCachingTests : IDisposable
 {
     private readonly TempCatalogDirectory directory = new();
+
+    [Fact]
+    public void GetSnapshot_Throws_WhenTwoFilesDeclareTheSameSeriesName()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
+          }
+        }
+        """);
+        directory.WriteFile("series_1_copy.json", """
+        {
+          "Serie 1": {
+            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Zane"}} ] } }
+          }
+        }
+        """);
+        var repository = directory.CreateRepository();
+
+        var exception = Assert.Throws<CatalogDataException>(() => repository.GetSnapshot());
+
+        Assert.Contains("Serie 1", exception.Message);
+        Assert.Contains("series_1", exception.Message);
+    }
+
+    [Fact]
+    public void GetSnapshot_ListsSeriesFromSeparateFilesSideBySide_WithSeriesZeroFirst()
+    {
+        directory.WriteFile("series_1.json", """
+        {
+          "Serie_1": {
+            "SortOrder": 10,
+            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
+          }
+        }
+        """);
+        directory.WriteFile("series_0_spinner.json", """
+        {
+          "Serie_0": {
+            "SortOrder": 0,
+            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Spinner Kai"}} ] } }
+          }
+        }
+        """);
+        var repository = directory.CreateRepository();
+
+        var snapshot = repository.GetSnapshot();
+
+        Assert.Equal(["Serie 0", "Serie 1"], snapshot.Series.Select(series => series.SeriesName));
+        Assert.Equal("Spinner Kai", Assert.Single(snapshot.Cards, card => card.SeriesName == "Serie 0").CardName);
+        Assert.Equal("Kai", Assert.Single(snapshot.Cards, card => card.SeriesName == "Serie 1").CardName);
+    }
 
     [Fact]
     public void GetSnapshot_CollapsesIdenticalCardEntries_IntoOne()
