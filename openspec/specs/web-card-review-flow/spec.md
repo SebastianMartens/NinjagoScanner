@@ -24,7 +24,7 @@ Series name and card number uniquely identify a catalog card (see GLOSSARY.md's 
 - **THEN** no group for that card is shown on the review page
 
 ### Requirement: Groups are ordered by known series order, then card number
-Groups, each corresponding to a matched catalog card, SHALL be ordered by that card's series' catalog `SortOrder`, then by `CardNumber` within the series using the same card-number rule used everywhere else in the application: purely numeric card numbers first ordered by value, then alphabetic-prefix-plus-number card numbers ordered by prefix alphabetically and then by numeric suffix, then anything else ordered alphabetically by raw text. Every photo whose `SetName`/`CardNumber` pair does not resolve, after normalization, to a catalog card - including a blank `SetName`, a blank `CardNumber`, an unrecognized series, or a card number not found within an otherwise recognized series - SHALL be merged into exactly one catch-all group, sorted after every matched group.
+Every photo whose `SetName`/`CardNumber` pair does not resolve, after normalization, to a catalog card - including a blank `SetName`, a blank `CardNumber`, an unrecognized series, or a card number not found within an otherwise recognized series - SHALL be merged into exactly one catch-all group, which SHALL be ordered before every matched group (when it has any photos). The matched groups, each corresponding to a matched catalog card, SHALL follow it, ordered by that card's series' catalog `SortOrder`, then by `CardNumber` within the series using the same card-number rule used everywhere else in the application: purely numeric card numbers first ordered by value, then alphabetic-prefix-plus-number card numbers ordered by prefix alphabetically and then by numeric suffix, then anything else ordered alphabetically by raw text.
 
 #### Scenario: Groups follow catalog series order
 - **WHEN** the review page lists matched groups
@@ -32,7 +32,7 @@ Groups, each corresponding to a matched catalog card, SHALL be ordered by that c
 
 #### Scenario: Unrecognized and blank series are combined into one trailing group
 - **WHEN** photos have a `SetName` that does not resolve to any known catalog series, or have no `SetName` at all
-- **THEN** all such photos appear together in a single group that is ordered after every matched group
+- **THEN** all such photos appear together in a single group that is ordered before every matched group
 
 #### Scenario: Numeric and alphanumeric card numbers within the same series order correctly
 - **WHEN** a series has matched groups for both purely numeric card numbers (e.g. `2`, `10`) and alphanumeric card numbers (e.g. `LE1`, `XXL1`)
@@ -41,6 +41,10 @@ Groups, each corresponding to a matched catalog card, SHALL be ordered by that c
 #### Scenario: A recognized series with an unrecognized card number falls into the catch-all group
 - **WHEN** a photo's `SetName` matches a known catalog series but its `CardNumber` does not match any card within that series
 - **THEN** that photo is placed in the catch-all group rather than forming its own group
+
+#### Scenario: No catch-all group when every photo resolves
+- **WHEN** every photo's `SetName`/`CardNumber` resolves to a catalog card
+- **THEN** no catch-all group is shown, and the first group is the matched group with the lowest series `SortOrder` and card number
 
 ### Requirement: A matched group's header shows the resolved catalog card name
 The review page SHALL show, in a matched group's header, the catalog card name resolved from that group's series name and card number, in addition to the existing series name and card number label. The catch-all group, which does not correspond to a single catalog card, SHALL NOT show a catalog card name in its header.
