@@ -1,0 +1,256 @@
+@page "/achievements"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject GamificationService GamificationService
+
+<PageTitle>Erfolge</PageTitle>
+
+<div class="achievements-page">
+	<header class="overview-header">
+		<p class="eyebrow">Ninjago Scanner</p>
+		<h1>Erfolge</h1>
+		<p class="lede">Abzeichen, Rang und Fortschritt deiner Sammlung.</p>
+	</header>
+
+	@if (isLoading)
+	{
+		<p>Lade Erfolge...</p>
+	}
+	else if (loadError is not null)
+	{
+		<div class="empty-state">
+			<h2>Erfolge konnten nicht geladen werden</h2>
+			<p class="table-secondary">@loadError</p>
+		</div>
+	}
+	else
+	{
+		<section class="rank-hero" style="--rank-accent: @rank.AccentColor;">
+			<div class="rank-hero-badge">@rank.Glyph</div>
+			<div class="rank-hero-body">
+				<div class="rank-hero-eyebrow">Rang @rank.Level</div>
+				<div class="rank-hero-name">@rank.Name</div>
+				<div class="rank-hero-meta">
+					<span>@xp XP gesammelt</span>
+					<span>Nächster Rang: @NextRankLabel()</span>
+				</div>
+				<div class="rank-progress-track">
+					<div class="rank-progress-fill" style="width: @(RankProgressPercent())%;"></div>
+				</div>
+				<div class="rank-hero-caption">Neue Karte +@GamificationService.XpNewCard XP · bestätigter Scan +@GamificationService.XpConfirmedReview XP · Erfolge bringen eigene XP</div>
+			</div>
+		</section>
+
+		<section>
+			<div class="section-label">Rangleiter</div>
+			<div class="rank-ladder">
+				@foreach (var ladderRank in RankDefinitions.All)
+				{
+					var reached = ladderRank.Level <= rank.Level;
+					var active = ladderRank.Level == rank.Level;
+					<div class="rank-ladder-item @(reached ? "is-reached" : "") @(active ? "is-active" : "")" style="--rank-accent: @ladderRank.AccentColor;">
+						<div class="rank-ladder-dot">@ladderRank.Glyph</div>
+						<div class="rank-ladder-name">@ladderRank.Name</div>
+						<div class="rank-ladder-min">@(ladderRank.MinXp == 0 ? "Start" : $"{ladderRank.MinXp} XP")</div>
+					</div>
+				}
+			</div>
+		</section>
+
+		<section>
+			<div class="section-label">Hintergründe</div>
+			<div class="bg-shelf">
+				@foreach (var background in BackgroundUnlocks.All)
+				{
+					var unlocked = rank.Level >= background.RequiredRankLevel;
+					<div class="bg-shelf-tile @(unlocked ? "is-unlocked" : "is-locked") @(background.ImageFile is null ? "bg-shelf-placeholder" : "")" style="@BackgroundTileStyle(background, unlocked)">
+						<div class="bg-shelf-name">@background.Name</div>
+						<div class="bg-shelf-req">@(unlocked ? "Freigeschaltet" : $"Ab Rang {background.RequiredRankLevel}")</div>
+					</div>
+				}
+			</div>
+		</section>
+
+		<div class="stat-grid">
+			<div class="stat-card">
+				<div class="stat-num">@unlockedCount<span class="stat-num-of">/@progress.Count</span></div>
+				<div class="stat-label">Erfolge freigeschaltet</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-num">@AchievementPercent()%</div>
+				<div class="stat-label">Fortschritt gesamt</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-num">@xp</div>
+				<div class="stat-label">Erfahrungspunkte</div>
+			</div>
+			<div class="stat-card">
+				<div class="stat-num">@rank.Level</div>
+				<div class="stat-label">Aktueller Rang</div>
+			</div>
+		</div>
+
+		@if (NextUp().Count > 0)
+		{
+			<section>
+				<div class="section-label">Fast geschafft</div>
+				<div class="next-up-list">
+					@foreach (var item in NextUp())
+					{
+						<div class="next-up-item">
+							<div class="next-up-glyph">@item.Achievement.Glyph</div>
+							<div class="next-up-body">
+								<div class="next-up-name">@item.Achievement.Name</div>
+								<div class="next-up-meta">@item.Current / @item.Goal · +@item.Achievement.Xp XP</div>
+							</div>
+							<div class="next-up-pct">@item.PercentComplete%</div>
+						</div>
+					}
+				</div>
+			</section>
+		}
+
+		<section>
+			<div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+				<div class="section-label">Alle Abzeichen</div>
+				<div class="chip-filter-bar">
+					<button type="button" class="chip-filter-btn @(activeFilter == AchievementFilter.All ? "is-active" : "")" @onclick="() => SetFilter(AchievementFilter.All)">Alle</button>
+					<button type="button" class="chip-filter-btn @(activeFilter == AchievementFilter.Unlocked ? "is-active" : "")" @onclick="() => SetFilter(AchievementFilter.Unlocked)">Freigeschaltet</button>
+					<button type="button" class="chip-filter-btn @(activeFilter == AchievementFilter.Locked ? "is-active" : "")" @onclick="() => SetFilter(AchievementFilter.Locked)">Offen</button>
+				</div>
+			</div>
+
+			@if (FilteredAchievements().Count == 0)
+			{
+				<div class="empty-state" style="margin-top: 1rem;">
+					<p class="table-secondary">Keine Erfolge in dieser Ansicht.</p>
+				</div>
+			}
+			else
+			{
+				<div class="achievement-grid">
+					@foreach (var item in FilteredAchievements())
+					{
+						<div class="achievement-card @(item.IsUnlocked ? "is-unlocked" : "")">
+							<div class="achievement-card-head">
+								<div class="achievement-badge">@item.Achievement.Glyph</div>
+								<div class="achievement-card-info">
+									<div class="achievement-title">@item.Achievement.Name</div>
+									<div class="achievement-chips">
+										<span class="cv-chip cv-chip-muted">@item.Achievement.Category.ToGermanLabel()</span>
+									</div>
+								</div>
+							</div>
+							<div class="achievement-desc">@item.Achievement.Description</div>
+							<div class="achievement-progress">
+								<div class="achievement-progress-track">
+									<div class="achievement-progress-fill" style="width: @(item.PercentComplete)%;"></div>
+								</div>
+								<div class="achievement-progress-row">
+									<div class="achievement-progress-text">@ProgressLabel(item)</div>
+									<div class="achievement-xp-label">+@item.Achievement.Xp XP</div>
+								</div>
+							</div>
+						</div>
+					}
+				</div>
+			}
+		</section>
+	}
+</div>
+
+@code {
+	private enum AchievementFilter { All, Unlocked, Locked }
+
+	private bool isLoading = true;
+	private string? loadError;
+	private IReadOnlyList<AchievementProgress> progress = Array.Empty<AchievementProgress>();
+	private int xp;
+	private RankDefinition rank = RankDefinitions.All[0];
+	private int unlockedCount;
+	private AchievementFilter activeFilter = AchievementFilter.All;
+
+	protected override async Task OnInitializedAsync()
+	{
+		try
+		{
+			progress = await GamificationService.GetProgressAsync();
+			xp = await GamificationService.GetXpAsync();
+			rank = GamificationService.GetRank(xp);
+			unlockedCount = progress.Count(item => item.IsUnlocked);
+		}
+		catch (Exception exception)
+		{
+			loadError = $"Katalog-/PictureService nicht erreichbar: {exception.Message}";
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private void SetFilter(AchievementFilter filter)
+	{
+		activeFilter = filter;
+	}
+
+	private IReadOnlyList<AchievementProgress> FilteredAchievements()
+	{
+		return activeFilter switch
+		{
+			AchievementFilter.Unlocked => progress.Where(item => item.IsUnlocked).ToArray(),
+			AchievementFilter.Locked => progress.Where(item => !item.IsUnlocked).ToArray(),
+			_ => progress
+		};
+	}
+
+	private List<AchievementProgress> NextUp()
+	{
+		return progress
+			.Where(item => !item.IsUnlocked)
+			.OrderByDescending(item => item.PercentComplete)
+			.Take(3)
+			.ToList();
+	}
+
+	private int AchievementPercent()
+	{
+		return progress.Count == 0 ? 0 : (int)Math.Round(100.0 * unlockedCount / progress.Count);
+	}
+
+	private int RankProgressPercent()
+	{
+		var next = RankDefinitions.Next(rank);
+		if (next is null)
+		{
+			return 100;
+		}
+
+		var span = next.MinXp - rank.MinXp;
+		return span <= 0 ? 100 : Math.Clamp((int)Math.Round(100.0 * (xp - rank.MinXp) / span), 0, 100);
+	}
+
+	private string NextRankLabel()
+	{
+		var next = RankDefinitions.Next(rank);
+		return next is null ? "Maximaler Rang" : $"noch {next.MinXp - xp} XP bis {next.Name}";
+	}
+
+	private static string BackgroundTileStyle(BackgroundUnlock background, bool unlocked)
+	{
+		if (background.ImageFile is null)
+		{
+			return string.Empty;
+		}
+
+		var overlayA = unlocked ? "0.45" : "0.82";
+		var overlayB = unlocked ? "0.6" : "0.9";
+		return $"background-image: linear-gradient(oklch(14% 0.015 290 / {overlayA}), oklch(14% 0.015 290 / {overlayB})), url('/images/backgrounds/{background.ImageFile}');";
+	}
+
+	private static string ProgressLabel(AchievementProgress item)
+	{
+		return item.IsUnlocked
+			? $"Freigeschaltet · {(item.UnlockedAtUtc is { } at ? at.ToLocalTime().ToString("d MMM yyyy") : "kürzlich")}"
+			: $"{item.Current} / {item.Goal}";
+	}
+}

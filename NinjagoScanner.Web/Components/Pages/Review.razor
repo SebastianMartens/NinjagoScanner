@@ -4,6 +4,8 @@
 @inject CatalogServiceClient CatalogServiceClient
 @inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
+@inject GamificationService GamificationService
+@inject GamificationCelebrationCenter CelebrationCenter
 
 <PageTitle>Karten-Review</PageTitle>
 
@@ -365,23 +367,36 @@
 
 	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
 	{
+		var xpBefore = await TryGetXpBeforeAsync();
 		await RunPhotoActionAsync(
 			photo,
 			() => PictureServiceClient.UpdateReviewStatusAsync(photo.PhotoId, reviewStatus),
 			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithReviewStatus(current, reviewStatus)));
+		await CelebrateSilentlyIfAnythingUnlockedAsync(xpBefore);
 	}
 
 	private async Task SaveCardNumberAsync(CardListItem photo)
 	{
 		var cardNumber = GetCardNumberDraft(photo);
+		var xpBefore = await TryGetXpBeforeAsync();
+		CardListItem? after = null;
 		await RunPhotoActionAsync(
 			photo,
 			() => PictureServiceClient.UpdateCardNumberAsync(photo.PhotoId, cardNumber),
 			() =>
 			{
-				session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithCardNumber(current, cardNumber));
+				session.ReplacePhoto(photo.PhotoId, current =>
+				{
+					after = ReviewSession.WithCardNumber(current, cardNumber);
+					return after;
+				});
 				cardNumberDrafts.Remove(photo.PhotoId);
 			});
+
+		if (after is not null)
+		{
+			await TryCelebrateCardChangeAsync(photo, after, xpBefore);
+		}
 	}
 
 	private async Task SaveLanguageAsync(CardListItem photo, string? language)
@@ -452,6 +467,7 @@
 		}
 
 		reanalysisErrors.Remove(photo.PhotoId);
+		var xpBefore = await TryGetXpBeforeAsync();
 
 		try
 		{
@@ -476,8 +492,11 @@
 
 			// The reanalysis response carries no image URL; keep the one the tile already shows
 			// (which also spares the browser re-downloading the photo).
-			session.ReplacePhoto(photo.PhotoId, previous => reanalyzed with { ImageUrl = previous.ImageUrl });
+			var updated = reanalyzed with { ImageUrl = photo.ImageUrl };
+			session.ReplacePhoto(photo.PhotoId, _ => updated);
 			cardNumberDrafts.Remove(photo.PhotoId);
+
+			await TryCelebrateCardChangeAsync(photo, updated, xpBefore);
 		}
 		finally
 		{
@@ -530,10 +549,21 @@
 
 	private async Task ReassignSeriesAsync(CardListItem photo, string seriesName)
 	{
+		var xpBefore = await TryGetXpBeforeAsync();
+		CardListItem? after = null;
 		await RunPhotoActionAsync(
 			photo,
 			() => PictureServiceClient.UpdateSetNameAsync(photo.PhotoId, seriesName),
-			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithSetName(current, seriesName)));
+			() => session.ReplacePhoto(photo.PhotoId, current =>
+			{
+				after = ReviewSession.WithSetName(current, seriesName);
+				return after;
+			}));
+
+		if (after is not null)
+		{
+			await TryCelebrateCardChangeAsync(photo, after, xpBefore);
+		}
 	}
 
 	private async Task ConfirmAllAsync()
@@ -545,6 +575,7 @@
 		}
 
 		isConfirmingAll = true;
+		var xpBefore = await TryGetXpBeforeAsync();
 
 		try
 		{
@@ -555,6 +586,89 @@
 		finally
 		{
 			isConfirmingAll = false;
+		}
+
+		// Routine "Confirm All" on an already-correct match only changes Review Status, never
+		// Owned Copies (they're independent - see the glossary), so it never shows the card
+		// overlay - only a standalone toast if something (e.g. review-50) unlocked from it.
+		await CelebrateSilentlyIfAnythingUnlockedAsync(xpBefore);
+	}
+
+	private async Task<int?> TryGetXpBeforeAsync()
+	{
+		try
+		{
+			return await GamificationService.GetXpAsync();
+		}
+		catch (Exception)
+		{
+			return null;
+		}
+	}
+
+	/// <summary>
+	/// Raises the unlock-moment overlay only when a correction actually changed which catalog card
+	/// the photo matches (web-card-review-flow) - a series/card-number edit that resolves to the
+	/// same card, or clears the match entirely, is not a celebration-worthy event. Best-effort: the
+	/// review action itself already succeeded by the time this runs, so a gamification hiccup here
+	/// (e.g. CatalogService briefly unreachable) is swallowed rather than surfaced as a page error.
+	/// </summary>
+	private async Task TryCelebrateCardChangeAsync(CardListItem before, CardListItem after, int? xpBefore)
+	{
+		if (xpBefore is null)
+		{
+			return;
+		}
+
+		try
+		{
+			var oldKey = CollectionQueryService.BuildOwnershipKey(before.SetName, before.CardNumber);
+			var newKey = CollectionQueryService.BuildOwnershipKey(after.SetName, after.CardNumber);
+
+			if (string.IsNullOrWhiteSpace(newKey) || string.Equals(newKey, oldKey, StringComparison.Ordinal))
+			{
+				// The matched card didn't change (e.g. a re-analysis only updated Rarity), so this
+				// isn't an Owned Copies change and gets no overlay - but it can still have crossed an
+				// achievement (e.g. first-legendary), which still deserves its toast.
+				await CelebrateSilentlyIfAnythingUnlockedAsync(xpBefore);
+				return;
+			}
+
+			var overview = await CollectionQueryService.GetCollectionOverviewAsync();
+			var matchedCard = overview.Cards.FirstOrDefault(item =>
+				string.Equals(CollectionQueryService.BuildOwnershipKey(item.Series, item.CardNumber), newKey, StringComparison.Ordinal));
+
+			if (matchedCard is null || matchedCard.OwnedCopies <= 0)
+			{
+				return;
+			}
+
+			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value);
+			var kind = matchedCard.OwnedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
+			CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, matchedCard.OwnedCopies, evaluation);
+		}
+		catch (Exception)
+		{
+		}
+	}
+
+	private async Task CelebrateSilentlyIfAnythingUnlockedAsync(int? xpBefore)
+	{
+		if (xpBefore is null)
+		{
+			return;
+		}
+
+		try
+		{
+			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value);
+			if (evaluation.NewlyUnlockedAchievements.Count > 0 || evaluation.RankedUp)
+			{
+				CelebrationCenter.CelebrateSilently(evaluation);
+			}
+		}
+		catch (Exception)
+		{
 		}
 	}
 }

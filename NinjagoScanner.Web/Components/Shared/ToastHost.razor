@@ -1,0 +1,41 @@
+@implements IDisposable
+@inject GamificationCelebrationCenter CelebrationCenter
+
+@if (CelebrationCenter.Toasts.Count > 0)
+{
+    <div class="toast-host">
+        @foreach (var toast in CelebrationCenter.Toasts)
+        {
+            <div class="achievement-toast" @key="toast.ToastId" @onclick="() => Dismiss(toast.ToastId)">
+                <div class="achievement-toast-badge">@toast.Achievement.Glyph</div>
+                <div class="achievement-toast-body">
+                    <div class="achievement-toast-eyebrow">Erfolg freigeschaltet</div>
+                    <div class="achievement-toast-name">@toast.Achievement.Name</div>
+                </div>
+                <div class="achievement-toast-xp">+@toast.Achievement.Xp XP</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        CelebrationCenter.Changed += OnCelebrationChanged;
+    }
+
+    private void OnCelebrationChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void Dismiss(string toastId)
+    {
+        CelebrationCenter.DismissToast(toastId);
+    }
+
+    public void Dispose()
+    {
+        CelebrationCenter.Changed -= OnCelebrationChanged;
+    }
+}

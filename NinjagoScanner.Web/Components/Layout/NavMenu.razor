@@ -10,9 +10,20 @@
             <NavLink class="cv-nav-link" href="collection">Sammlung</NavLink>
             <NavLink class="cv-nav-link" href="review">Review</NavLink>
             <NavLink class="cv-nav-link" href="upload">Upload</NavLink>
+            <NavLink class="cv-nav-link" href="achievements">Erfolge</NavLink>
             <NavLink class="cv-nav-link" href="about">Über</NavLink>
         </nav>
         <div class="cv-nav-user">
+            @if (_rank is not null)
+            {
+                <a class="cv-nav-rank" href="achievements" title="@($"{_rank.Name} · {_xp} XP")">
+                    <span class="cv-nav-rank-text">
+                        <span class="cv-nav-rank-name">@_rank.Name</span>
+                        <span class="cv-nav-rank-xp">@_xp XP</span>
+                    </span>
+                    <span class="cv-nav-rank-badge" style="--rank-accent: @_rank.AccentColor;">@_rank.Glyph</span>
+                </a>
+            }
             <AuthorizeView>
                 <Authorized>
                     @if (!string.IsNullOrWhiteSpace(_collectionName))
@@ -51,6 +62,10 @@
         <span class="cv-tab-dot"></span>
         <span>Upload</span>
     </NavLink>
+    <NavLink class="cv-tab" href="achievements">
+        <span class="cv-tab-dot"></span>
+        <span>Erfolge</span>
+    </NavLink>
     <NavLink class="cv-tab" href="about">
         <span class="cv-tab-dot"></span>
         <span>Über</span>
@@ -60,13 +75,31 @@
 @code {
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
     [Inject] private ICurrentCollectionContext CurrentCollectionContext { get; set; } = default!;
+    [Inject] private GamificationService GamificationService { get; set; } = default!;
 
     private string? _collectionName;
+    private RankDefinition? _rank;
+    private int _xp;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var collection = await CurrentCollectionContext.GetOwnedCollectionAsync(authState.User);
         _collectionName = collection?.Name;
+
+        if (collection is not null)
+        {
+            try
+            {
+                _xp = await GamificationService.GetXpAsync();
+                _rank = GamificationService.GetRank(_xp);
+            }
+            catch (Exception)
+            {
+                // CatalogService/PictureService unreachable - the nav still has to render on every
+                // page, so degrade to no rank badge instead of taking the whole layout down.
+                _rank = null;
+            }
+        }
     }
 }

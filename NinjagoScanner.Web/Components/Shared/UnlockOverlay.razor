@@ -1,0 +1,114 @@
+@implements IDisposable
+@inject GamificationCelebrationCenter CelebrationCenter
+
+@if (CelebrationCenter.Current is { } celebration)
+{
+    <div class="unlock-backdrop" style="--unlock-accent: @AccentFor(celebration);" @onclick="Dismiss">
+        @if (celebration.Kind != UnlockCelebrationKind.Duplicate)
+        {
+            <div class="unlock-ray"></div>
+        }
+        <div class="unlock-panel" @onclick:stopPropagation="true">
+            <div class="unlock-kicker">@Kicker(celebration)</div>
+
+            @if (celebration.Kind == UnlockCelebrationKind.RankUp)
+            {
+                <div class="unlock-rank-badge">@celebration.Rank?.Glyph</div>
+            }
+            else
+            {
+                <div class="unlock-card-art"></div>
+            }
+
+            <div>
+                <div class="unlock-name">@Headline(celebration)</div>
+                <div class="unlock-sub">@Subline(celebration)</div>
+            </div>
+
+            @if (celebration.Kind != UnlockCelebrationKind.RankUp && !string.IsNullOrWhiteSpace(celebration.Rarity))
+            {
+                <span class="cv-chip cv-chip-purple">@celebration.Rarity</span>
+            }
+
+            <p class="unlock-note">@Note(celebration)</p>
+            <div class="unlock-xp-note">@XpNote(celebration)</div>
+
+            <button class="cv-btn-primary" type="button" @onclick="Dismiss">Weiter</button>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        CelebrationCenter.Changed += OnCelebrationChanged;
+    }
+
+    private void OnCelebrationChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void Dismiss()
+    {
+        CelebrationCenter.DismissCurrent();
+    }
+
+    private static string Kicker(UnlockCelebration celebration) => celebration.Kind switch
+    {
+        UnlockCelebrationKind.NewCard => "Neue Karte!",
+        UnlockCelebrationKind.Duplicate => "Dublette",
+        _ => $"Rang {celebration.Rank?.Level} erreicht"
+    };
+
+    private static string? Headline(UnlockCelebration celebration) =>
+        celebration.Kind == UnlockCelebrationKind.RankUp ? celebration.Rank?.Name : celebration.CardName;
+
+    private static string Subline(UnlockCelebration celebration)
+    {
+        if (celebration.Kind != UnlockCelebrationKind.RankUp)
+        {
+            return $"{celebration.Series} · Nr. {celebration.CardNumber}";
+        }
+
+        var rank = celebration.Rank!;
+        var next = RankDefinitions.Next(rank);
+        return next is null
+            ? $"{rank.MinXp} XP · Höchster Rang"
+            : $"{rank.MinXp} XP · Nächster Rang: {next.Name}";
+    }
+
+    private static string Note(UnlockCelebration celebration) => celebration.Kind switch
+    {
+        UnlockCelebrationKind.NewCard => "Zu deiner Sammlung hinzugefügt",
+        UnlockCelebrationKind.Duplicate => $"Du besitzt diese Karte jetzt {celebration.Copies}×",
+        _ => celebration.UnlockedBackground is { } background
+            ? $"Neuer Hintergrund freigeschaltet: {background.Name}"
+            : "Neuer Titel und Abzeichen im Profil"
+    };
+
+    private static string XpNote(UnlockCelebration celebration) =>
+        celebration.Kind == UnlockCelebrationKind.RankUp ? "Rangaufstieg" : $"+{celebration.XpGained} XP";
+
+    private static string AccentFor(UnlockCelebration celebration) => celebration.Kind switch
+    {
+        UnlockCelebrationKind.RankUp => celebration.Rank?.AccentColor ?? "oklch(75% 0.17 150)",
+        UnlockCelebrationKind.Duplicate => "oklch(70% 0.02 290)",
+        _ => RarityColor(celebration.Rarity)
+    };
+
+    private static string RarityColor(string? rarity) => (rarity ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "common" => "oklch(60% 0.01 290)",
+        "rare" => "oklch(75% 0.17 150)",
+        "ultra rare" => "oklch(70% 0.19 300)",
+        "legendary" => "oklch(78% 0.15 85)",
+        "limited edition" => "oklch(70% 0.19 300)",
+        _ => "oklch(75% 0.17 150)"
+    };
+
+    public void Dispose()
+    {
+        CelebrationCenter.Changed -= OnCelebrationChanged;
+    }
+}

@@ -3,6 +3,9 @@
 @implements IDisposable
 @using System.Globalization
 @inject PictureServiceClient PictureServiceClient
+@inject CollectionQueryService CollectionQueryService
+@inject GamificationService GamificationService
+@inject GamificationCelebrationCenter CelebrationCenter
 
 <PageTitle>Foto-Upload</PageTitle>
 
@@ -309,6 +312,11 @@
 
         try
         {
+            // Best-effort: a gamification hiccup (e.g. CatalogService briefly unreachable) must
+            // never turn a successful upload into a reported failure, so it's captured outside the
+            // upload's own try/catch semantics below.
+            var xpBefore = await TryGetXpBeforeAsync();
+
             // Streams the photo bytes straight to PictureService over gRPC - they never pass
             // through browser-to-storage; PictureService assigns the photo ID and triggers
             // AI Analysis once the stream completes.
@@ -317,6 +325,11 @@
 
             successMessage = $"Upload erfolgreich: {card.SourceFileName} (Status: {card.AnalysisStatus}).";
             selectedFile = null;
+
+            if (xpBefore is { } xp)
+            {
+                await TryCelebrateMatchAsync(card, xp);
+            }
         }
         catch (InvalidOperationException exception)
         {
@@ -329,6 +342,54 @@
         finally
         {
             isUploading = false;
+        }
+    }
+
+    /// <summary>
+    /// Raises the unlock-moment overlay when a scan matched a catalog card (web-photo-upload
+    /// "after a successful scan+match, raises the unlock-feedback event") - new card vs. duplicate
+    /// is read off the post-upload owned-copies count for that card, which already includes the
+    /// photo just uploaded.
+    /// </summary>
+    private async Task TryCelebrateMatchAsync(CardListItem card, int xpBefore)
+    {
+        if (string.IsNullOrWhiteSpace(card.SetName) || string.IsNullOrWhiteSpace(card.CardNumber))
+        {
+            return;
+        }
+
+        try
+        {
+            var overview = await CollectionQueryService.GetCollectionOverviewAsync();
+            var matchedKey = CollectionQueryService.BuildOwnershipKey(card.SetName, card.CardNumber);
+            var matchedCard = overview.Cards.FirstOrDefault(item =>
+                CollectionQueryService.BuildOwnershipKey(item.Series, item.CardNumber) == matchedKey);
+
+            if (matchedCard is null || matchedCard.OwnedCopies <= 0)
+            {
+                return;
+            }
+
+            var evaluation = await GamificationService.EvaluateAsync(xpBefore);
+            var kind = matchedCard.OwnedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
+            CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, card.Rarity, matchedCard.OwnedCopies, evaluation);
+        }
+        catch (Exception)
+        {
+            // The upload itself already succeeded - a missed celebration isn't worth reporting as
+            // an upload failure.
+        }
+    }
+
+    private async Task<int?> TryGetXpBeforeAsync()
+    {
+        try
+        {
+            return await GamificationService.GetXpAsync();
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 

@@ -109,6 +109,64 @@
     flex-shrink: 0;
 }
 
+.cv-nav-rank {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    padding: 0.2rem 0.35rem 0.2rem 0.6rem;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+}
+
+.cv-nav-rank:hover {
+    background: var(--cv-surface);
+    text-decoration: none;
+}
+
+.cv-nav-rank-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+}
+
+.cv-nav-rank-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    color: var(--cv-text);
+}
+
+.cv-nav-rank-xp {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--cv-text-muted);
+}
+
+.cv-nav-rank-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: oklch(from var(--rank-accent) l c h / 0.18);
+    border: 1.5px solid oklch(from var(--rank-accent) l c h / 0.75);
+    color: var(--rank-accent);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .cv-nav-rank-text {
+        display: none;
+    }
+}
+
 .cv-nav-username {
     font-family: 'Rajdhani', sans-serif;
     font-weight: 600;

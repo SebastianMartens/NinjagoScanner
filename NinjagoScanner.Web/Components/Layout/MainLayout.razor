@@ -24,6 +24,14 @@
     </main>
 </div>
 
+@* MainLayout itself has no @rendermode (most pages opt into interactivity individually), so
+   without an explicit render mode here these two would static-render once and never see
+   GamificationCelebrationCenter's live updates. Requesting the same InteractiveServer render
+   mode every interactive page already uses lets the runtime host them on that page's own
+   circuit instead of spinning up an unreachable separate one. *@
+<UnlockOverlay @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
+<ToastHost @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
+
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>

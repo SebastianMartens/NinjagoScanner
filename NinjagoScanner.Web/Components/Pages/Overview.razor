@@ -2,6 +2,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
+@inject GamificationService GamificationService
 @inject NavigationManager NavigationManager
 
 <PageTitle>Ninjago Scanner</PageTitle>
@@ -61,6 +62,25 @@
 			}
 		</section>
 
+		@if (_rank is not null)
+		{
+			<section class="rank-status-block">
+				<div class="section-label">Rang &amp; Erfahrung</div>
+				<div class="rank-status-row" style="--rank-accent: @_rank.AccentColor;">
+					<div class="rank-hero-badge">@_rank.Glyph</div>
+					<div class="rank-status-body">
+						<div class="rank-status-meta">
+							<span class="rank-status-title">Rang @_rank.Level · @_rank.Name</span>
+							<span>@_xp XP · @RankStatusToNextLabel()</span>
+						</div>
+						<div class="rank-progress-track">
+							<div class="rank-progress-fill" style="width: @(RankStatusPercent())%;"></div>
+						</div>
+					</div>
+				</div>
+			</section>
+		}
+
 		<section class="series-summary">
 			<div class="series-summary-header">
 				<h2>Serienübersicht</h2>
@@ -108,6 +128,8 @@
 
 	private SeriesSummaryResult seriesSummary = new() { Series = Array.Empty<SeriesSummaryItem>() };
 	private bool isSummaryLoading = true;
+	private RankDefinition? _rank;
+	private int _xp;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -121,10 +143,48 @@
 			summaryLoadError = $"Katalog-/PictureService nicht erreichbar: {exception.Message}";
 			seriesSummary = new SeriesSummaryResult { Series = Array.Empty<SeriesSummaryItem>() };
 		}
-		finally
+
+		// Kept out of the try/catch above: a gamification-only hiccup must not wipe out an
+		// already-successfully-loaded series summary and show the "unreachable" error state for it.
+		try
 		{
-			isSummaryLoading = false;
+			_xp = await GamificationService.GetXpAsync();
+			_rank = GamificationService.GetRank(_xp);
 		}
+		catch (Exception)
+		{
+			_rank = null;
+		}
+
+		isSummaryLoading = false;
+	}
+
+	private int RankStatusPercent()
+	{
+		if (_rank is null)
+		{
+			return 0;
+		}
+
+		var next = RankDefinitions.Next(_rank);
+		if (next is null)
+		{
+			return 100;
+		}
+
+		var span = next.MinXp - _rank.MinXp;
+		return span <= 0 ? 100 : Math.Clamp((int)Math.Round(100.0 * (_xp - _rank.MinXp) / span), 0, 100);
+	}
+
+	private string RankStatusToNextLabel()
+	{
+		if (_rank is null)
+		{
+			return string.Empty;
+		}
+
+		var next = RankDefinitions.Next(_rank);
+		return next is null ? "alles erreicht" : $"noch {next.MinXp - _xp} XP bis {next.Name}";
 	}
 
 	private async Task StartGeminiScanAsync()

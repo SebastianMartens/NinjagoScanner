@@ -22,7 +22,7 @@ Achievement
 
 Persisted per user: `{ achievementId, unlockedAtUtc }`. Progress itself is **derived**, never stored - recompute on collection change so a corrected review can't leave a stale unlock.
 
-### Initial set (12)
+### Initial set (8)
 
 | Id | Glyph | Name | Category | Rule | XP |
 |---|---|---|---|---|---|
@@ -115,5 +115,7 @@ Rejected alternatives:
 ## Deferred
 
 - **Streak achievement**: no per-scan timestamp log exists today to compute a streak from. A `streak-*` achievement is out of scope for this change; revisit once/if such a log exists.
+- **"Makelloser Scan" achievement** (prototype: 20 scans accepted without correction): same blocker as the streak achievement - nothing tracks whether a given scan was later corrected, so "accepted without correction" isn't computable today. Revisit alongside the streak achievement if that history ever gets tracked.
+- **"Team Ninja" achievement** (prototype: own all six main ninjas): would require hardcoding which six card names/numbers count as "the six main ninja" across all 16 series, a content decision not covered by this change's scope. Revisit as a deliberate content-curation task if wanted.
 - **Leaderboard**: not yet implemented (per Rank visibility above), so surfacing rank there is out of scope for this change. Revisit rank display and XP-vs-owned-cards sorting once a leaderboard exists.
 - **Trade / Tausch category**: card sharing isn't implemented, so the Tausch category is dropped from the initial category enum rather than shipped empty (`dupes-25` moved to Sammeln - it only counts owned duplicates, not actual trades). The "bereit zum Tauschen" duplicate-overlay copy is dropped too, since it implied a trade action that doesn't exist. Revisit once card sharing ships.

@@ -11,6 +11,8 @@ public class AppDbContext : IdentityDbContext<AppUser>
 
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<CollectionMembership> CollectionMemberships => Set<CollectionMembership>();
+    public DbSet<AchievementUnlock> AchievementUnlocks => Set<AchievementUnlock>();
+    public DbSet<GamificationProfile> GamificationProfiles => Set<GamificationProfile>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -20,6 +22,16 @@ public class AppDbContext : IdentityDbContext<AppUser>
         {
             entity.HasKey(membership => new { membership.CollectionId, membership.UserId });
             entity.Property(membership => membership.Role).HasConversion<string>();
+        });
+
+        builder.Entity<AchievementUnlock>(entity =>
+        {
+            entity.HasKey(unlock => new { unlock.CollectionId, unlock.AchievementId });
+        });
+
+        builder.Entity<GamificationProfile>(entity =>
+        {
+            entity.HasKey(profile => profile.CollectionId);
         });
     }
 }

@@ -144,6 +144,13 @@ builder.Services.AddScoped(provider => new PictureServiceClient(
 builder.Services.AddScoped(provider => new CollectionQueryService(
     provider.GetRequiredService<CatalogServiceClient>(),
     provider.GetRequiredService<PictureServiceClient>()));
+builder.Services.AddScoped(provider => new GamificationService(
+    provider.GetRequiredService<CatalogServiceClient>(),
+    provider.GetRequiredService<PictureServiceClient>(),
+    provider.GetRequiredService<AppDbContext>(),
+    provider.GetRequiredService<ICurrentCollectionContext>(),
+    provider.GetRequiredService<AuthenticationStateProvider>()));
+builder.Services.AddScoped<GamificationCelebrationCenter>();
 
 // OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
 // automatically by AddOtlpExporter() from the standard OTel environment variables — see
