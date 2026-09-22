@@ -6,6 +6,7 @@ import asyncio
 import dataclasses
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 
@@ -344,12 +345,41 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
 
         response = pb2.ListCardsResponse()
 
-        await self._sidecar_cache.warm_from_store(request.collection_id)
+        # Diagnostic spans only (no behavior change): at collection sizes in the thousands, the
+        # bulk DynamoDB scan, the paginated S3 listing and the per-photo presign loop below are
+        # each plausible bottlenecks and were previously invisible - aioboto3/botocore has no
+        # automatic OTel instrumentation, so every AWS call otherwise vanishes into one opaque
+        # ListCards span. A span per photo would flood the trace at collection scale, so the
+        # per-photo cache-get/presign costs are accumulated and reported as attributes instead.
+        with _tracer.start_as_current_span("sidecar_cache.warm_from_store"):
+            await self._sidecar_cache.warm_from_store(request.collection_id)
 
-        async for photo_id in self._photo_store.list_photo_ids(request.collection_id):
-            record = await self._sidecar_cache.get(request.collection_id, photo_id)
-            download_url = await self._photo_store.create_download_url(request.collection_id, photo_id)
-            response.cards.append(_to_card_entry(photo_id, record, download_url))
+        with _tracer.start_as_current_span("photo_store.list_photo_ids"):
+            photo_ids = [photo_id async for photo_id in self._photo_store.list_photo_ids(request.collection_id)]
+
+        with _tracer.start_as_current_span(
+            "list_cards.build_entries", attributes={"list_cards.photo_count": len(photo_ids)}
+        ) as build_span:
+            cache_get_seconds = 0.0
+            presign_seconds = 0.0
+
+            for photo_id in photo_ids:
+                start = time.perf_counter()
+                record = await self._sidecar_cache.get(request.collection_id, photo_id)
+                cache_get_seconds += time.perf_counter() - start
+
+                start = time.perf_counter()
+                download_url = await self._photo_store.create_download_url(request.collection_id, photo_id)
+                presign_seconds += time.perf_counter() - start
+
+                response.cards.append(_to_card_entry(photo_id, record, download_url))
+
+            build_span.set_attributes(
+                {
+                    "list_cards.cache_get_seconds": cache_get_seconds,
+                    "list_cards.presign_seconds": presign_seconds,
+                }
+            )
 
         return response
 
