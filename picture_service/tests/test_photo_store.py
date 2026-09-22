@@ -1,3 +1,5 @@
+import asyncio
+import time
 from collections.abc import AsyncIterator
 
 import aioboto3
@@ -67,3 +69,46 @@ async def test_create_download_url_points_at_object_key(photo_store: PhotoStore)
     url = await photo_store.create_download_url("col-1", "photo-1")
 
     assert "photos/col-1/photo-1" in url
+
+
+class _StubPresignClient:
+    """Mimics aiobotocore's `generate_presigned_url`: an async method that does no real
+    async I/O and instead blocks synchronously (here via `time.sleep`, standing in for the
+    real client's synchronous HMAC signing work) for the duration of the call."""
+
+    def __init__(self, delay_seconds: float, url: str) -> None:
+        self._delay_seconds = delay_seconds
+        self._url = url
+
+    async def generate_presigned_url(self, *args: object, **kwargs: object) -> str:
+        time.sleep(self._delay_seconds)
+        return self._url
+
+
+async def test_create_download_url_returns_stub_result_unchanged():
+    store = PhotoStore(_StubPresignClient(delay_seconds=0, url="https://example.com/signed"), BUCKET)
+
+    url = await store.create_download_url("col-1", "photo-1")
+
+    assert url == "https://example.com/signed"
+
+
+async def test_create_download_url_does_not_block_the_event_loop():
+    # 200ms of simulated signing work vs. a concurrent coroutine that only needs 10ms -
+    # if the event loop were blocked for the duration of the presign call (as with a plain
+    # `await self._s3.generate_presigned_url(...)`), the fast coroutine could not run until
+    # the slow one finished, so it would still complete second.
+    store = PhotoStore(_StubPresignClient(delay_seconds=0.2, url="https://example.com/signed"), BUCKET)
+    completion_order: list[str] = []
+
+    async def slow_presign() -> None:
+        await store.create_download_url("col-1", "photo-1")
+        completion_order.append("slow")
+
+    async def fast_unrelated_work() -> None:
+        await asyncio.sleep(0.01)
+        completion_order.append("fast")
+
+    await asyncio.gather(slow_presign(), fast_unrelated_work())
+
+    assert completion_order == ["fast", "slow"]

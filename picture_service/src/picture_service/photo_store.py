@@ -7,6 +7,7 @@ pre-signed download URLs this module creates.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import timedelta
 from typing import Any
@@ -41,14 +42,25 @@ class PhotoStore:
         )
 
     async def create_download_url(self, collection_id: str, photo_id: str) -> str:
-        return await self._s3.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": self._bucket_name,
-                "Key": build_object_key(collection_id, photo_id),
-            },
-            ExpiresIn=int(_DOWNLOAD_URL_LIFETIME.total_seconds()),
-        )
+        """`generate_presigned_url` does no network I/O - it's local HMAC signing - but
+        aiobotocore still exposes it as a coroutine, and in practice that coroutine runs
+        to completion without ever yielding, so a plain `await` blocks PictureService's
+        single event loop for the duration of the signing work. Running it via
+        `asyncio.run` inside `asyncio.to_thread` moves that work off the loop entirely."""
+
+        def _presign_in_thread() -> str:
+            return asyncio.run(
+                self._s3.generate_presigned_url(
+                    "get_object",
+                    Params={
+                        "Bucket": self._bucket_name,
+                        "Key": build_object_key(collection_id, photo_id),
+                    },
+                    ExpiresIn=int(_DOWNLOAD_URL_LIFETIME.total_seconds()),
+                )
+            )
+
+        return await asyncio.to_thread(_presign_in_thread)
 
     async def get_bytes(self, collection_id: str, photo_id: str) -> bytes:
         response = await self._s3.get_object(
