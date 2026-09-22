@@ -1,12 +1,11 @@
 # Tasks: Gamification (Achievements, XP, Ranks, Unlock Moments)
 
 ## 1. Decisions before code
-- [ ] Pick the persistence store for unlock timestamps / selected background (design.md Q1).
-- [ ] Confirm whether per-scan timestamps exist for `streak-7` (Q2); if not, mark it deferred.
-- [ ] Decide hide-vs-show for the Tausch category (Q3).
+- [x] Persistence: `AchievementUnlock` + `GamificationProfile` in Web's existing SQLite `AppDbContext`, scoped per Collection (design.md Persistence).
+- [x] `streak-7`, leaderboard rank display, and the Tausch category/trade achievements: deferred out of scope for this change (design.md Deferred). `dupes-25` moved to Sammeln.
 
 ## 2. Model + service
-- [ ] `Models/Achievement.cs`, `AchievementTier`, `AchievementCategory`, `UnlockedAchievement`.
+- [ ] `Models/Achievement.cs`, `AchievementCategory`, `UnlockedAchievement`.
 - [ ] `Models/RankDefinition.cs` + the 10-rank table from design.md.
 - [ ] `Services/GamificationService.cs`: `GetProgress()` (all achievements with current/goal), `GetXp()` (derived total), `GetRank(xp)`, `EvaluateAfter(scanResult)` returning newly unlocked achievements + whether a rank was crossed.
 - [ ] Persist unlock timestamps; never persist derived progress.
@@ -17,7 +16,7 @@
 - [ ] Rank hero: badge, "Rang N", rank name, XP, next-rank label, progress bar, XP-source caption.
 - [ ] Four stat cards: unlocked/total, percent, XP, legendary badges.
 - [ ] "Fast geschafft": three closest incomplete achievements by percent.
-- [ ] Badge grid with filter (Alle / Freigeschaltet / In Arbeit / Gesperrt), tier chip, category chip, progress bar, unlock date.
+- [ ] Badge grid with filter (Alle / Freigeschaltet / Offen), category chip, progress bar, unlock date.
 - [ ] Rank ladder: all 10, horizontally scrollable, reached ones highlighted, current one outlined.
 - [ ] Background shelf: 4 tiles, locked ones greyscaled with "Ab Rang N".
 - [ ] Empty state when a filter matches nothing.
@@ -32,15 +31,16 @@
 ## 5. Rank visibility
 - [ ] Header: rank kanji badge + name + XP (text hidden below 780px).
 - [ ] Status page: "Rang & Erfahrung" block above series progress.
-- [ ] Leaderboard rows: rank name caption.
 
 ## 6. Hook-ups
 - [ ] Upload: raise celebration after a successful scan+match (new vs duplicate from the collection).
-- [ ] Review: raise celebration on "Confirm All" per group.
-- [ ] Ensure a corrected review re-evaluates and does not double-award.
+- [ ] Review: raise celebration only when a correction changes the matched card (SeriesName/CardNumber) - i.e. changes Owned Copies.
+- [ ] Review: routine "Confirm All" on an already-correct match raises no celebration overlay - it only changes Review Status, not Owned Copies. Still re-evaluate achievements/XP (e.g. `review-50`) and fire a standalone toast if something unlocks.
+- [ ] Ensure a corrected review (correct series name or card number) re-evaluates and does not double-award.
+- [ ] If a rank threshold is crossed purely from silent review XP (no overlay showing), defer the rank-up overlay to the next event that does show a card overlay.
 
 ## 7. Styling
-- [ ] Tier accent tokens, badge card states, overlay + toast styles in `app.css`.
+- [ ] Badge accent token, badge card states, overlay + toast styles in `app.css`.
 - [ ] Keyframes `cv-reveal`, `cv-ray`, `cv-toast-in`.
 - [ ] Reduced-motion: rays and overshoot disabled under `prefers-reduced-motion`.
 
@@ -53,5 +53,5 @@
 - [ ] Overlay CTA fully visible at 540px viewport height.
 - [ ] Rank-up reachable via the primary button, not only via backdrop click.
 - [ ] Unlocking an achievement twice is impossible; timestamps survive restart.
-- [ ] Contrast: tier-coloured text on badge cards ≥ 4.5:1.
+- [ ] Contrast: badge accent text on badge cards ≥ 4.5:1.
 - [ ] Archive the change once verified.
