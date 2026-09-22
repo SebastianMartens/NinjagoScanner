@@ -6,7 +6,7 @@
     "Thema": "Sehr frühe Ninjago-Serie. Verkauft mit Ninjago Spinner Sets",
     "Besonderheiten": [
       "Frühe Ninjago Spinner Karten von 2011 und 2012",
-      "Zwei Wellen (Wave 1 = 2011, Wave 2 = 2012), beide beginnen bei Karte 1. Die Kartennummern von Wave 2 tragen das Präfix WB (z.B. WB1), damit sie nicht mit Wave 1 kollidieren",
+      "Zwei Decks (Wave 1 = 2011, Wave 2 = 2012), beide beginnen bei Karte 1. Die Kartennummern von Wave 2 tragen das Präfix WB (z.B. WB1), damit sie nicht mit Wave 1 kollidieren",
       "Spezial-Editionskarten (Sternchen-Nummern) sind als LE1-LE9 (Wave 1) bzw. WBLE1-WBLE6 (Wave 2) erfasst"
     ],
     "Kategorien": {
@@ -258,7 +258,7 @@
           {"Karten-Nr.": "WBLE3", "Name": {"en": "Constrictai Grasp"}},
           {"Karten-Nr.": "WBLE4", "Name": {"en": "Hypnobrai Rattle"}},
           {"Karten-Nr.": "WBLE5", "Name": {"en": "Kendo Jay"}},
-          {"Karten-Nr.": "WBLE6", "Name": {"en": "Rattla"}}
+          {"Karten-Nr.": "WBLE22", "Name": {"en": "Rattla Special Edition"}}
         ]
       }
     }
