@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <style>
+    @keyframes cv-pop { from { opacity: 0; transform: scale(0.94) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  </style>
+</helmet>
+<div style="{{wrapStyle}}">
+  <div style="{{artStyle}}"><div style="{{artLabelStyle}}">card photo</div></div>
+
+  <div style="{{ownLabelStyle}}">{{photo.setName}} · #{{photo.cardNumber}}</div>
+  <sc-if value="{{hasCardName}}" hint-placeholder-val="{{false}}">
+    <div style="{{ownNameStyle}}">{{photo.cardName}}</div>
+  </sc-if>
+
+  <div style="{{segWrapStyle}}">
+    <div onClick="{{setUnreviewed}}" style="{{segUnreviewedStyle}}">Unreviewed</div>
+    <div onClick="{{setVerified}}" style="{{segVerifiedStyle}}">Verified</div>
+    <div onClick="{{setIncorrect}}" style="{{segIncorrectStyle}}">Incorrect</div>
+  </div>
+
+  <div style="position:relative;">
+    <div onClick="{{onToggleSeries}}" style="{{seriesTriggerStyle}}">
+      <div style="{{currentSwatchStyle}}"></div>
+      <div style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{photo.setName}}</div>
+      <div style="color:oklch(55% 0.02 290);">▾</div>
+    </div>
+    <sc-if value="{{photo.popoverOpen}}" hint-placeholder-val="{{false}}">
+      <div style="{{popoverStyle}}">
+        <sc-for list="{{photo.seriesList}}" as="s" hint-placeholder-count="16">
+          <div onClick="{{s.onPick}}" title="{{s.name}}" style="{{s.cellStyle}}" style-hover="{{s.cellHoverStyle}}">
+            <div style="{{s.swatchStyle}}"></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="{{fieldRowStyle}}">
+    <div style="{{fieldLabelStyle}}">Card #</div>
+    <input value="{{cardNumberValue}}" onChange="{{onCardNumberInput}}" onBlur="{{commitCardNumber}}" style="{{smallInputStyle}}"></input>
+  </div>
+
+  <div style="{{fieldRowStyle}}">
+    <div style="{{fieldLabelStyle}}">Lang</div>
+    <select value="{{photo.language}}" onChange="{{onLanguageSelect}}" style="{{smallInputStyle}}">
+      <option value="de">German</option>
+      <option value="en">English</option>
+      <option value="pl">Polish</option>
+      <option value="unknown">Unknown</option>
+    </select>
+  </div>
+
+  <div onClick="{{onToggleDetails}}" style="{{detailsToggleStyle}}">{{detailsLabel}}</div>
+  <sc-if value="{{detailsOpen}}" hint-placeholder-val="{{false}}">
+    <div style="{{detailsPanelStyle}}">
+      <div><span style="{{detailKeyStyle}}">Rarity </span>{{photo.rarity}}</div>
+      <div><span style="{{detailKeyStyle}}">Confidence </span>{{confidencePct}}%</div>
+      <div style="color:oklch(70% 0.02 290);">{{photo.reasoningSummary}}</div>
+      <div style="{{tagsWrapStyle}}">
+        <sc-for list="{{photo.detectedText}}" as="tag" hint-placeholder-count="2">
+          <div style="{{tagStyle}}">{{tag}}</div>
+        </sc-for>
+      </div>
+      <div style="{{mutedStyle}}">Scanned {{photo.scannedAt}}</div>
+      <sc-if value="{{hasError}}" hint-placeholder-val="{{false}}">
+        <div style="{{errorStyle}}">{{photo.errorMessage}}</div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:220,&quot;height&quot;:420}}">
+
+class Component extends DCLogic {
+  state = { detailsOpen: false, draft: null };
+
+  componentDidUpdate(prevProps) {
+    if (prevProps.photo.cardNumber !== this.props.photo.cardNumber && this.state.draft !== null) {
+      this.setState({ draft: null });
+    }
+  }
+
+  renderVals() {
+    const photo = this.props.photo || {};
+    const status = photo.reviewStatus || 'unreviewed';
+    const seg = (key, activeColor) => {
+      const active = status === key;
+      return `flex:1; text-align:center; padding:7px 4px; font-family:'Rajdhani',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.02em; cursor:pointer; border-radius:6px; color:${active ? 'oklch(12% 0.01 290)' : 'oklch(65% 0.02 290)'}; background:${active ? activeColor : 'transparent'};`;
+    };
+    const draftValue = this.state.draft !== null ? this.state.draft : (photo.cardNumber || '');
+
+    return {
+      photo,
+      hasCardName: !!photo.cardName,
+      hasError: !!photo.errorMessage,
+      confidencePct: Math.round((photo.confidence || 0) * 100),
+      wrapStyle: `display:flex; flex-direction:column; gap:10px; background:oklch(19% 0.02 290); border:1px solid oklch(28% 0.03 290); border-radius:14px; padding:12px; width:100%;`,
+      artStyle: `aspect-ratio:3/4; border-radius:9px; overflow:hidden; display:flex; align-items:center; justify-content:center; background:repeating-linear-gradient(135deg, oklch(28% 0.03 290), oklch(28% 0.03 290) 6px, oklch(22% 0.02 290) 6px, oklch(22% 0.02 290) 12px);`,
+      artLabelStyle: `font-family:monospace; font-size:10px; color:oklch(65% 0.02 290 / 0.6);`,
+      ownLabelStyle: `font-family:'Rajdhani',sans-serif; font-size:12px; color:oklch(58% 0.02 290); letter-spacing:0.02em;`,
+      ownNameStyle: `font-weight:700; font-size:14px; color:oklch(94% 0.01 290);`,
+      segWrapStyle: `display:flex; gap:4px; background:oklch(15% 0.015 290); border-radius:8px; padding:3px;`,
+      segUnreviewedStyle: seg('unreviewed', 'oklch(70% 0.02 290)'),
+      segVerifiedStyle: seg('verified', 'oklch(75% 0.17 150)'),
+      segIncorrectStyle: seg('incorrect', 'oklch(70% 0.18 25)'),
+      setUnreviewed: () => this.props.onStatusChange(photo.id, 'unreviewed'),
+      setVerified: () => this.props.onStatusChange(photo.id, 'verified'),
+      setIncorrect: () => this.props.onStatusChange(photo.id, 'incorrect'),
+      seriesTriggerStyle: `display:flex; align-items:center; gap:8px; background:oklch(15% 0.015 290); border:1px solid oklch(30% 0.03 290); border-radius:8px; padding:8px 10px; cursor:pointer; font-size:13px; font-weight:600;`,
+      currentSwatchStyle: `width:14px; height:14px; border-radius:4px; background:oklch(65% 0.19 300); flex-shrink:0;`,
+      onToggleSeries: () => this.props.onTogglePopover(photo.id),
+      popoverStyle: `position:absolute; z-index:30; top:calc(100% + 6px); left:0; right:0; display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; background:oklch(16% 0.02 290); border:1px solid oklch(32% 0.03 290); border-radius:10px; padding:10px; box-shadow:0 12px 30px rgba(0,0,0,0.5); animation: cv-pop 0.16s ease;`,
+      fieldRowStyle: `display:flex; align-items:center; gap:8px;`,
+      fieldLabelStyle: `font-family:'Rajdhani',sans-serif; font-size:11px; color:oklch(55% 0.02 290); width:38px; flex-shrink:0;`,
+      smallInputStyle: `flex:1; min-width:0; font-family:'Noto Sans JP',sans-serif; background:oklch(15% 0.015 290); border:1px solid oklch(30% 0.03 290); color:oklch(90% 0.01 290); padding:6px 8px; border-radius:6px; font-size:12px; outline:none;`,
+      cardNumberValue: draftValue,
+      onCardNumberInput: (e) => this.setState({ draft: e.target.value }),
+      commitCardNumber: () => this.props.onCardNumberChange(photo.id, draftValue),
+      onLanguageSelect: (e) => this.props.onLanguageChange(photo.id, e.target.value),
+      detailsOpen: this.state.detailsOpen,
+      detailsLabel: this.state.detailsOpen ? 'Hide details ▴' : 'Show details ▾',
+      detailsToggleStyle: `font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:700; color:oklch(70% 0.17 150); cursor:pointer; letter-spacing:0.02em;`,
+      onToggleDetails: () => this.setState(s => ({ detailsOpen: !s.detailsOpen })),
+      detailsPanelStyle: `display:flex; flex-direction:column; gap:6px; font-size:12px; color:oklch(75% 0.01 290); background:oklch(15% 0.015 290); border-radius:8px; padding:10px; border:1px solid oklch(26% 0.02 290);`,
+      detailKeyStyle: `color:oklch(55% 0.02 290); font-family:'Rajdhani',sans-serif;`,
+      tagsWrapStyle: `display:flex; flex-wrap:wrap; gap:6px;`,
+      tagStyle: `font-family:monospace; font-size:10px; padding:2px 6px; border-radius:4px; background:oklch(24% 0.02 290); color:oklch(65% 0.02 290);`,
+      mutedStyle: `font-size:11px; color:oklch(50% 0.02 290);`,
+      errorStyle: `font-size:11px; color:oklch(75% 0.16 25); font-family:monospace;`,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
