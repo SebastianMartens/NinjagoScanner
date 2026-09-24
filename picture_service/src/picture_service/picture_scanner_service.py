@@ -13,9 +13,10 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 import grpc
 from opentelemetry import trace
 
-from picture_service import catalog_client, gemini_service
+from picture_service import card_analysis, catalog_client
 from picture_service._generated import picture_service_pb2 as pb2
 from picture_service._generated import picture_service_pb2_grpc as pb2_grpc
+from picture_service.card_analysis_stage_1_and_2 import StructuredModel, build_chat_model
 from picture_service.config import SUPPORTED_EXTENSIONS, ScannerConfig
 from picture_service.models import (
     AnalysisStatuses,
@@ -28,25 +29,25 @@ from picture_service.models import (
     utc_now,
 )
 from picture_service.photo_store import PhotoStore
-from picture_service.sidecar_cache import SidecarCache
+from picture_service.sidecar_store import SidecarStore
 
 logger = logging.getLogger("picture_service")
 _tracer = trace.get_tracer("picture_service.scan")
 
-ModelFactory = Callable[[ScannerConfig, dict], gemini_service.StructuredModel]
+ModelFactory = Callable[[ScannerConfig, dict], StructuredModel]
 CatalogLoader = Callable[[str], Awaitable[CatalogSnapshot]]
 
 
 class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
     def __init__(
         self,
-        sidecar_cache: SidecarCache,
+        sidecar_store: SidecarStore,
         photo_store: PhotoStore,
         *,
-        build_model: ModelFactory = gemini_service.build_chat_model,
+        build_model: ModelFactory = build_chat_model,
         load_catalog_snapshot: CatalogLoader = catalog_client.load_catalog_snapshot,
     ) -> None:
-        self._sidecar_cache = sidecar_cache
+        self._sidecar_store = sidecar_store
         self._photo_store = photo_store
         self._build_model = build_model
         self._load_catalog_snapshot = load_catalog_snapshot
@@ -110,7 +111,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             with _tracer.start_as_current_span(
                 "scan.photo", attributes={"photo.id": photo_id, "photo.index": index}
             ) as photo_span:
-                existing = await self._sidecar_cache.get(request.collection_id, photo_id)
+                existing = await self._sidecar_store.get(request.collection_id, photo_id)
 
                 if _should_skip_existing_sidecar(existing, config.overwrite_existing_sidecars):
                     photo_span.set_attribute("scan.outcome", "skipped")
@@ -124,7 +125,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                     with _tracer.start_as_current_span("photo_store.get_bytes") as fetch_span:
                         image_bytes = await self._photo_store.get_bytes(request.collection_id, photo_id)
                         fetch_span.set_attribute("image.bytes", len(image_bytes))
-                    result = await gemini_service.analyze_card(
+                    result = await card_analysis.analyze_card(
                         self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
                     )
                 except Exception as exception:
@@ -145,7 +146,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                     result = dataclasses.replace(result, review_status=existing.review_status)
 
                 with _tracer.start_as_current_span("sidecar.set_from_analysis_result"):
-                    await self._sidecar_cache.set_from_analysis_result(request.collection_id, photo_id, result)
+                    await self._sidecar_store.set_from_analysis_result(request.collection_id, photo_id, result)
 
                 photo_span.set_attribute("scan.outcome", result.analysis_status.lower())
                 processed_count += 1
@@ -217,12 +218,12 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             # Batch upload: only the file name is recorded, so a later Scan (which retries anything
             # not ok/uncertain) picks the photo up. Deliberately before ScannerConfig/catalog are
             # touched - no Gemini key or CatalogService is needed for this path.
-            await self._sidecar_cache.set_record(
+            await self._sidecar_store.set_record(
                 metadata.collection_id,
                 photo_id,
                 SidecarRecord(source_file_name=source_file_name, analysis_status=AnalysisStatuses.NOT_ANALYZED),
             )
-            record = await self._sidecar_cache.get(metadata.collection_id, photo_id)
+            record = await self._sidecar_store.get(metadata.collection_id, photo_id)
             return pb2.UploadPhotoResponse(card=_to_card_entry(photo_id, record))
 
         config = ScannerConfig.load_for_upload(
@@ -235,9 +236,9 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
 
         result = await self._analyze_stored_photo(config, context, photo_id, source_file_name, image_bytes)
 
-        await self._sidecar_cache.set_from_analysis_result(metadata.collection_id, photo_id, result)
+        await self._sidecar_store.set_from_analysis_result(metadata.collection_id, photo_id, result)
 
-        record = await self._sidecar_cache.get(metadata.collection_id, photo_id)
+        record = await self._sidecar_store.get(metadata.collection_id, photo_id)
         return pb2.UploadPhotoResponse(card=_to_card_entry(photo_id, record))
 
     async def _analyze_stored_photo(
@@ -267,7 +268,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
 
         try:
             with _tracer.start_as_current_span("analyze_stored_photo", attributes={"photo.id": photo_id}):
-                return await gemini_service.analyze_card(
+                return await card_analysis.analyze_card(
                     self._build_model, config, catalog, photo_id, source_file_name, image_bytes, verified
                 )
         except Exception as exception:
@@ -296,7 +297,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         if not await self._photo_store.exists(request.collection_id, request.photo_id):
             await context.abort(grpc.StatusCode.NOT_FOUND, f"Foto '{request.photo_id}' wurde im Speicher nicht gefunden.")
 
-        existing = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        existing = await self._sidecar_store.get(request.collection_id, request.photo_id)
         source_file_name = existing.source_file_name if existing and existing.source_file_name else request.photo_id
         image_bytes = await self._photo_store.get_bytes(request.collection_id, request.photo_id)
 
@@ -312,13 +313,13 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
 
         # Re-read now rather than reusing `existing`: the analysis takes seconds, and a review
         # status set meanwhile must not be reverted.
-        latest = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        latest = await self._sidecar_store.get(request.collection_id, request.photo_id)
         if latest is not None and latest.review_status:
             result = dataclasses.replace(result, review_status=latest.review_status)
 
-        await self._sidecar_cache.set_from_analysis_result(request.collection_id, request.photo_id, result)
+        await self._sidecar_store.set_from_analysis_result(request.collection_id, request.photo_id, result)
 
-        record = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        record = await self._sidecar_store.get(request.collection_id, request.photo_id)
         return pb2.ReanalyzePhotoResponse(card=_to_card_entry(request.photo_id, record))
 
     # --- Download URLs ---
@@ -351,8 +352,8 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         # automatic OTel instrumentation, so every AWS call otherwise vanishes into one opaque
         # ListCards span. A span per photo would flood the trace at collection scale, so the
         # per-photo cache-get/presign costs are accumulated and reported as attributes instead.
-        with _tracer.start_as_current_span("sidecar_cache.warm_from_store"):
-            await self._sidecar_cache.warm_from_store(request.collection_id)
+        with _tracer.start_as_current_span("sidecar_store.warm_from_store"):
+            await self._sidecar_store.warm_from_store(request.collection_id)
 
         with _tracer.start_as_current_span("photo_store.list_photo_ids"):
             photo_ids = [photo_id async for photo_id in self._photo_store.list_photo_ids(request.collection_id)]
@@ -365,7 +366,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
 
             for photo_id in photo_ids:
                 start = time.perf_counter()
-                record = await self._sidecar_cache.get(request.collection_id, photo_id)
+                record = await self._sidecar_store.get(request.collection_id, photo_id)
                 cache_get_seconds += time.perf_counter() - start
 
                 start = time.perf_counter()
@@ -388,7 +389,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
     ) -> pb2.ListSourceFileNamesResponse:
         await _ensure_collection_id(request.collection_id, context)
 
-        names = {name async for name in self._sidecar_cache.list_source_file_names(request.collection_id)}
+        names = {name async for name in self._sidecar_store.list_source_file_names(request.collection_id)}
         return pb2.ListSourceFileNamesResponse(source_file_names=sorted(names))
 
     async def GetCardDetails(
@@ -399,14 +400,14 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         if not request.collection_id.strip():
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Keine collection_id angegeben.")
 
-        record = await self._sidecar_cache.get(request.collection_id, request.photo_id)
+        record = await self._sidecar_store.get(request.collection_id, request.photo_id)
         return pb2.GetCardDetailsResponse(details=_to_card_details(request.photo_id, record))
 
     # --- Sidecar editing ---
 
     async def UpdateSidecar(self, request: pb2.UpdateSidecarRequest, context: grpc.aio.ServicerContext) -> pb2.UpdateSidecarResponse:
         await _ensure_collection_id(request.collection_id, context)
-        existing = await self._sidecar_cache.get(request.collection_id, request.photo_id) or SidecarRecord()
+        existing = await self._sidecar_store.get(request.collection_id, request.photo_id) or SidecarRecord()
 
         updated = SidecarRecord(
             analysis_status=_normalize_nullable(request.analysis_status),
@@ -432,7 +433,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             derived=existing.derived,
         )
 
-        await self._sidecar_cache.set_record(request.collection_id, request.photo_id, updated)
+        await self._sidecar_store.set_record(request.collection_id, request.photo_id, updated)
         return pb2.UpdateSidecarResponse(success=True)
 
     async def UpdateSetName(self, request: pb2.UpdateSetNameRequest, context: grpc.aio.ServicerContext) -> pb2.UpdateSetNameResponse:
@@ -463,9 +464,9 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         self, collection_id: str, photo_id: str, field_name: str, value: str, context: grpc.aio.ServicerContext
     ) -> None:
         await _ensure_collection_id(collection_id, context)
-        existing = await self._sidecar_cache.get(collection_id, photo_id) or SidecarRecord()
+        existing = await self._sidecar_store.get(collection_id, photo_id) or SidecarRecord()
         updated = dataclasses.replace(existing, **{field_name: _normalize_nullable(value)})
-        await self._sidecar_cache.set_record(collection_id, photo_id, updated)
+        await self._sidecar_store.set_record(collection_id, photo_id, updated)
 
     # --- Maintenance ---
 
@@ -483,7 +484,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         already_current = 0
         errors = 0
 
-        async for collection_id, photo_id, record in self._sidecar_cache.list_all():
+        async for collection_id, photo_id, record in self._sidecar_store.list_all():
             total_files += 1
 
             needs_status_migration = not (record.analysis_status and record.analysis_status.strip())
@@ -507,7 +508,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                         detected=repaired.detected if repaired.detected is not None else {},
                         derived=repaired.derived if repaired.derived is not None else {},
                     )
-                await self._sidecar_cache.set_record(collection_id, photo_id, repaired)
+                await self._sidecar_store.set_record(collection_id, photo_id, repaired)
                 migrated += 1
             except Exception:
                 logger.exception("Sidecar-Migration fuer %s/%s fehlgeschlagen", collection_id, photo_id)
@@ -524,7 +525,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             await context.abort(grpc.StatusCode.NOT_FOUND, f"Das Foto '{request.photo_id}' wurde nicht gefunden.")
 
         await self._photo_store.delete(request.collection_id, request.photo_id)
-        await self._sidecar_cache.remove(request.collection_id, request.photo_id)
+        await self._sidecar_store.remove(request.collection_id, request.photo_id)
 
         return pb2.DeletePhotoResponse(success=True)
 

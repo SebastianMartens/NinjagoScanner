@@ -48,7 +48,7 @@ class VerifiedMatch:
 
 @dataclass(frozen=True)
 class CardAnalysisResult:
-    """Produced only by AI Analysis (see gemini_service.py). `detected`/`derived` hold the
+    """Produced only by AI Analysis (see card_analysis.py). `detected`/`derived` hold the
     staged pipeline's stage 1/2 generic key-value output (see picture-service-attribute-detection,
     picture-service-derived-attributes); the remaining fields are the pipeline's judged output
     (picture-service-catalog-matching) - the sidecar's Judged section (picture-service-sidecar-sections).

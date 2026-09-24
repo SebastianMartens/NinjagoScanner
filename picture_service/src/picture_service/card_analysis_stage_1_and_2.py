@@ -1,4 +1,4 @@
-"""Gemini card analysis, staged per picture-service-staged-analysis-pipeline.
+"""Stages 1 and 2 of card analysis: the Gemini calls, per picture-service-staged-analysis-pipeline.
 
 Stage 1 (attribute detection, see picture-service-attribute-detection) is a vision call, photo
 only, no series catalog - a generic, open-ended key-value map of what's visible. Stage 2
@@ -13,7 +13,8 @@ by the Gemini SDK underneath it (see picture-service-gemini-analysis and the
 picture-service-sdk-gemini-retries change): this module makes one call per stage and classifies
 whatever the SDK finally raises.
 
-Stage 3 (catalog matching) is deterministic, no LLM call - see card_analysis_stage_3.py.
+Orchestration across all three stages lives in card_analysis.py; stage 3 (catalog matching) is
+deterministic, no LLM call - see card_analysis_stage_3.py.
 """
 
 from __future__ import annotations
@@ -26,17 +27,8 @@ from langchain_core.exceptions import ModelError, ModelNotFoundError
 from opentelemetry import trace
 
 from picture_service.config import ScannerConfig
-from picture_service.models import (
-    CARD_CLASSES,
-    AnalysisStatuses,
-    AttributeMap,
-    CardAnalysisResult,
-    CatalogSnapshot,
-    VerifiedMatch,
-    utc_now,
-)
+from picture_service.models import CARD_CLASSES, AttributeMap
 from picture_service.prompts import ATTRIBUTE_DETECTION_PROMPT, DERIVED_ATTRIBUTES_PROMPT
-from picture_service.card_analysis_stage_3 import match_catalog
 
 _tracer = trace.get_tracer("picture_service.gemini")
 
@@ -60,7 +52,7 @@ DERIVED_ATTRIBUTES_SCHEMA: dict[str, Any] = {
 
 
 class StructuredModel(Protocol):
-    """Minimal shape gemini_service depends on - a LangChain `with_structured_output(...,
+    """Minimal shape this module depends on - a LangChain `with_structured_output(...,
     include_raw=True)` runnable, or any fake providing the same `ainvoke` contract for tests.
     """
 
@@ -69,7 +61,8 @@ class StructuredModel(Protocol):
 
 def build_chat_model(config: ScannerConfig, schema: dict[str, Any]) -> StructuredModel:
     """Builds a fresh structured-output model bound to one stage's schema - stage 1 and stage 2
-    use different schemas, so each stage calls this with its own (see analyze_card)."""
+    use different schemas, so each stage calls this with its own (see card_analysis.py's
+    analyze_card)."""
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     # The Gemini SDK owns retries: max_retries is the *total* attempt count including the first
@@ -226,80 +219,3 @@ async def compute_derived_attributes(
         attributes = {key: value for key, value in attributes.items() if key != "class"}
 
     return AttributeStageResult(success=True, attributes=attributes, raw_model_response=raw_text)
-
-
-ModelFactory = Any  # Callable[[ScannerConfig, dict[str, Any]], StructuredModel] - see picture_scanner_service.py
-
-
-async def analyze_card(
-    build_model: ModelFactory,
-    config: ScannerConfig,
-    catalog: CatalogSnapshot,
-    photo_id: str,
-    source_file_name: str,
-    image_bytes: bytes,
-    verified: VerifiedMatch | None = None,
-) -> CardAnalysisResult:
-    """Runs all three stages sequentially (picture-service-staged-analysis-pipeline's design.md
-    "Where stage 2's output lands relative to stage 3") and combines their outcomes into the
-    sidecar's Judged section (picture-service-catalog-matching's "Judged analysis status
-    reflects detection, derivation, and matching outcomes").
-
-    `verified` is the series/card number a human already confirmed for this photo, if any:
-    stages 1 and 2 still re-run, but the result always carries that series and card number
-    (picture-service-catalog-matching's "Verified series and card number survive re-analysis")."""
-    detection = await detect_attributes(
-        build_model(config, ATTRIBUTE_DETECTION_SCHEMA), config, source_file_name, image_bytes
-    )
-    if not detection.success:
-        return _stage_failure_result(photo_id, source_file_name, config.model, detection, verified=verified)
-
-    derivation = await compute_derived_attributes(
-        build_model(config, DERIVED_ATTRIBUTES_SCHEMA), config, detection.attributes
-    )
-    if not derivation.success:
-        return _stage_failure_result(
-            photo_id, source_file_name, config.model, derivation, detected=detection.attributes, verified=verified
-        )
-
-    with _tracer.start_as_current_span("catalog.match"):
-        match = match_catalog(derivation.attributes, catalog, verified)
-
-    return CardAnalysisResult(
-        photo_id=photo_id,
-        analysis_status=match.analysis_status,
-        source_file_name=source_file_name,
-        ai_model=config.model,
-        scanned_at_utc=utc_now(),
-        card_name=match.card_name,
-        card_number=match.card_number,
-        set_name=match.set_name,
-        language=match.language,
-        error_message=match.error_message,
-        detected=detection.attributes,
-        derived=derivation.attributes,
-    )
-
-
-def _stage_failure_result(
-    photo_id: str,
-    source_file_name: str,
-    model: str,
-    stage_result: AttributeStageResult,
-    *,
-    detected: AttributeMap | None = None,
-    verified: VerifiedMatch | None = None,
-) -> CardAnalysisResult:
-    return CardAnalysisResult(
-        photo_id=photo_id,
-        analysis_status=AnalysisStatuses.FAILED,
-        source_file_name=source_file_name,
-        ai_model=model,
-        scanned_at_utc=utc_now(),
-        set_name=verified.set_name if verified else None,
-        card_number=verified.card_number if verified else None,
-        error_message=stage_result.error_message,
-        raw_model_response=stage_result.raw_model_response,
-        is_transport_failure=stage_result.is_transport_failure,
-        detected=dict(detected) if detected is not None else {},
-    )

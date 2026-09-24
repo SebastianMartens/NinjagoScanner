@@ -1,4 +1,4 @@
-"""Gemini prompts for the staged analysis pipeline (see gemini_service.py).
+"""Gemini prompts for the staged analysis pipeline (see card_analysis_stage_1_and_2.py).
 
 Kept apart from the call/retry logic so prompt wording can be tuned without touching it. All
 prompts are English. German strings that appear inside them ("Fahrzeug", "Falle", "Aktion") are

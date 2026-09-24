@@ -7,7 +7,7 @@ import pytest
 from langchain_core.exceptions import ModelInvalidRequestError
 
 from picture_service._generated import picture_service_pb2 as pb2
-from picture_service.gemini_service import ATTRIBUTE_DETECTION_SCHEMA
+from picture_service.card_analysis_stage_1_and_2 import ATTRIBUTE_DETECTION_SCHEMA
 from picture_service.models import (
     AnalysisStatuses,
     CatalogCardInfo,
@@ -18,7 +18,7 @@ from picture_service.models import (
     SidecarRecord,
 )
 from picture_service.picture_scanner_service import PictureScannerService
-from picture_service.sidecar_cache import SidecarCache
+from picture_service.sidecar_store import SidecarStore
 from tests.fakes import FakePhotoStore, FakeSidecarTable
 from tests.grpc_fakes import AbortCalled, FakeServicerContext
 
@@ -47,7 +47,7 @@ def make_service(
     that fake entirely, for tests that need a model that fails or has side effects."""
     sidecar_table = sidecar_table or FakeSidecarTable()
     photo_store = photo_store or FakePhotoStore()
-    cache = SidecarCache(sidecar_table)
+    store = SidecarStore(sidecar_table)
 
     async def load_catalog_snapshot(address):
         if catalog_error:
@@ -64,7 +64,7 @@ def make_service(
 
     return (
         PictureScannerService(
-            cache, photo_store, build_model=build_model, load_catalog_snapshot=load_catalog_snapshot
+            store, photo_store, build_model=build_model, load_catalog_snapshot=load_catalog_snapshot
         ),
         sidecar_table,
         photo_store,
@@ -752,9 +752,9 @@ async def test_reanalyze_photo_keeps_a_review_status_changed_during_the_analysis
 
     class ReviewingDuringAnalysisModel:
         async def ainvoke(self, messages):
-            cache = holder["service"]._sidecar_cache
-            current = await cache.get("col-a", "p1")
-            await cache.set_record("col-a", "p1", dataclasses.replace(current, review_status=ReviewStatuses.VERIFIED))
+            store = holder["service"]._sidecar_store
+            current = await store.get("col-a", "p1")
+            await store.set_record("col-a", "p1", dataclasses.replace(current, review_status=ReviewStatuses.VERIFIED))
             parsed = {"card_number": "1"}
             return {"raw": _Raw(str(parsed)), "parsed": parsed, "parsing_error": None}
 

@@ -32,7 +32,7 @@ from picture_service._generated import picture_service_pb2_grpc as pb2_grpc
 from picture_service.config import resolve_aws_region, resolve_photos_bucket_name, resolve_sidecar_table_name
 from picture_service.photo_store import PhotoStore
 from picture_service.picture_scanner_service import PictureScannerService
-from picture_service.sidecar_cache import SidecarCache
+from picture_service.sidecar_store import SidecarStore
 from picture_service.sidecar_table import SidecarTable
 
 logger = logging.getLogger("picture_service")
@@ -115,10 +115,10 @@ async def _serve() -> None:
 
         photo_store = PhotoStore(s3_client, resolve_photos_bucket_name())
         sidecar_table = SidecarTable(dynamodb_resource, resolve_sidecar_table_name())
-        sidecar_cache = SidecarCache(sidecar_table)
+        sidecar_store = SidecarStore(sidecar_table)
 
         server = grpc.aio.server()
-        pb2_grpc.add_CardPictureServiceServicer_to_server(PictureScannerService(sidecar_cache, photo_store), server)
+        pb2_grpc.add_CardPictureServiceServicer_to_server(PictureScannerService(sidecar_store, photo_store), server)
         server.add_insecure_port(f"[::]:{grpc_port}")
 
         liveness_server = None

@@ -1,7 +1,9 @@
-"""DynamoDB-backed sidecar record storage, ported from SidecarTable.cs.
+"""Raw DynamoDB item CRUD for sidecar records, ported from SidecarTable.cs.
 
-Keyed by collection ID (partition key) and generated photo ID (sort key) - see
-picture-service-photo-storage's "Photo storage is partitioned by collection" (matching the
+Internal collaborator of SidecarStore (sidecar_store.py), the repository-like entry point other
+code should depend on - this module only knows about DynamoDB item shapes, not caching or any
+sidecar-domain logic. Keyed by collection ID (partition key) and generated photo ID (sort key) -
+see picture-service-photo-storage's "Photo storage is partitioned by collection" (matching the
 S3 object identity in photo_store.py). Same PascalCase attribute names as the C# service so
 this reads/writes the exact item shape already in production (see design.md's "Preserve the
 exact DynamoDB item shape and S3 key layout").
