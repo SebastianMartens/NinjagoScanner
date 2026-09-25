@@ -32,6 +32,9 @@ internal sealed class ReviewSession
 
     public IReadOnlyList<CardReviewGroup> Groups => groups;
 
+    /// <summary>The catalog and every photo as currently known to this session, including local edits.</summary>
+    public ReviewSnapshot Snapshot => new(catalog, photos.ToArray());
+
     /// <summary>
     /// The groups satisfying every active filter, in display order. Cached: recomputed only after
     /// the groups or a filter value changed, so reading it repeatedly during a render is free.

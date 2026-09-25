@@ -638,7 +638,7 @@
 	{
 		try
 		{
-			return await GamificationService.GetXpAsync();
+			return await GamificationService.GetXpAsync(session.Snapshot);
 		}
 		catch (Exception)
 		{
@@ -674,18 +674,21 @@
 				return;
 			}
 
-			var overview = await CollectionQueryService.GetCollectionOverviewAsync();
-			var matchedCard = overview.Cards.FirstOrDefault(item =>
-				string.Equals(CollectionQueryService.BuildOwnershipKey(item.Series, item.CardNumber), newKey, StringComparison.Ordinal));
+			// Owned Copies from the session's in-memory photos - no need to re-fetch the collection.
+			var snapshot = session.Snapshot;
+			var matchedCard = snapshot.Catalog.FirstOrDefault(card =>
+				string.Equals(CollectionQueryService.BuildOwnershipKey(card.Series, card.CardNumber), newKey, StringComparison.Ordinal));
+			var ownedCopies = snapshot.Photos.Count(photo =>
+				string.Equals(CollectionQueryService.BuildOwnershipKey(photo.SetName, photo.CardNumber), newKey, StringComparison.Ordinal));
 
-			if (matchedCard is null || matchedCard.OwnedCopies <= 0)
+			if (string.IsNullOrEmpty(matchedCard.Series) || ownedCopies <= 0)
 			{
 				return;
 			}
 
-			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value);
-			var kind = matchedCard.OwnedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
-			CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, matchedCard.OwnedCopies, evaluation);
+			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value, snapshot);
+			var kind = ownedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
+			CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, ownedCopies, evaluation);
 		}
 		catch (Exception)
 		{
@@ -701,7 +704,7 @@
 
 		try
 		{
-			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value);
+			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value, session.Snapshot);
 			if (evaluation.NewlyUnlockedAchievements.Count > 0 || evaluation.RankedUp)
 			{
 				CelebrationCenter.CelebrateSilently(evaluation);

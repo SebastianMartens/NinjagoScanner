@@ -33,8 +33,22 @@ internal sealed class GamificationService(
     /// <summary>The current derived XP total, with no side effects - used by callers to snapshot "before" state ahead of an action, then compared via <see cref="EvaluateAsync"/> once it's done.</summary>
     public async Task<int> GetXpAsync(CancellationToken cancellationToken = default)
     {
+        return await GetXpAsync(await BuildStateAsync(cancellationToken), cancellationToken);
+    }
+
+    /// <summary>
+    /// <see cref="GetXpAsync(CancellationToken)"/> computed from a snapshot the caller already holds
+    /// in memory (the /review page's session) instead of re-fetching the catalog and the whole
+    /// collection - which made every review action pay for two full collection listings.
+    /// </summary>
+    public Task<int> GetXpAsync(ReviewSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        return GetXpAsync(BuildState(snapshot), cancellationToken);
+    }
+
+    private async Task<int> GetXpAsync(GamificationCollectionState state, CancellationToken cancellationToken)
+    {
         var collectionId = await GetCollectionIdAsync(cancellationToken);
-        var state = await BuildStateAsync(cancellationToken);
         var bonusXp = await GetBonusXpAsync(collectionId, cancellationToken);
         return ComputeXp(state, CurrentlyUnlockedIds(state), bonusXp);
     }
@@ -74,8 +88,18 @@ internal sealed class GamificationService(
     /// </summary>
     public async Task<GamificationEvaluationResult> EvaluateAsync(int xpBefore, CancellationToken cancellationToken = default)
     {
+        return await EvaluateAsync(xpBefore, await BuildStateAsync(cancellationToken), cancellationToken);
+    }
+
+    /// <summary><see cref="EvaluateAsync(int, CancellationToken)"/> computed from an in-memory snapshot - see <see cref="GetXpAsync(ReviewSnapshot, CancellationToken)"/>.</summary>
+    public Task<GamificationEvaluationResult> EvaluateAsync(int xpBefore, ReviewSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        return EvaluateAsync(xpBefore, BuildState(snapshot), cancellationToken);
+    }
+
+    private async Task<GamificationEvaluationResult> EvaluateAsync(int xpBefore, GamificationCollectionState state, CancellationToken cancellationToken)
+    {
         var collectionId = await GetCollectionIdAsync(cancellationToken);
-        var state = await BuildStateAsync(cancellationToken);
         var (_, newlyUnlocked) = await SyncUnlocksAsync(collectionId, state, cancellationToken);
 
         var bonusXp = await GetBonusXpAsync(collectionId, cancellationToken);
@@ -168,6 +192,25 @@ internal sealed class GamificationService(
     {
         var cardsFromCatalog = await catalogServiceClient.ListCatalogCardsAsync(cancellationToken);
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
+        return BuildState(
+            cardsFromCatalog,
+            photoEntries.Select(entry => new PhotoFacts(entry.SetName, entry.CardNumber, entry.Rarity, entry.ReviewStatus)).ToArray());
+    }
+
+    private static GamificationCollectionState BuildState(ReviewSnapshot snapshot)
+    {
+        return BuildState(
+            snapshot.Catalog,
+            snapshot.Photos.Select(photo => new PhotoFacts(photo.SetName, photo.CardNumber, photo.Rarity, photo.ReviewStatus)).ToArray());
+    }
+
+    /// <summary>The only photo fields gamification reads, shared by gRPC CardEntry and in-memory CardListItem sources.</summary>
+    private sealed record PhotoFacts(string? SetName, string? CardNumber, string? Rarity, string? ReviewStatus);
+
+    private static GamificationCollectionState BuildState(
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> cardsFromCatalog,
+        IReadOnlyList<PhotoFacts> photoEntries)
+    {
         var photosByKey = photoEntries.ToLookup(entry => CollectionQueryService.BuildOwnershipKey(entry.SetName, entry.CardNumber));
 
         var distinctOwnedCards = 0;
@@ -189,7 +232,7 @@ internal sealed class GamificationService(
                 totalInSeries++;
 
                 var key = CollectionQueryService.BuildOwnershipKey(card.Series, card.CardNumber);
-                var matches = string.IsNullOrWhiteSpace(key) ? Array.Empty<CardEntry>() : photosByKey[key].ToArray();
+                var matches = string.IsNullOrWhiteSpace(key) ? Array.Empty<PhotoFacts>() : photosByKey[key].ToArray();
                 if (matches.Length == 0)
                 {
                     continue;
