@@ -43,7 +43,7 @@ internal sealed class GamificationCelebrationCenter : IDisposable
             CardNumber = cardNumber,
             Rarity = rarity,
             Copies = copies,
-            XpGained = kind == UnlockCelebrationKind.NewCard ? GamificationService.XpNewCard : GamificationService.XpDuplicateCopy
+            XpGained = kind == UnlockCelebrationKind.NewCard ? GamificationService.XpNewCard : 0
         };
 
         if (evaluation.RankedUp)

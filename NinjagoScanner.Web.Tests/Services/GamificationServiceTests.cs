@@ -135,7 +135,7 @@ public sealed class GamificationServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetXpAsync_SumsAchievementCardDuplicateAndReviewXp()
+    public async Task GetXpAsync_SumsAchievementCardAndReviewXp_WithNothingForDuplicates()
     {
         // Cole owned twice (1 duplicate copy), Zane owned once with a verified review.
         pictureHost.WritePhoto("photo-1", Sidecar("Serie 2", "4"));
@@ -144,8 +144,21 @@ public sealed class GamificationServiceTests : IAsyncLifetime
 
         var xp = await handle.Service.GetXpAsync();
 
-        // first-scan (20) + 2 distinct cards * 50 + 1 duplicate * 10 + 1 verified review * 10
-        Assert.Equal(20 + 2 * 50 + 1 * 10 + 1 * 10, xp);
+        // first-scan (20) + 2 distinct cards * 50 + 1 verified review * 10 - the duplicate adds nothing
+        Assert.Equal(20 + 2 * 50 + 1 * 10, xp);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AddingDuplicateCopy_LeavesXpUnchanged()
+    {
+        pictureHost.WritePhoto("photo-1", Sidecar("Serie 2", "4"));
+        var xpBefore = (await handle.Service.EvaluateAsync(0)).XpAfter; // persists first-scan up front
+
+        pictureHost.WritePhoto("photo-2", Sidecar("Serie 2", "4"));
+        var evaluation = await handle.Service.EvaluateAsync(xpBefore);
+
+        Assert.Empty(evaluation.NewlyUnlockedAchievements);
+        Assert.Equal(xpBefore, evaluation.XpAfter);
     }
 
     [Fact]

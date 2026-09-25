@@ -686,9 +686,16 @@
 				return;
 			}
 
+			if (ownedCopies > 1)
+			{
+				// Correcting to an already-owned card is routine review clean-up, not a reveal - no
+				// overlay, and duplicates earn no XP, so only an achievement it crossed gets a toast.
+				await CelebrateSilentlyIfAnythingUnlockedAsync(xpBefore);
+				return;
+			}
+
 			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value, snapshot);
-			var kind = ownedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
-			CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, ownedCopies, evaluation);
+			CelebrationCenter.CelebrateCard(UnlockCelebrationKind.NewCard,matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, ownedCopies, evaluation);
 		}
 		catch (Exception)
 		{

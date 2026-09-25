@@ -31,7 +31,10 @@
             }
 
             <p class="unlock-note">@Note(celebration)</p>
-            <div class="unlock-xp-note">@XpNote(celebration)</div>
+            @if (celebration.Kind == UnlockCelebrationKind.RankUp || celebration.XpGained > 0)
+            {
+                <div class="unlock-xp-note">@XpNote(celebration)</div>
+            }
 
             <button class="cv-btn-primary" type="button" @onclick="Dismiss">Weiter</button>
         </div>

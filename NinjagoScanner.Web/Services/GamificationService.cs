@@ -23,7 +23,6 @@ internal sealed class GamificationService(
     AuthenticationStateProvider authenticationStateProvider)
 {
     internal const int XpNewCard = 50;
-    internal const int XpDuplicateCopy = 10;
     internal const int XpConfirmedReview = 10;
 
     private string? cachedCollectionId;
@@ -135,9 +134,9 @@ internal sealed class GamificationService(
             .Where(achievement => unlockedAchievementIds.Contains(achievement.Id))
             .Sum(achievement => achievement.Xp);
 
+        // Duplicate copies earn no XP of their own - only the dupes-25 achievement counts them.
         return achievementXp
             + state.DistinctOwnedCards * XpNewCard
-            + state.DuplicateCopies * XpDuplicateCopy
             + state.VerifiedReviewCount * XpConfirmedReview
             + bonusXp;
     }
