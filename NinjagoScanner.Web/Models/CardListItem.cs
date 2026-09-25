@@ -10,7 +10,12 @@ public sealed record CardListItem
 {
     public required string PhotoId { get; init; }
     public required string SourceFileName { get; init; }
-    public required string ImageUrl { get; init; }
+
+    /// <summary>
+    /// The photo's short-lived download URL, or empty until a caller resolves it (listing a
+    /// collection resolves none - only the photos a page displays get one).
+    /// </summary>
+    public string ImageUrl { get; init; } = string.Empty;
     public required string AnalysisStatus { get; init; }
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }

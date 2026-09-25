@@ -118,8 +118,7 @@ internal sealed class PictureServiceClient
         var card = await StreamUploadAsync(sourceFileName, fileSizeBytes, content, skipAnalysis: false, cancellationToken);
 
         var downloadUrl = await GetDownloadUrlAsync(card.PhotoId, cancellationToken);
-        card.DownloadUrl = downloadUrl;
-        return ToCardListItem(card);
+        return ToCardListItem(card) with { ImageUrl = downloadUrl };
     }
 
     /// <summary>
@@ -175,7 +174,7 @@ internal sealed class PictureServiceClient
     /// <summary>
     /// The source file names of every photo already in the collection, as an ordinal
     /// (case-sensitive) set - the batch upload's skip-if-filename-exists lookup. Cheap compared
-    /// to <see cref="GetCardsAsync"/>: no download URL is created per photo.
+    /// to <see cref="GetCardsAsync"/>: it reads no photo objects.
     /// </summary>
     public async Task<HashSet<string>> ListSourceFileNamesAsync(CancellationToken cancellationToken = default)
     {
@@ -188,6 +187,10 @@ internal sealed class PictureServiceClient
         return new HashSet<string>(response.SourceFileNames, StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// Every photo in the collection, without download URLs (<see cref="CardListItem.ImageUrl"/> is
+    /// empty) - resolve them for just the photos being displayed via <see cref="GetDownloadUrlsAsync"/>.
+    /// </summary>
     public async Task<IReadOnlyList<CardListItem>> GetCardsAsync(CancellationToken cancellationToken = default)
     {
         var entries = await ListCardEntriesAsync(cancellationToken);
@@ -214,6 +217,32 @@ internal sealed class PictureServiceClient
             cancellationToken: cancellationToken);
 
         return response.DownloadUrl;
+    }
+
+    /// <summary>
+    /// Resolves download URLs for exactly <paramref name="photoIds"/> in one bounded call - never
+    /// one call per photo, and never the whole collection: callers pass only the photos they are
+    /// about to display. A photo id with no stored photo is absent from the result (callers treat
+    /// that as "nothing to show"). Makes no call at all for an empty list.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> GetDownloadUrlsAsync(
+        IEnumerable<string> photoIds,
+        CancellationToken cancellationToken = default)
+    {
+        var requestedIds = photoIds.Distinct(StringComparer.Ordinal).ToArray();
+        if (requestedIds.Length == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
+        var request = new GetPhotoDownloadUrlsRequest { CollectionId = collectionId };
+        request.PhotoIds.AddRange(requestedIds);
+
+        var response = await client.GetPhotoDownloadUrlsAsync(request, cancellationToken: cancellationToken);
+
+        return response.Urls.ToDictionary(entry => entry.PhotoId, entry => entry.DownloadUrl, StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -348,7 +377,6 @@ internal sealed class PictureServiceClient
         {
             PhotoId = entry.PhotoId,
             SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
-            ImageUrl = entry.DownloadUrl,
             AnalysisStatus = entry.AnalysisStatus,
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),

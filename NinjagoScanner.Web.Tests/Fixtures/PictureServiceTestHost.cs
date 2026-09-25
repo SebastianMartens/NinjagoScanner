@@ -59,8 +59,15 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
     /// <summary>Every <c>UploadPhoto</c> call received, in order, with whether it set <c>skip_analysis</c>.</summary>
     public IReadOnlyList<RecordedUpload> Uploads => callLog.Uploads.ToArray();
 
-    /// <summary>How many <c>GetPhotoDownloadUrl</c> calls were received.</summary>
+    /// <summary>How many <c>GetPhotoDownloadUrl</c> (singular) calls were received.</summary>
     public int DownloadUrlCallCount => callLog.DownloadUrlCallCount;
+
+    /// <summary>
+    /// The photo ids of every <c>GetPhotoDownloadUrls</c> (bounded, plural) call received, one entry
+    /// per call, in order - so tests can assert both how many calls were made and exactly which
+    /// photos each one asked about.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<string>> DownloadUrlsRequests => callLog.DownloadUrlsRequests.ToArray();
 
     public void WritePhoto(string photoId, string? sidecarJson = null, string? collectionId = null)
     {
@@ -162,6 +169,8 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         private int downloadUrlCallCount;
 
         public ConcurrentQueue<RecordedUpload> Uploads { get; } = new();
+
+        public ConcurrentQueue<IReadOnlyList<string>> DownloadUrlsRequests { get; } = new();
 
         public int DownloadUrlCallCount => Volatile.Read(ref downloadUrlCallCount);
 
@@ -297,6 +306,28 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             });
         }
 
+        public override Task<GetPhotoDownloadUrlsResponse> GetPhotoDownloadUrls(GetPhotoDownloadUrlsRequest request, ServerCallContext context)
+        {
+            EnsureCollectionId(request.CollectionId);
+            callLog.DownloadUrlsRequests.Enqueue(request.PhotoIds.ToArray());
+
+            // Mirrors the real service: a photo id with no stored photo is omitted, not an error.
+            var response = new GetPhotoDownloadUrlsResponse();
+            foreach (var photoId in request.PhotoIds.Distinct(StringComparer.Ordinal))
+            {
+                if (photoStore.Exists(request.CollectionId, photoId))
+                {
+                    response.Urls.Add(new PhotoDownloadUrl
+                    {
+                        PhotoId = photoId,
+                        DownloadUrl = photoStore.CreateDownloadUrl(request.CollectionId, photoId)
+                    });
+                }
+            }
+
+            return Task.FromResult(response);
+        }
+
         public override Task<ListCardsResponse> ListCards(ListCardsRequest request, ServerCallContext context)
         {
             EnsureCollectionId(request.CollectionId);
@@ -305,7 +336,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             foreach (var photoId in photoStore.ListPhotoIds(request.CollectionId))
             {
                 var record = sidecarStore.Get(request.CollectionId, photoId);
-                response.Cards.Add(ToCardEntry(photoId, record, photoStore.CreateDownloadUrl(request.CollectionId, photoId)));
+                response.Cards.Add(ToCardEntry(photoId, record));
             }
 
             return Task.FromResult(response);
@@ -443,7 +474,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
 
         private static string? NormalizeNullable(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-        private static CardEntry ToCardEntry(string photoId, FakeSidecarRecord? record, string downloadUrl = "")
+        private static CardEntry ToCardEntry(string photoId, FakeSidecarRecord? record)
         {
             return new CardEntry
             {
@@ -455,8 +486,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 SetName = record?.SetName ?? string.Empty,
                 Rarity = record?.Rarity ?? string.Empty,
                 Language = record?.Language ?? "de",
-                ReviewStatus = record?.ReviewStatus ?? "unreviewed",
-                DownloadUrl = downloadUrl
+                ReviewStatus = record?.ReviewStatus ?? "unreviewed"
             };
         }
     }

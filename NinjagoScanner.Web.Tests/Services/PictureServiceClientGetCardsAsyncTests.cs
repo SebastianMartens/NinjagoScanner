@@ -4,9 +4,9 @@ using NinjagoScanner.Web.Tests.Fixtures;
 namespace NinjagoScanner.Web.Tests.Services;
 
 /// <summary>
-/// Covers <see cref="PictureServiceClient.GetCardsAsync"/> resolving every photo's download URL
-/// straight from the single ListCards call (PictureService includes it on every CardEntry),
-/// without any separate download-URL request.
+/// Covers <see cref="PictureServiceClient.GetCardsAsync"/> resolving no download URLs (listing a
+/// collection must not scale with its size) and <see cref="PictureServiceClient.GetDownloadUrlsAsync"/>
+/// resolving exactly the requested photos in one call.
 /// </summary>
 public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
 {
@@ -53,15 +53,42 @@ public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetCardsAsync_ResolvesEveryPhotosImageUrl_FromListCardsDirectly()
+    public async Task GetCardsAsync_ResolvesNoImageUrls_AndMakesNoDownloadUrlRequest()
     {
         var cards = await pictureServiceClient.GetCardsAsync();
 
         Assert.Equal(3, cards.Count);
-        foreach (var card in cards)
-        {
-            Assert.False(string.IsNullOrWhiteSpace(card.ImageUrl));
-            Assert.Equal($"https://fake-photo-store.test/{card.PhotoId}", card.ImageUrl);
-        }
+        Assert.All(cards, card => Assert.Equal(string.Empty, card.ImageUrl));
+        Assert.Empty(pictureHost.DownloadUrlsRequests);
+        Assert.Equal(0, pictureHost.DownloadUrlCallCount);
+    }
+
+    [Fact]
+    public async Task GetDownloadUrlsAsync_ResolvesOnlyTheRequestedPhotos_InOneCall()
+    {
+        var urls = await pictureServiceClient.GetDownloadUrlsAsync(["photo-1", "photo-3"]);
+
+        Assert.Equal(2, urls.Count);
+        Assert.Equal("https://fake-photo-store.test/photo-1", urls["photo-1"]);
+        Assert.Equal("https://fake-photo-store.test/photo-3", urls["photo-3"]);
+        Assert.DoesNotContain("photo-2", urls.Keys);
+        Assert.Equal(["photo-1", "photo-3"], Assert.Single(pictureHost.DownloadUrlsRequests));
+    }
+
+    [Fact]
+    public async Task GetDownloadUrlsAsync_OmitsAPhotoThatDoesNotExist_WithoutFailing()
+    {
+        var urls = await pictureServiceClient.GetDownloadUrlsAsync(["photo-1", "gone"]);
+
+        Assert.Equal(["photo-1"], urls.Keys);
+    }
+
+    [Fact]
+    public async Task GetDownloadUrlsAsync_WithNoPhotoIds_MakesNoCall()
+    {
+        var urls = await pictureServiceClient.GetDownloadUrlsAsync([]);
+
+        Assert.Empty(urls);
+        Assert.Empty(pictureHost.DownloadUrlsRequests);
     }
 }

@@ -167,7 +167,7 @@
                                 </select>
                             </label>
 
-                            @if (SelectedPhoto is not null)
+                            @if (SelectedPhoto is not null && !string.IsNullOrEmpty(SelectedPhoto.ImageUrl))
                             {
                                 <img class="detail-image" src="@SelectedPhoto.ImageUrl" alt="@SelectedPhoto.SourceFileName" loading="lazy" />
                             }

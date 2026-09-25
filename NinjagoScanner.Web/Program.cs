@@ -131,8 +131,8 @@ builder.Services.AddSingleton(_ => GrpcChannel.ForAddress(pictureServiceAddress,
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5)
     },
-    // See PictureServiceClient's prior single-channel setup: ListCards' presigned download_url
-    // per entry makes the response grow with photo count, past the client's default 4 MB limit.
+    // ListCards returns one entry per photo in the collection, so the response grows with photo
+    // count and can pass the client's default 4 MB limit.
     MaxReceiveMessageSize = null
 }));
 builder.Services.AddScoped(provider => new PictureServiceClient(

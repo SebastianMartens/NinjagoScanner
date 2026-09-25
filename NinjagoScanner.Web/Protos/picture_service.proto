@@ -12,9 +12,10 @@ package pictureservice;
 // Web resolves and supplies the caller's authorized collection_id, since PictureService has no
 // public endpoint and Web is its only caller. Callers stream photo bytes to this service via
 // UploadPhoto, which assigns the generated photo_id, stores the bytes, and triggers AI Analysis.
-// ListCards includes a ready-to-use download_url on every entry; GetPhotoDownloadUrl exists only
-// for resolving a single photo_id a caller has in hand without a ListCards result (e.g. right
-// after UploadPhoto). CardEntry only carries the fields every list/grid view needs for every row;
+// ListCards carries no download URLs (presigning every photo in a collection scales with collection
+// size, not with what a page displays): callers resolve URLs for just the photo_ids they display via
+// GetPhotoDownloadUrls, in one bounded call. GetPhotoDownloadUrl resolves a single photo_id a caller
+// has in hand (e.g. right after UploadPhoto). CardEntry only carries the fields every list/grid view needs for every row;
 // GetCardDetails resolves the rest for one photo_id at a time, for callers showing a single card's
 // full details (an expanded review tile, the collection detail pane). ReanalyzePhoto re-runs AI
 // Analysis on a single stored photo on demand (the Review page's re-analysis button). MigrateSidecars is the one
@@ -24,6 +25,7 @@ service CardPictureService {
   rpc Scan (ScanRequest) returns (ScanSummary);
   rpc UploadPhoto (stream UploadPhotoRequest) returns (UploadPhotoResponse);
   rpc GetPhotoDownloadUrl (GetPhotoDownloadUrlRequest) returns (GetPhotoDownloadUrlResponse);
+  rpc GetPhotoDownloadUrls (GetPhotoDownloadUrlsRequest) returns (GetPhotoDownloadUrlsResponse);
   rpc ListCards (ListCardsRequest) returns (ListCardsResponse);
   rpc GetCardDetails (GetCardDetailsRequest) returns (GetCardDetailsResponse);
   rpc UpdateSidecar (UpdateSidecarRequest) returns (UpdateSidecarResponse);
@@ -75,7 +77,8 @@ message CardEntry {
   string rarity = 6;
   string review_status = 12;
   string language = 13;
-  string download_url = 15;
+  reserved 15;
+  reserved "download_url";
 }
 
 message ListCardsRequest {
@@ -157,6 +160,22 @@ message GetPhotoDownloadUrlRequest {
 
 message GetPhotoDownloadUrlResponse {
   string download_url = 1;
+}
+
+// Resolves download URLs for a caller-supplied, bounded list of photo_ids within one collection.
+// A photo_id with no stored photo in that collection is omitted from the response, not an error.
+message GetPhotoDownloadUrlsRequest {
+  string collection_id = 1;
+  repeated string photo_ids = 2;
+}
+
+message PhotoDownloadUrl {
+  string photo_id = 1;
+  string download_url = 2;
+}
+
+message GetPhotoDownloadUrlsResponse {
+  repeated PhotoDownloadUrl urls = 1;
 }
 
 message UpdateSidecarRequest {

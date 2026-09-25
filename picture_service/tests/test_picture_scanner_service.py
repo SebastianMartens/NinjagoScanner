@@ -168,13 +168,90 @@ async def test_list_cards_preserves_explicit_unknown_language():
     assert response.cards[0].language == "unknown"
 
 
-async def test_list_cards_includes_download_url_on_every_entry():
+async def test_list_cards_does_not_presign_any_download_url():
+    service, _, photo_store = make_service()
+    photo_store.bytes_by_key[("col-a", "p1")] = b"data"
+    photo_store.bytes_by_key[("col-a", "p2")] = b"data"
+
+    await service.ListCards(pb2.ListCardsRequest(collection_id="col-a"), FakeServicerContext())
+
+    assert "create_download_url" not in photo_store.calls
+
+
+# --- GetPhotoDownloadUrls ---
+
+
+async def test_get_photo_download_urls_requires_collection_id():
+    service, _, _ = make_service()
+    with pytest.raises(AbortCalled) as exc_info:
+        await service.GetPhotoDownloadUrls(
+            pb2.GetPhotoDownloadUrlsRequest(collection_id="", photo_ids=["p1"]), FakeServicerContext()
+        )
+    assert exc_info.value.code == grpc.StatusCode.INVALID_ARGUMENT
+
+
+async def test_get_photo_download_urls_resolves_several_photos_in_one_call():
+    service, _, photo_store = make_service()
+    for photo_id in ("p1", "p2", "p3"):
+        photo_store.bytes_by_key[("col-a", photo_id)] = b"data"
+
+    response = await service.GetPhotoDownloadUrls(
+        pb2.GetPhotoDownloadUrlsRequest(collection_id="col-a", photo_ids=["p1", "p2", "p3"]), FakeServicerContext()
+    )
+
+    assert {entry.photo_id: entry.download_url for entry in response.urls} == {
+        "p1": "https://example.test/col-a/p1",
+        "p2": "https://example.test/col-a/p2",
+        "p3": "https://example.test/col-a/p3",
+    }
+
+
+async def test_get_photo_download_urls_omits_missing_photo_ids_and_still_resolves_the_rest():
+    service, _, photo_store = make_service()
+    photo_store.bytes_by_key[("col-a", "p1")] = b"data"
+    photo_store.bytes_by_key[("col-a", "p3")] = b"data"
+
+    response = await service.GetPhotoDownloadUrls(
+        pb2.GetPhotoDownloadUrlsRequest(collection_id="col-a", photo_ids=["p1", "gone", "p3"]), FakeServicerContext()
+    )
+
+    assert sorted(entry.photo_id for entry in response.urls) == ["p1", "p3"]
+
+
+async def test_get_photo_download_urls_returns_empty_response_for_empty_request():
     service, _, photo_store = make_service()
     photo_store.bytes_by_key[("col-a", "p1")] = b"data"
 
-    response = await service.ListCards(pb2.ListCardsRequest(collection_id="col-a"), FakeServicerContext())
+    response = await service.GetPhotoDownloadUrls(
+        pb2.GetPhotoDownloadUrlsRequest(collection_id="col-a", photo_ids=[]), FakeServicerContext()
+    )
 
-    assert response.cards[0].download_url != ""
+    assert list(response.urls) == []
+    assert "create_download_url" not in photo_store.calls
+
+
+async def test_get_photo_download_urls_only_resolves_requested_photos():
+    service, _, photo_store = make_service()
+    photo_store.bytes_by_key[("col-a", "p1")] = b"data"
+    photo_store.bytes_by_key[("col-a", "p2")] = b"data"
+
+    response = await service.GetPhotoDownloadUrls(
+        pb2.GetPhotoDownloadUrlsRequest(collection_id="col-a", photo_ids=["p1"]), FakeServicerContext()
+    )
+
+    assert [entry.photo_id for entry in response.urls] == ["p1"]
+    assert photo_store.calls.count("create_download_url") == 1
+
+
+async def test_get_photo_download_urls_does_not_resolve_another_collections_photo():
+    service, _, photo_store = make_service()
+    photo_store.bytes_by_key[("col-b", "p1")] = b"data"
+
+    response = await service.GetPhotoDownloadUrls(
+        pb2.GetPhotoDownloadUrlsRequest(collection_id="col-a", photo_ids=["p1"]), FakeServicerContext()
+    )
+
+    assert list(response.urls) == []
 
 
 # --- UploadPhoto ---

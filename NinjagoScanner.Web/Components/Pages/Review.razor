@@ -44,8 +44,8 @@
 					<input value="@session.SearchText" placeholder="Kartennummer oder Kartenname" @oninput="OnSearchTextChanged" />
 				</label>
 				<span class="review-nav-position">@(FilteredGroups.Count == 0 ? 0 : session.CurrentIndex + 1) / @FilteredGroups.Count</span>
-				<button class="review-btn" type="button" disabled="@(session.CurrentIndex <= 0)" @onclick="session.GoToPrevious">← Zurueck</button>
-				<button class="review-btn" type="button" disabled="@(session.CurrentIndex >= FilteredGroups.Count - 1)" @onclick="session.GoToNext">Weiter →</button>
+				<button class="review-btn" type="button" disabled="@(session.CurrentIndex <= 0)" @onclick="GoToPreviousAsync">← Zurueck</button>
+				<button class="review-btn" type="button" disabled="@(session.CurrentIndex >= FilteredGroups.Count - 1)" @onclick="GoToNextAsync">Weiter →</button>
 			</div>
 		}
 	</header>
@@ -95,7 +95,10 @@
 
 				<article class="review-photo-tile">
 					<div class="review-photo-image">
-						<img src="@photo.ImageUrl" alt="@photo.SourceFileName" loading="lazy" />
+						@if (!string.IsNullOrEmpty(photo.ImageUrl))
+						{
+							<img src="@photo.ImageUrl" alt="@photo.SourceFileName" loading="lazy" />
+						}
 					</div>
 
 					<div class="review-photo-body">
@@ -271,7 +274,32 @@
 		knownSeries = await CatalogServiceClient.GetKnownSeriesAsync();
 		session = new ReviewSession(await CollectionQueryService.GetReviewSnapshotAsync());
 		session.TryShowCard(SeriesQueryParameter, CardQueryParameter);
+		await EnsureCurrentGroupUrlsAsync();
 		isLoading = false;
+	}
+
+	/// <summary>
+	/// Resolves download URLs for the shown group's photos that lack one (one bounded call, only for
+	/// those photos - see <see cref="ReviewSession.ResolveMissingDownloadUrlsAsync"/>). Called after
+	/// anything that can change which group is shown or which photos it holds.
+	/// </summary>
+	private Task EnsureCurrentGroupUrlsAsync()
+	{
+		return session.ResolveMissingDownloadUrlsAsync(
+			MaxDisplayedPhotosPerGroup,
+			photoIds => PictureServiceClient.GetDownloadUrlsAsync(photoIds));
+	}
+
+	private async Task GoToPreviousAsync()
+	{
+		session.GoToPrevious();
+		await EnsureCurrentGroupUrlsAsync();
+	}
+
+	private async Task GoToNextAsync()
+	{
+		session.GoToNext();
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
 	private string GetCardNumberDraft(CardListItem photo)
@@ -348,21 +376,25 @@
 		session.Reload(await CollectionQueryService.GetReviewSnapshotAsync());
 		cardNumberDrafts.Clear();
 		photoDetails.Clear();
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
-	private void OnReviewStatusFilterChanged(ChangeEventArgs e)
+	private async Task OnReviewStatusFilterChanged(ChangeEventArgs e)
 	{
 		session.SetReviewStatusFilter(e.Value?.ToString() ?? AllFilterValue);
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
-	private void OnAnalysisStatusFilterChanged(ChangeEventArgs e)
+	private async Task OnAnalysisStatusFilterChanged(ChangeEventArgs e)
 	{
 		session.SetAnalysisStatusFilter(e.Value?.ToString() ?? AllFilterValue);
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
-	private void OnSearchTextChanged(ChangeEventArgs e)
+	private async Task OnSearchTextChanged(ChangeEventArgs e)
 	{
 		session.SetSearchText(e.Value?.ToString() ?? string.Empty);
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
 	private async Task SetReviewStatusAsync(CardListItem photo, string reviewStatus)
@@ -457,6 +489,10 @@
 		{
 			busyPhotoId = null;
 		}
+
+		// The local edit may have moved a photo into (or the whole view onto) a group whose photos
+		// have no URL yet.
+		await EnsureCurrentGroupUrlsAsync();
 	}
 
 	private async Task ReanalyzeAsync(CardListItem photo)
@@ -495,6 +531,7 @@
 			var updated = reanalyzed with { ImageUrl = photo.ImageUrl };
 			session.ReplacePhoto(photo.PhotoId, _ => updated);
 			cardNumberDrafts.Remove(photo.PhotoId);
+			await EnsureCurrentGroupUrlsAsync();
 
 			await TryCelebrateCardChangeAsync(photo, updated, xpBefore);
 		}
@@ -587,6 +624,9 @@
 		{
 			isConfirmingAll = false;
 		}
+
+		// Confirming advances to the next group, whose photos have no URLs yet.
+		await EnsureCurrentGroupUrlsAsync();
 
 		// Routine "Confirm All" on an already-correct match only changes Review Status, never
 		// Owned Copies (they're independent - see the glossary), so it never shows the card

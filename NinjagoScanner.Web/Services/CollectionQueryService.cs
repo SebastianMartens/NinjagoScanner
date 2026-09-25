@@ -77,6 +77,12 @@ internal sealed class CollectionQueryService(
             .ThenBy(item => item.Card.CardName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        // One bounded call for exactly the photos this grid shows (one per catalog card of the
+        // selected series), not one URL per photo in the whole collection.
+        var downloadUrls = await pictureServiceClient.GetDownloadUrlsAsync(
+            matchedCards.Where(item => item.MatchedPhoto is not null).Select(item => item.MatchedPhoto!.PhotoId),
+            cancellationToken);
+
         var result = new List<GalleryCardItem>(matchedCards.Length);
         foreach (var (card, matchedPhoto, photoCount) in matchedCards)
         {
@@ -88,7 +94,7 @@ internal sealed class CollectionQueryService(
                 CardNumber = card.CardNumber,
                 CardName = card.CardName,
                 PhotoId = matchedPhoto?.PhotoId,
-                ImageUrl = matchedPhoto?.DownloadUrl,
+                ImageUrl = matchedPhoto is not null && downloadUrls.TryGetValue(matchedPhoto.PhotoId, out var imageUrl) ? imageUrl : null,
                 PhotoCount = photoCount,
                 Rarity = matchedPhoto?.Rarity,
                 ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus)
@@ -334,6 +340,8 @@ internal sealed class CollectionQueryService(
             .OrderBy(entry => entry.PhotoId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
+        var downloadUrls = await pictureServiceClient.GetDownloadUrlsAsync(matches.Select(entry => entry.PhotoId), cancellationToken);
+
         var result = new List<CollectionCardPhotoItem>(matches.Length);
         foreach (var entry in matches)
         {
@@ -342,7 +350,7 @@ internal sealed class CollectionQueryService(
             {
                 PhotoId = entry.PhotoId,
                 SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
-                ImageUrl = entry.DownloadUrl,
+                ImageUrl = downloadUrls.GetValueOrDefault(entry.PhotoId, string.Empty),
                 Sidecar = ToCollectionSidecar(entry, details)
             });
         }

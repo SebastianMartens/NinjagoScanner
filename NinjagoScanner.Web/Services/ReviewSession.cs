@@ -142,6 +142,51 @@ internal sealed class ReviewSession
     }
 
     /// <summary>
+    /// Resolves download URLs for the current group's displayed photos (its first
+    /// <paramref name="maxDisplayedPhotos"/>) that do not have one yet, with a single call to
+    /// <paramref name="resolveUrlsAsync"/> covering exactly those photos - never the rest of the
+    /// collection. A photo that already has a URL is never passed to it and never changed, so a
+    /// shown image's URL stays stable while the user works. Makes no call when nothing is missing.
+    /// Photos the resolver returns no URL for stay without one. Call it whenever the shown group or
+    /// its membership may have changed.
+    /// </summary>
+    public async Task ResolveMissingDownloadUrlsAsync(
+        int maxDisplayedPhotos,
+        Func<IReadOnlyList<string>, Task<IReadOnlyDictionary<string, string>>> resolveUrlsAsync)
+    {
+        var group = CurrentGroup;
+        if (group is null)
+        {
+            return;
+        }
+
+        var missingPhotoIds = group.Photos
+            .Take(maxDisplayedPhotos)
+            .Where(photo => string.IsNullOrEmpty(photo.ImageUrl))
+            .Select(photo => photo.PhotoId)
+            .ToArray();
+        if (missingPhotoIds.Length == 0)
+        {
+            return;
+        }
+
+        var urls = await resolveUrlsAsync(missingPhotoIds);
+
+        // The session may have changed while the call was in flight, so re-check against the
+        // photos as they are now: only fill a gap, never overwrite an existing URL.
+        var applied = false;
+        foreach (var (photoId, url) in urls)
+        {
+            applied |= ApplyReplacement(photoId, photo => string.IsNullOrEmpty(photo.ImageUrl) ? photo with { ImageUrl = url } : photo);
+        }
+
+        if (applied)
+        {
+            Regroup(keepPosition: true);
+        }
+    }
+
+    /// <summary>
     /// Replaces one photo with <paramref name="transform"/> applied to it. No-op for an unknown
     /// photo id. Stays on the current group where possible (see <see cref="Regroup"/>).
     /// </summary>

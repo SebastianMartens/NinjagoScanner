@@ -131,6 +131,35 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetGalleryCardsAsync_ResolvesUrlsOnlyForTheMatchedPhotoOfEachCard_InOneCall()
+    {
+        await collectionQueryService.GetGalleryCardsAsync("Serie 2");
+
+        // Cole -> photo-1, Zane -> photo-2 (lowest of its two photos). Not photo-3 (Zane's other
+        // photo) and not photo-4 (belongs to Serie 10).
+        var call = Assert.Single(pictureHost.DownloadUrlsRequests);
+        Assert.Equal(["photo-1", "photo-2"], call.Order());
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_SwitchingSeries_ResolvesOnlyTheNewlySelectedSeriesPhotos()
+    {
+        await collectionQueryService.GetGalleryCardsAsync("Serie 2");
+        await collectionQueryService.GetGalleryCardsAsync("Serie 10");
+
+        Assert.Equal(2, pictureHost.DownloadUrlsRequests.Count);
+        Assert.Equal(["photo-4"], pictureHost.DownloadUrlsRequests[1]);
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_SeriesWithNoPhotos_MakesNoDownloadUrlRequest()
+    {
+        await collectionQueryService.GetGalleryCardsAsync("Serie 5");
+
+        Assert.Empty(pictureHost.DownloadUrlsRequests);
+    }
+
+    [Fact]
     public async Task GetGalleryCardsAsync_PuzzleSubGroup_CategoryLabelIsParentSlashChildName()
     {
         var cards = await collectionQueryService.GetGalleryCardsAsync("Serie 2");

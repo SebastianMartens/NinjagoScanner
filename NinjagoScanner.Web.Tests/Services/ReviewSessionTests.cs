@@ -461,4 +461,137 @@ public sealed class ReviewSessionTests
         Assert.Equal(ReviewStatuses.Unreviewed, statuses["p-2"]);
         Assert.Equal(ReviewStatuses.Unreviewed, statuses["p-3"]);
     }
+
+    // --- Download URL resolution (scope-photo-download-urls) ---
+
+    private const int DisplayCap = 18;
+
+    private static CardListItem WithoutUrl(CardListItem photo) => photo with { ImageUrl = string.Empty };
+
+    private sealed class RecordingUrlResolver
+    {
+        public List<IReadOnlyList<string>> Calls { get; } = [];
+
+        public Task<IReadOnlyDictionary<string, string>> ResolveAsync(IReadOnlyList<string> photoIds)
+        {
+            Calls.Add(photoIds);
+            IReadOnlyDictionary<string, string> urls = photoIds.ToDictionary(id => id, id => $"https://resolved.test/{id}");
+            return Task.FromResult(urls);
+        }
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_ResolvesOnlyTheCurrentGroupsPhotos_InOneCall()
+    {
+        var session = SessionShowingAllGroups(
+            WithoutUrl(Photo("p-1", "Serie 2", "2")),
+            WithoutUrl(Photo("p-2", "Serie 2", "2")),
+            WithoutUrl(Photo("p-other-group", "Serie 2", "10")));
+        var resolver = new RecordingUrlResolver();
+
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+
+        var call = Assert.Single(resolver.Calls);
+        Assert.Equal(["p-1", "p-2"], call.Order());
+        Assert.All(session.CurrentGroup!.Photos, photo => Assert.Equal($"https://resolved.test/{photo.PhotoId}", photo.ImageUrl));
+        var otherGroupPhoto = session.Groups.Single(group => group.Photos.Any(photo => photo.PhotoId == "p-other-group")).Photos.Single();
+        Assert.Equal(string.Empty, otherGroupPhoto.ImageUrl);
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_NeverRequestsMoreThanTheDisplayCap()
+    {
+        var photos = Enumerable.Range(1, 25).Select(i => WithoutUrl(Photo($"p-{i:00}", "Serie 2", "2"))).ToArray();
+        var session = SessionShowingAllGroups(photos);
+        var resolver = new RecordingUrlResolver();
+
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+
+        var call = Assert.Single(resolver.Calls);
+        Assert.Equal(DisplayCap, call.Count);
+        Assert.DoesNotContain("p-25", call);
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_MakesNoCallWhenEveryDisplayedPhotoAlreadyHasAUrl()
+    {
+        var session = SessionShowingAllGroups(Photo("p-1", "Serie 2", "2"), Photo("p-2", "Serie 2", "2"));
+        var resolver = new RecordingUrlResolver();
+
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+
+        Assert.Empty(resolver.Calls);
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_NavigatingToAnotherGroup_ResolvesOnlyThatGroup_AndBackDoesNotRerequest()
+    {
+        var session = SessionShowingAllGroups(
+            WithoutUrl(Photo("p-2", "Serie 2", "2")),
+            WithoutUrl(Photo("p-10", "Serie 2", "10")));
+        var resolver = new RecordingUrlResolver();
+
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+        session.GoToNext();
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+        session.GoToPrevious();
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+
+        Assert.Equal(2, resolver.Calls.Count);
+        Assert.Equal(["p-2"], resolver.Calls[0]);
+        Assert.Equal(["p-10"], resolver.Calls[1]);
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_APhotoEnteringTheGroupViaALocalEdit_GetsItsUrl_WithoutRerequestingTheOthers()
+    {
+        var session = SessionShowingAllGroups(
+            WithoutUrl(Photo("p-1", "Serie 2", "2")),
+            WithoutUrl(Photo("p-stray", "Serie 10", "1")));
+        var resolver = new RecordingUrlResolver();
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+        var shownKey = session.CurrentGroup!.Key;
+        Assert.Equal(["p-1"], Assert.Single(resolver.Calls));
+
+        // p-stray was never in a displayed group; a series/number correction moves it into this one.
+        session.ReplacePhoto("p-stray", photo => photo with { SetName = "Serie 2", CardNumber = "2" });
+        Assert.Equal(shownKey, session.CurrentGroup!.Key);
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, resolver.ResolveAsync);
+
+        Assert.Equal(2, resolver.Calls.Count);
+        Assert.Equal(["p-stray"], resolver.Calls[1]);
+        Assert.All(session.CurrentGroup.Photos, photo => Assert.False(string.IsNullOrEmpty(photo.ImageUrl)));
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_NeverOverwritesAnExistingUrl()
+    {
+        var session = SessionShowingAllGroups(Photo("p-1", "Serie 2", "2"), WithoutUrl(Photo("p-2", "Serie 2", "2")));
+        var originalUrl = session.CurrentGroup!.Photos.Single(photo => photo.PhotoId == "p-1").ImageUrl;
+
+        // A resolver that (wrongly) also returns a fresh URL for the photo that already has one.
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, _ =>
+            Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>
+            {
+                ["p-1"] = "https://other.test/p-1",
+                ["p-2"] = "https://other.test/p-2"
+            }));
+
+        var photos = session.CurrentGroup.Photos.ToDictionary(photo => photo.PhotoId);
+        Assert.Equal(originalUrl, photos["p-1"].ImageUrl);
+        Assert.Equal("https://other.test/p-2", photos["p-2"].ImageUrl);
+    }
+
+    [Fact]
+    public async Task ResolveMissingDownloadUrls_APhotoTheResolverReturnsNoUrlFor_StaysWithoutOne()
+    {
+        var session = SessionShowingAllGroups(WithoutUrl(Photo("p-1", "Serie 2", "2")), WithoutUrl(Photo("p-gone", "Serie 2", "2")));
+
+        await session.ResolveMissingDownloadUrlsAsync(DisplayCap, _ =>
+            Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string> { ["p-1"] = "https://resolved.test/p-1" }));
+
+        var photos = session.CurrentGroup!.Photos.ToDictionary(photo => photo.PhotoId);
+        Assert.Equal("https://resolved.test/p-1", photos["p-1"].ImageUrl);
+        Assert.Equal(string.Empty, photos["p-gone"].ImageUrl);
+    }
 }
