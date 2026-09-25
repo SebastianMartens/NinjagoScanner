@@ -15,7 +15,7 @@
             <p class="eyebrow">Ninjago Scanner</p>
             <h1>Foto direkt vom Handy hochladen</h1>
             <p class="lede">
-                Waehle auf Android direkt die Kamera oder eine vorhandene Aufnahme.
+                Wähle auf Android direkt die Kamera oder eine vorhandene Aufnahme.
                 Das Bild wird hochgeladen und automatisch analysiert.
             </p>
         </div>
@@ -30,17 +30,17 @@
         @if (selectedFile is not null)
         {
             <p class="upload-selection">
-                Ausgewaehlt: <strong>@selectedFile.Name</strong> (@FormatFileSize(selectedFile.Size))
+                Ausgewählt: <strong>@selectedFile.Name</strong> (@FormatFileSize(selectedFile.Size))
             </p>
         }
 
         <p class="upload-limit">
-            Maximale Dateigroesse: @FormatFileSize(maxUploadBytes)
+            Maximale Dateigrösse: @FormatFileSize(maxUploadBytes)
         </p>
 
         <div class="upload-actions">
             <button class="btn btn-primary" type="button" @onclick="UploadSelectedFileAsync" disabled="@(isUploading || selectedFile is null)">
-                @(isUploading ? "Upload laeuft..." : "Foto hochladen")
+                @(isUploading ? "Upload läuft..." : "Foto hochladen")
             </button>
             <a class="btn btn-outline-secondary" href="/">Zur Kartenansicht</a>
         </div>
@@ -59,15 +59,15 @@
     <section class="upload-card">
         <h2>Viele Fotos auf einmal hochladen</h2>
         <p class="upload-limit">
-            Die Fotos werden nur gespeichert, nicht analysiert &ndash; die Analyse startest du danach auf der
-            Uebersicht mit &bdquo;Gemini-Suche starten&ldquo;. Dateien, deren Name in der Sammlung schon vorkommt,
-            werden uebersprungen; nach einem Abbruch kannst du dieselbe Auswahl einfach erneut hochladen.
-            Der Tab muss waehrenddessen geoeffnet bleiben.
+            Die Fotos werden nur gespeichert, nicht analysiert &ndash; die Analyse startest du danach unten mit
+            &bdquo;Nicht analysierte Fotos analysieren&ldquo;. Dateien, deren Name in der Sammlung schon vorkommt,
+            werden nicht erneut hochgeladen; nach einem Abbruch kannst du dieselbe Auswahl einfach erneut hochladen.
+            Der Tab muss während des Vorgangs geöffnet bleiben.
         </p>
 
         <label class="upload-check">
             <input type="checkbox" checked="@selectFolder" disabled="@isBatchRunning" @onchange="OnSelectFolderChanged" />
-            <span>Ganzen Ordner auswaehlen</span>
+            <span>Ganzen Ordner auswählen</span>
         </label>
 
         <label class="upload-field">
@@ -79,13 +79,13 @@
         @if (batchFiles.Count > 0 && batchUpload is null)
         {
             <p class="upload-selection">
-                Ausgewaehlt: <strong>@batchFiles.Count.ToString("N0", German)</strong> Dateien
+                Ausgewählt: <strong>@batchFiles.Count.ToString("N0", German)</strong> Dateien
             </p>
         }
 
         <div class="upload-actions">
             <button class="btn btn-primary" type="button" @onclick="StartBatchUploadAsync" disabled="@(isBatchRunning || batchFiles.Count == 0)">
-                @(isBatchRunning ? "Batch-Upload laeuft..." : "Fotos hochladen")
+                @(isBatchRunning ? "Batch-Upload läuft..." : "Fotos hochladen")
             </button>
         </div>
 
@@ -143,6 +143,17 @@
         {
             <p class="upload-error">@batchErrorMessage</p>
         }
+
+        <div class="upload-actions">
+            <button class="btn btn-outline-primary" type="button" @onclick="StartAnalysisAsync" disabled="@(isScanning || isBatchRunning)">
+                @(isScanning ? "Analyse läuft..." : "Nicht analysierte Fotos analysieren")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(scanStatusMessage))
+        {
+            <p class="upload-selection">@scanStatusMessage</p>
+        }
     </section>
 </div>
 
@@ -173,6 +184,9 @@
     private bool isDisposed;
     private string? batchErrorMessage;
     private DateTime lastRenderUtc;
+
+    private bool isScanning;
+    private string? scanStatusMessage;
 
     private IBrowserFile? selectedFile;
     private bool isUploading;
@@ -215,7 +229,7 @@
         if (eventArgs.FileCount > MaxBatchFiles)
         {
             batchFiles = [];
-            batchErrorMessage = $"Zu viele Dateien ausgewaehlt: maximal {MaxBatchFiles.ToString("N0", German)} pro Batch-Upload.";
+            batchErrorMessage = $"Zu viele Dateien ausgewählt: maximal {MaxBatchFiles.ToString("N0", German)} pro Batch-Upload.";
             return;
         }
 
@@ -278,6 +292,36 @@
         }
     }
 
+    private async Task StartAnalysisAsync()
+    {
+        if (isScanning || isBatchRunning)
+        {
+            return;
+        }
+
+        isScanning = true;
+        scanStatusMessage = null;
+
+        try
+        {
+            var summary = await PictureServiceClient.ScanAsync(disposeCancellation.Token);
+
+            scanStatusMessage = ScanStatusMessageFormatter.BuildMessage(summary);
+        }
+        catch (OperationCanceledException) when (disposeCancellation.IsCancellationRequested)
+        {
+            // The circuit is going away; nothing left to show.
+        }
+        catch (Exception exception)
+        {
+            scanStatusMessage = $"Analyse fehlgeschlagen: {exception.Message}";
+        }
+        finally
+        {
+            isScanning = false;
+        }
+    }
+
     // A 10,000-file batch would otherwise push 10,000 renders over the SignalR circuit.
     private void OnBatchProgressChanged()
     {
@@ -301,7 +345,7 @@
     {
         if (selectedFile is null)
         {
-            errorMessage = "Bitte zuerst ein Foto auswaehlen.";
+            errorMessage = "Bitte zuerst ein Foto auswählen.";
             successMessage = null;
             return;
         }

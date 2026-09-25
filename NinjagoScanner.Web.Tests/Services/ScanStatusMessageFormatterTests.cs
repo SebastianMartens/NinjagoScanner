@@ -22,7 +22,18 @@ public sealed class ScanStatusMessageFormatterTests
 
         var message = ScanStatusMessageFormatter.BuildMessage(summary);
 
-        Assert.Equal("Scan fertig: 10 verarbeitet, 2 uebersprungen, 1 unsicher, 3 fehlgeschlagen.", message);
+        Assert.Equal("Analyse fertig: 10 verarbeitet, 2 uebersprungen, 1 unsicher, 3 fehlgeschlagen.", message);
+        Assert.DoesNotContain("Gemini", message);
+    }
+
+    [Fact]
+    public void BuildMessage_ReturnsNeutralFallback_WhenConfigurationErrorHasNoMessage()
+    {
+        var summary = new ScanSummaryDto { HasConfigurationError = true, Message = null };
+
+        var message = ScanStatusMessageFormatter.BuildMessage(summary);
+
+        Assert.Equal("Analyse konnte nicht gestartet werden.", message);
     }
 
     [Fact]
@@ -34,5 +45,6 @@ public sealed class ScanStatusMessageFormatterTests
 
         Assert.Contains("vorzeitig abgebrochen", message);
         Assert.Contains("5 verarbeitet, 0 uebersprungen, 0 unsicher, 1 fehlgeschlagen.", message);
+        Assert.DoesNotContain("Gemini", message);
     }
 }

@@ -67,6 +67,8 @@ Internal modules/classes in PictureService (e.g. `photo_store.py`, `sidecar_stor
 
 Hosting: all three services run as Fly.io apps in one Fly organization, connected over Fly's private network (6PN / `*.internal` DNS) — only `NinjagoScanner.Web` gets a public Fly IP. See each project's `fly.toml` and `infra/README.md`.
 
+Text that will appear in the Web UI currently is only available in german. We use german "Umlauts" in the UI (ä,ü,ö).
+
 ## Domain vocabulary & spec workflow
 
 This repo uses **OpenSpec** for spec-driven changes (`openspec/` — `specs/`, `changes/`, `GLOSSARY.md`, `config.yaml`). Specs live in one shared `openspec/specs/` directory but capability names are prefixed by owning project (`catalog-service-*`, `picture-service-*`, `web-*`); unprefixed only for genuinely cross-cutting specs like the gRPC contracts. Use the `openspec-*` skills/commands for proposing, applying, and archiving changes rather than editing specs by hand.
