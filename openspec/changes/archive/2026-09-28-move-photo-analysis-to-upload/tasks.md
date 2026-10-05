@@ -15,4 +15,4 @@
 ## 4. Verification
 
 - [x] 4.1 Run `dotnet test NinjagoScanner.slnx` and verify it passes.
-- [ ] 4.2 Run the app. Verify that `/` shows no analysis button, and that on `/upload` the analysis button sits in the batch section, is disabled during a batch upload, and shows the summary message after a run.
+- [x] 4.2 Run the app. Verify that `/` shows no analysis button, and that on `/upload` the analysis button sits in the batch section, is disabled during a batch upload, and shows the summary message after a run.
