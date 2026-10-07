@@ -14,19 +14,19 @@
 ## 3. Friends
 
 - [x] 3.1 Implement `FriendService` (search, request, accept, decline, cancel, remove, mutual-request resolution, list) with xunit tests for every scenario in `web-friends`
-- [ ] 3.2 Build `/friends` page (German UI, auth required, nav entry with pending badge) and verify with a bUnit/host test and a manual browser check
+- [x] 3.2 Build `/friends` page (German UI, auth required, nav entry with pending badge) and verify with a bUnit/host test and a manual browser check
 
 ## 4. Collection sharing
 
 - [x] 4.1 Implement `FriendAccessService` and visibility setting with tests for friend, non-friend, private, removed friend, forged username
 - [x] 4.2 Add read-only friend facade over `CollectionQueryService` and `GamificationService` (no unlock/celebration side effects); verify tests that no write RPC is reachable for foreign collections
-- [ ] 4.3 Build `/friends/{username}` page (overview, gallery, rank/XP, achievements, comparison counts, visibility toggle in own settings) and verify via browser check
+- [x] 4.3 Build `/friends/{username}` page (overview, gallery, rank/XP, achievements, comparison counts, visibility toggle in own settings) and verify via browser check
 
 ## 5. Trade finder
 
 - [x] 5.1 Implement pure `TradeMatchingService` (surplus, wanted, tier pairing, weight fallback, `Unausgewogen` flag, best-copy retention) with unit tests for every scenario in `web-trade-finder`
 - [x] 5.2 Implement partner ranking over visible friends and verify ordering/zero-overlap/private-excluded tests
-- [ ] 5.3 Build `/trade` finder UI (partner list, suggestion with manual adjust, balance indicator) and verify via browser check
+- [x] 5.3 Build `/trade` finder UI (partner list, suggestion with manual adjust, balance indicator) and verify via browser check
 
 ## 6. Trade execution and log
 
@@ -34,7 +34,7 @@
 - [x] 6.2 Implement accept/execute (revalidate, optimistic status flip, `TransferPhotos`, completion transaction with log + BonusXp) and verify tests for success, stale, transfer failure, double accept, XP once, sidecar preserved
 - [x] 6.3 Add recovery sweep for stale `Executing` trades and verify test
 - [x] 6.4 Extend `PictureServiceTestHost` fake with real move semantics and add end-to-end trade tests through in-process hosts
-- [ ] 6.5 Build trade proposal/inbox UI and `/trade/log` page (only own trades, immutable) and verify via browser check
+- [x] 6.5 Build trade proposal/inbox UI and `/trade/log` page (only own trades, immutable) and verify via browser check
 
 ## 7. Finish
 
