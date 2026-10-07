@@ -66,8 +66,9 @@ internal sealed class TradeService(
     /// <summary>A trade left Executing for longer than this is picked up by the recovery sweep.</summary>
     public static readonly TimeSpan StaleExecutingAfter = TimeSpan.FromMinutes(5);
 
-    // Serializes proposals inside this process so two concurrent proposals cannot both reserve
-    // the same photo (check-then-insert); a single Fly machine runs the app.
+    // Best-effort in-process serialization of proposals so concurrent surplus checks on one
+    // machine do not interleave. It is NOT the double-reservation guard: that is the filtered
+    // unique index on open TradeItem reservations, which holds across machines.
     private static readonly SemaphoreSlim ProposalGate = new(1, 1);
 
     // ---------------------------------------------------------------- propose
@@ -134,8 +135,14 @@ internal sealed class TradeService(
                 return TradeActionResult.Fail(failure.Failure, failure.Message);
             }
 
+            var proposalNames = await dbContext.Users
+                .Where(u => u.Id == proposerUserId || u.Id == recipientUserId)
+                .Select(u => new { u.Id, u.UserName })
+                .ToDictionaryAsync(u => u.Id, u => u.UserName ?? string.Empty, cancellationToken);
             var trade = new Trade
             {
+                ProposerUserName = proposalNames.GetValueOrDefault(proposerUserId, string.Empty),
+                RecipientUserName = proposalNames.GetValueOrDefault(recipientUserId, string.Empty),
                 ProposerUserId = proposerUserId,
                 RecipientUserId = recipientUserId,
                 ProposerCollectionId = proposerCollectionId,
@@ -143,8 +150,24 @@ internal sealed class TradeService(
                 Status = TradeStatus.Pending,
                 Items = selection.Items
             };
+            foreach (var item in trade.Items)
+            {
+                item.Reserved = true;
+            }
+
             dbContext.Trades.Add(trade);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // The unique open-reservation index fired: another proposal (possibly on another
+                // machine) reserved one of these photos between validation and insert.
+                dbContext.ChangeTracker.Clear();
+                return TradeActionResult.Fail(TradeFailure.AlreadyReserved, "Eine der Karten ist bereits in einem anderen offenen Tausch.");
+            }
+
             return TradeActionResult.Ok("Der Tauschvorschlag wurde gesendet.", trade.Id, TradeStatus.Pending);
         }
         finally
@@ -357,6 +380,8 @@ internal sealed class TradeService(
                 await GetStatusAsync(trade.Id, CancellationToken.None));
         }
 
+        await ReleaseReservationsAsync(dbContext, [trade.Id], CancellationToken.None);
+
         var names = await dbContext.Users
             .Where(u => u.Id == trade.ProposerUserId || u.Id == trade.RecipientUserId)
             .Select(u => new { u.Id, u.UserName })
@@ -524,7 +549,9 @@ internal sealed class TradeService(
                  })
         {
             var byId = cards.ToDictionary(card => card.PhotoId, StringComparer.Ordinal);
+            // Photos marked "incorrect" cannot be vouched for: they are neither tradable nor surplus.
             var copiesPerKey = cards
+                .Where(card => !IsIncorrect(card.ReviewStatus))
                 .Select(card => CollectionQueryService.BuildOwnershipKey(card.SetName, card.CardNumber))
                 .Where(key => !string.IsNullOrEmpty(key) && catalog.ContainsKey(key))
                 .GroupBy(key => key, StringComparer.OrdinalIgnoreCase)
@@ -547,6 +574,11 @@ internal sealed class TradeService(
                 if (!byId.TryGetValue(photoId, out var entry))
                 {
                     return Rejected(TradeFailure.NotTradable, "Eine der Karten ist nicht mehr in der Sammlung vorhanden.");
+                }
+
+                if (IsIncorrect(entry.ReviewStatus))
+                {
+                    return Rejected(TradeFailure.NotTradable, "Als fehlerhaft markierte Fotos können nicht getauscht werden.");
                 }
 
                 var key = CollectionQueryService.BuildOwnershipKey(entry.SetName, entry.CardNumber);
@@ -583,6 +615,9 @@ internal sealed class TradeService(
             new([], new SelectionFailure(failure, message));
     }
 
+    private static bool IsIncorrect(string? reviewStatus) =>
+        string.Equals(reviewStatus, Models.ReviewStatuses.Incorrect, StringComparison.OrdinalIgnoreCase);
+
     private async Task<bool> AreFriendsAsync(string userA, string userB, CancellationToken cancellationToken)
     {
         var (low, high) = Friendship.CanonicalPair(userA, userB);
@@ -608,6 +643,10 @@ internal sealed class TradeService(
     private async Task<bool> TransitionAsync(string tradeId, TradeStatus from, TradeStatus to, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        var ownsTransaction = dbContext.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         var rows = await dbContext.Trades
             .Where(t => t.Id == tradeId && t.Status == from)
             .ExecuteUpdateAsync(set => set
@@ -615,6 +654,29 @@ internal sealed class TradeService(
                 .SetProperty(t => t.ResolvedAt, now)
                 .SetProperty(t => t.ConcurrencyStamp, Guid.NewGuid().ToString("n")),
                 cancellationToken);
+        if (rows > 0)
+        {
+            await ReleaseReservationsAsync(dbContext, [tradeId], cancellationToken);
+        }
+
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return rows > 0;
     }
+
+    /// <summary>
+    /// Clears the open-reservation flag of every item whose trade is no longer Pending/Executing,
+    /// freeing the photos for new proposals. Call after moving a trade to a terminal status, in
+    /// the same transaction.
+    /// </summary>
+    internal static Task<int> ReleaseReservationsAsync(
+        AppDbContext db, IReadOnlyCollection<string> tradeIds, CancellationToken cancellationToken) =>
+        db.TradeItems
+            .Where(i => i.Reserved && tradeIds.Contains(i.TradeId)
+                        && !db.Trades.Any(t => t.Id == i.TradeId
+                                               && (t.Status == TradeStatus.Pending || t.Status == TradeStatus.Executing)))
+            .ExecuteUpdateAsync(set => set.SetProperty(i => i.Reserved, false), cancellationToken);
 }

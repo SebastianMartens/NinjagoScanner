@@ -246,6 +246,29 @@ internal sealed class PictureServiceClient
         return response.Results;
     }
 
+    /// <summary>
+    /// Download URLs for photos of an explicitly named collection (e.g. a friend's card in the
+    /// trade finder). Same bounded-call rules as <see cref="GetDownloadUrlsAsync"/>; the collection
+    /// id must already have been authorized by the caller (never from client input).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> GetDownloadUrlsForCollectionAsync(
+        string collectionId,
+        IEnumerable<string> photoIds,
+        CancellationToken cancellationToken = default)
+    {
+        var requestedIds = photoIds.Distinct(StringComparer.Ordinal).ToArray();
+        if (requestedIds.Length == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var request = new GetPhotoDownloadUrlsRequest { CollectionId = collectionId };
+        request.PhotoIds.AddRange(requestedIds);
+        var response = await client.GetPhotoDownloadUrlsAsync(request, cancellationToken: cancellationToken);
+        return response.Urls.ToDictionary(entry => entry.PhotoId, entry => entry.DownloadUrl, StringComparer.Ordinal);
+    }
+
     public async Task<string> GetDownloadUrlAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);

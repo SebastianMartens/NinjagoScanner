@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using NinjagoScanner.Web.Data;
+
 namespace NinjagoScanner.Web.Services;
 
 /// <summary>Loads the owned copies of one collection. Implementations must only be given collection IDs
@@ -17,7 +20,8 @@ public sealed record TradePartnerRank(
 public sealed class TradePartnerService(
     FriendService friendService,
     FriendAccessService friendAccessService,
-    ITradeInventoryLoader inventoryLoader)
+    ITradeInventoryLoader inventoryLoader,
+    AppDbContext dbContext)
 {
     public async Task<IReadOnlyList<TradePartnerRank>> RankPartnersAsync(
         string viewerUserId,
@@ -39,18 +43,34 @@ public sealed class TradePartnerService(
             }
 
             var theirs = await inventoryLoader.LoadAsync(access.CollectionId, cancellationToken);
-            candidates.Add(Rank(friend.UserId, friend.UserName, mine, theirs, catalog, myReservedPhotoIds));
+            var theirReserved = await GetReservedPhotoIdsAsync(access.CollectionId, cancellationToken);
+            candidates.Add(Rank(friend.UserId, friend.UserName, mine, theirs, catalog, myReservedPhotoIds, theirReserved));
         }
 
         return Order(candidates);
     }
 
+    /// <summary>Photos of the collection currently reserved in open (Pending/Executing) trades.</summary>
+    private async Task<ISet<string>> GetReservedPhotoIdsAsync(string collectionId, CancellationToken cancellationToken)
+    {
+        var ids = await dbContext.TradeItems
+            .AsNoTracking()
+            .Where(i => i.Reserved)
+            .Join(dbContext.Trades, i => i.TradeId, t => t.Id, (i, t) => new { i, t })
+            .Where(x => (x.i.Side == TradeSide.FromProposer && x.t.ProposerCollectionId == collectionId)
+                        || (x.i.Side == TradeSide.FromRecipient && x.t.RecipientCollectionId == collectionId))
+            .Select(x => x.i.PhotoId)
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet(StringComparer.Ordinal);
+    }
+
     public static TradePartnerRank Rank(
         string userId, string userName, TradeInventory mine, TradeInventory theirs,
-        IReadOnlyList<TradeCatalogCard> catalog, ISet<string>? myReservedPhotoIds = null)
+        IReadOnlyList<TradeCatalogCard> catalog, ISet<string>? myReservedPhotoIds = null,
+        ISet<string>? friendReservedPhotoIds = null)
     {
         var offer = TradeMatchingService.GetOfferableTo(mine, theirs, catalog, myReservedPhotoIds).Count;
-        var want = TradeMatchingService.GetOfferableTo(theirs, mine, catalog).Count;
+        var want = TradeMatchingService.GetOfferableTo(theirs, mine, catalog, friendReservedPhotoIds).Count;
         return new TradePartnerRank(userId, userName, offer, want, Math.Min(offer, want), true);
     }
 

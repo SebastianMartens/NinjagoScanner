@@ -1,0 +1,304 @@
+@page "/friends/{Username}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject FriendCollectionService FriendCollectionService
+
+<PageTitle>@(view?.OwnerUserName is { } owner ? $"Sammlung von {owner}" : "Freunde")</PageTitle>
+
+<div class="friend-collection-page">
+    @if (isLoading)
+    {
+        <p>Lade Sammlung...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="empty-state">
+            <h2>Sammlung konnte nicht geladen werden</h2>
+            <p class="table-secondary">@loadError</p>
+        </div>
+    }
+    else if (view is null || view.Status == FriendAccessStatus.NotFound)
+    {
+        <div class="empty-state" id="friend-not-found">
+            <h2>Seite nicht gefunden</h2>
+            <p>Die gesuchte Seite existiert nicht.</p>
+        </div>
+    }
+    else if (view.Status == FriendAccessStatus.Private)
+    {
+        <header class="overview-header">
+            <p class="eyebrow">Freunde</p>
+            <h1>@view.OwnerUserName</h1>
+        </header>
+        <div class="empty-state" id="friend-private">
+            <h2>Diese Sammlung ist privat</h2>
+            <p>@view.OwnerUserName hat die Sammlung auf &bdquo;Nur ich&ldquo; gestellt.</p>
+            <p><a href="friends">Zurück zu den Freunden</a></p>
+        </div>
+    }
+    else
+    {
+        <header class="overview-header">
+            <p class="eyebrow">Sammlung von</p>
+            <h1>@view.OwnerUserName</h1>
+            <p class="lede">Nur ansehen: Du siehst die Karten, den Rang und die Erfolge deines Freundes.</p>
+            <p><a href="friends">Zurück zu den Freunden</a> &middot; <a href="trade?friend=@Uri.EscapeDataString(view.OwnerUserName ?? string.Empty)">Mit @view.OwnerUserName tauschen</a></p>
+        </header>
+
+        <section class="rank-status-block">
+            <div class="section-label">Rang &amp; Erfahrung</div>
+            @if (view.Rank is { } rank)
+            {
+                <div class="rank-status-row" style="--rank-accent: @rank.AccentColor;">
+                    <div class="rank-hero-badge">@rank.Glyph</div>
+                    <div class="rank-status-body">
+                        <div class="rank-status-meta">
+                            <span class="rank-status-title">Rang @rank.Level · @rank.Name</span>
+                            <span>@view.Xp XP</span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
+
+        @if (view.Comparison is { } comparison)
+        {
+            <section id="friend-comparison">
+                <div class="section-label">Vergleich mit dir</div>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-num" data-compare="shared">@comparison.Shared</div>
+                        <div class="stat-label">Karten, die ihr beide habt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" data-compare="friend-only">@comparison.FriendOnly</div>
+                        <div class="stat-label">Nur @view.OwnerUserName hat</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-num" data-compare="viewer-only">@comparison.ViewerOnly</div>
+                        <div class="stat-label">Nur du hast</div>
+                    </div>
+                </div>
+            </section>
+        }
+
+        @if (view.Summary is { } summary)
+        {
+            <section class="catalog-statistics">
+                <div class="series-summary-header"><h2>Übersicht</h2></div>
+                <div class="collection-stats">
+                    <span>@summary.TotalCatalogCards Karte(n) im Katalog</span>
+                    <span>@summary.OwnedCatalogCards im Besitz</span>
+                    <span>@(summary.TotalCatalogCards - summary.OwnedCatalogCards) fehlen</span>
+                </div>
+            </section>
+
+            <section class="series-summary">
+                <div class="series-summary-header"><h2>Serienfortschritt</h2></div>
+                <div class="series-tile-grid">
+                    @foreach (var series in summary.Series)
+                    {
+                        <div class="series-tile @(series.SeriesName == selectedSeries ? "is-selected" : "")" @onclick="() => SelectSeriesAsync(series.SeriesName)">
+                            <h3>@series.SeriesName</h3>
+                            <div class="series-tile-progress">
+                                <div class="series-tile-progress-bar" style="width: @(OwnedPercent(series))%"></div>
+                            </div>
+                            <div class="series-tile-stats">
+                                <span>@series.OwnedCards / @series.TotalCards Karten</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="gallery-page" id="friend-gallery">
+            <div class="gallery-controls">
+                <label>
+                    <span>Serie</span>
+                    <select value="@selectedSeries" @onchange="OnSeriesChangedAsync">
+                        @foreach (var series in view.SeriesNames)
+                        {
+                            <option value="@series">@series</option>
+                        }
+                    </select>
+                </label>
+            </div>
+
+            @if (isGalleryLoading)
+            {
+                <p>Lade Galerie...</p>
+            }
+            else if (galleryError is not null)
+            {
+                <div class="empty-state" id="friend-gallery-error">
+                    <p class="table-secondary">Die Galerie konnte nicht geladen werden: @galleryError</p>
+                </div>
+            }
+            else if (galleryCards.Count == 0)
+            {
+                <div class="empty-state">
+                    <p class="table-secondary">In dieser Serie besitzt @view.OwnerUserName noch keine Karten.</p>
+                </div>
+            }
+            else
+            {
+                @foreach (var section in GallerySections)
+                {
+                    <section class="gallery-section">
+                        <div class="gallery-section-header">
+                            <h2>@section.Key</h2>
+                            <span>@section.Count() Karte(n)</span>
+                        </div>
+                        <div class="gallery-grid gallery-grid-standard">
+                            @foreach (var card in section)
+                            {
+                                <div class="gallery-tile gallery-tile-photo">
+                                    <span class="gallery-tile-media">
+                                        @if (card.ImageUrl is not null)
+                                        {
+                                            <img class="gallery-tile-image @(card.Rotated180 ? "rotated-180" : null)" src="@card.ImageUrl" alt="@card.CardName" loading="lazy" />
+                                        }
+                                        else
+                                        {
+                                            <span class="gallery-tile-placeholder-name">@card.CardName</span>
+                                        }
+                                        <span class="gallery-tile-badge">@card.PhotoCount</span>
+                                    </span>
+                                    <span class="gallery-tile-caption">Nr. @card.CardNumber &middot; @card.CardName</span>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                }
+            }
+        </section>
+
+        <section id="friend-achievements">
+            <div class="section-label">Freigeschaltete Erfolge</div>
+            @if (UnlockedAchievements.Count == 0)
+            {
+                <div class="empty-state">
+                    <p class="table-secondary">@view.OwnerUserName hat noch keine Erfolge freigeschaltet.</p>
+                </div>
+            }
+            else
+            {
+                <div class="achievement-grid">
+                    @foreach (var item in UnlockedAchievements)
+                    {
+                        <div class="achievement-card is-unlocked">
+                            <div class="achievement-card-head">
+                                <div class="achievement-badge">@item.Achievement.Glyph</div>
+                                <div class="achievement-card-info">
+                                    <div class="achievement-title">@item.Achievement.Name</div>
+                                    <div class="achievement-chips">
+                                        <span class="cv-chip cv-chip-muted">@item.Achievement.Category.ToGermanLabel()</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="achievement-desc">@item.Achievement.Description</div>
+                            <div class="achievement-progress-row">
+                                <div class="achievement-progress-text">Freigeschaltet@(item.UnlockedAtUtc is { } at ? $" · {at.ToLocalTime().ToString("d MMM yyyy", German)}" : "")</div>
+                                <div class="achievement-xp-label">+@item.Achievement.Xp XP</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Username { get; set; }
+
+    private bool isLoading = true;
+    private bool isGalleryLoading;
+    private string? loadError;
+    private string? galleryError;
+    private static readonly System.Globalization.CultureInfo German = new("de-DE");
+    private FriendCollectionView? view;
+    private string userId = string.Empty;
+    private string selectedSeries = string.Empty;
+    private IReadOnlyList<GalleryCardItem> galleryCards = [];
+
+    private IReadOnlyList<AchievementProgress> UnlockedAchievements =>
+        view?.Achievements.Where(item => item.IsUnlocked).ToArray() ?? [];
+
+    private IEnumerable<IGrouping<string, GalleryCardItem>> GallerySections => galleryCards
+        .GroupBy(card => card.Category, StringComparer.OrdinalIgnoreCase)
+        .OrderBy(group => group.Min(card => CardNumberSorting.BuildSortKey(card.CardNumber)), StringComparer.Ordinal);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        view = null;
+        galleryCards = [];
+        selectedSeries = string.Empty;
+        loadError = null;
+        galleryError = null;
+
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        try
+        {
+            view = await FriendCollectionService.GetViewAsync(userId, Username);
+            if (view.Status == FriendAccessStatus.Visible)
+            {
+                selectedSeries = view.Summary?.Series.FirstOrDefault(s => s.OwnedCards > 0)?.SeriesName
+                    ?? view.SeriesNames.FirstOrDefault()
+                    ?? string.Empty;
+                await LoadGalleryAsync();
+            }
+        }
+        catch (Exception ex) when (ex is Grpc.Core.RpcException or HttpRequestException)
+        {
+            loadError = $"Katalog-/PictureService nicht erreichbar: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Task OnSeriesChangedAsync(ChangeEventArgs e) => SelectSeriesAsync(e.Value?.ToString() ?? string.Empty);
+
+    private async Task SelectSeriesAsync(string series)
+    {
+        if (string.Equals(series, selectedSeries, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        selectedSeries = series;
+        await LoadGalleryAsync();
+    }
+
+    private async Task LoadGalleryAsync()
+    {
+        isGalleryLoading = true;
+        galleryError = null;
+        try
+        {
+            galleryCards = string.IsNullOrWhiteSpace(selectedSeries)
+                ? []
+                : await FriendCollectionService.GetOwnedGalleryAsync(userId, Username, selectedSeries) ?? [];
+        }
+        catch (Exception ex) when (ex is Grpc.Core.RpcException or HttpRequestException)
+        {
+            galleryCards = [];
+            galleryError = ex.Message;
+        }
+        finally
+        {
+            isGalleryLoading = false;
+        }
+    }
+
+    private static int OwnedPercent(SeriesSummaryItem series) =>
+        series.TotalCards == 0 ? 0 : (int)Math.Round(100.0 * series.OwnedCards / series.TotalCards);
+}

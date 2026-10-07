@@ -1,0 +1,448 @@
+@page "/trade"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Security.Claims
+@using NinjagoScanner.Web.Data
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject TradeFinderService TradeFinderService
+@inject TradeService TradeService
+
+<PageTitle>Tauschen</PageTitle>
+
+<div class="trade-page">
+    <header class="overview-header">
+        <p class="eyebrow">Ninjago Scanner</p>
+        <h1>Tauschen</h1>
+        <p class="lede">Tausche Dubletten mit deinen Freunden. Beide Seiten geben gleich viele Karten, möglichst gleicher Seltenheit.</p>
+        <p><a href="trade/log">Zum Tauschprotokoll</a></p>
+    </header>
+
+    @if (message is not null)
+    {
+        <div class="trade-message @(messageIsError ? "is-error" : "is-ok")" role="status">@message</div>
+    }
+
+    @if (isLoading)
+    {
+        <p>Lade Tauschdaten...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="empty-state">
+            <h2>Tauschdaten konnten nicht geladen werden</h2>
+            <p class="table-secondary">@loadError</p>
+        </div>
+    }
+    else
+    {
+        @if (incoming.Count > 0 || outgoing.Count > 0)
+        {
+            <section class="trade-section" id="trade-inbox">
+                <h2>Tauschvorschläge</h2>
+
+                @if (incoming.Count > 0)
+                {
+                    <h3>Eingehend</h3>
+                    @foreach (var trade in incoming)
+                    {
+                        <article class="trade-proposal" data-trade-id="@trade.TradeId">
+                            <div class="trade-proposal-head">
+                                <strong>@trade.PartnerUserName</strong> möchte tauschen
+                                <span class="cv-chip cv-chip-muted">@trade.CreatedAt.LocalDateTime.ToString("dd.MM.yyyy HH:mm")</span>
+                            </div>
+                            <div class="trade-proposal-sides">
+                                <div>
+                                    <h4>Du erhältst</h4>
+                                    <ul>
+                                        @foreach (var card in trade.Received)
+                                        {
+                                            <li>@CardText(card) @RarityTag(card.Rarity)</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4>Du gibst</h4>
+                                    <ul>
+                                        @foreach (var card in trade.Given)
+                                        {
+                                            <li>@CardText(card) @RarityTag(card.Rarity)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="trade-actions">
+                                <button type="button" class="cv-btn-primary" disabled="@isBusy" @onclick="() => AcceptAsync(trade.TradeId)">Annehmen</button>
+                                <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => DeclineAsync(trade.TradeId)">Ablehnen</button>
+                            </div>
+                        </article>
+                    }
+                }
+
+                @if (outgoing.Count > 0)
+                {
+                    <h3>Ausgehend</h3>
+                    @foreach (var trade in outgoing)
+                    {
+                        <article class="trade-proposal" data-trade-id="@trade.TradeId">
+                            <div class="trade-proposal-head">
+                                Vorschlag an <strong>@trade.PartnerUserName</strong>
+                                <span class="cv-chip cv-chip-muted">@(trade.Status == TradeStatus.Executing ? TradeLabels.Outcome(trade.Status) : "Wartet auf Antwort")</span>
+                            </div>
+                            <div class="trade-proposal-sides">
+                                <div>
+                                    <h4>Du gibst</h4>
+                                    <ul>
+                                        @foreach (var card in trade.Given)
+                                        {
+                                            <li>@CardText(card) @RarityTag(card.Rarity)</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4>Du erhältst</h4>
+                                    <ul>
+                                        @foreach (var card in trade.Received)
+                                        {
+                                            <li>@CardText(card) @RarityTag(card.Rarity)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="trade-actions">
+                                <button type="button" class="cv-btn-secondary" disabled="@(isBusy || trade.Status != TradeStatus.Pending)" @onclick="() => CancelAsync(trade.TradeId)">Zurückziehen</button>
+                            </div>
+                        </article>
+                    }
+                }
+            </section>
+        }
+
+        <section class="trade-section" id="trade-partners">
+            <h2>Tauschpartner</h2>
+            <button type="button" class="cv-btn-ghost" id="trade-refresh" disabled="@isBusy" @onclick="RefreshAsync">Aktualisieren</button>
+            @if (overview is null || overview.Partners.Count == 0)
+            {
+                <div class="empty-state">
+                    <h2>Noch keine Freunde</h2>
+                    <p class="table-secondary">Füge zuerst Freunde hinzu, um mit ihnen zu tauschen.</p>
+                </div>
+            }
+            else
+            {
+                <ul class="trade-partner-list">
+                    @foreach (var partner in overview.Partners)
+                    {
+                        <li class="trade-partner @(partner.IsAvailable ? null : "is-unavailable") @(session?.PartnerUserName == partner.UserName ? "is-selected" : null)">
+                            <span class="trade-partner-name">@partner.UserName</span>
+                            @if (partner.IsAvailable)
+                            {
+                                <span class="trade-partner-counts">
+                                    Du kannst @partner.OfferCount anbieten &middot; @partner.WantCount Karte(n) für dich
+                                </span>
+                                <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => SelectPartnerAsync(partner.UserName)">Tausch planen</button>
+                            }
+                            else
+                            {
+                                <span class="cv-chip cv-chip-muted">Nicht verfügbar (Sammlung privat)</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        @if (isLoadingSession)
+        {
+            <p>Lade Vorschlag...</p>
+        }
+        else if (session is not null && draft is not null)
+        {
+            <section class="trade-section" id="trade-suggestion">
+                <h2>Vorschlag für @session.PartnerUserName</h2>
+
+                <div class="trade-balance @(draft.Balance.IsBalanced ? "is-balanced" : "is-unbalanced")" id="trade-balance">
+                    <span class="cv-chip @(draft.Balance.IsBalanced ? "cv-chip-green" : "cv-chip-red")">@TradeLabels.BalanceText(draft.Balance)</span>
+                    <span>Du gibst @draft.Balance.GiveCount &middot; Du erhältst @draft.Balance.ReceiveCount</span>
+                    <span>Wert: @draft.Balance.GiveWeight : @draft.Balance.ReceiveWeight (@TradeLabels.WeightText(draft.Balance.WeightDifference))</span>
+                </div>
+
+                @if (draft.Pairs.Count == 0)
+                {
+                    <div class="empty-state">
+                        <h2>Kein Tausch möglich</h2>
+                        <p class="table-secondary">Aktuell gibt es keine Karten, die ihr gegeneinander tauschen könnt.</p>
+                    </div>
+                }
+
+                @for (var i = 0; i < draft.Pairs.Count; i++)
+                {
+                    var index = i;
+                    var pair = draft.Pairs[index];
+                    <div class="trade-pair @(pair.Unausgewogen ? "is-unausgewogen" : null)" data-pair-index="@index">
+                        <div class="trade-pair-side">
+                            <h4>Du gibst</h4>
+                            <TradeCardView Series="@pair.Give.Series" CardNumber="@pair.Give.CardNumber" CardName="@pair.Give.CardName"
+                                           Rarity="@pair.Give.Rarity" ImageUrl="@ImageFor(pair.Give.PhotoId)" />
+                            <select aria-label="Eigene Karte ersetzen" value="@pair.Give.PhotoId" @onchange="e => SwapGive(index, e.Value?.ToString())">
+                                <option value="@pair.Give.PhotoId">@OfferText(pair.Give)</option>
+                                @foreach (var option in draft.UnusedGive)
+                                {
+                                    <option value="@option.PhotoId">@OfferText(option)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="trade-pair-middle">
+                            <span aria-hidden="true">&#8644;</span>
+                            @if (pair.Unausgewogen)
+                            {
+                                <span class="cv-chip cv-chip-red">Unausgewogen</span>
+                            }
+                            <span class="table-secondary">@TradeLabels.WeightText(pair.WeightDifference)</span>
+                            <button type="button" class="cv-btn-ghost" @onclick="() => RemovePair(index)">Entfernen</button>
+                        </div>
+                        <div class="trade-pair-side">
+                            <h4>Du erhältst</h4>
+                            <TradeCardView Series="@pair.Receive.Series" CardNumber="@pair.Receive.CardNumber" CardName="@pair.Receive.CardName"
+                                           Rarity="@pair.Receive.Rarity" ImageUrl="@ImageFor(pair.Receive.PhotoId)" />
+                            <select aria-label="Karte des Freundes ersetzen" value="@pair.Receive.PhotoId" @onchange="e => SwapReceive(index, e.Value?.ToString())">
+                                <option value="@pair.Receive.PhotoId">@OfferText(pair.Receive)</option>
+                                @foreach (var option in draft.UnusedReceive)
+                                {
+                                    <option value="@option.PhotoId">@OfferText(option)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                }
+
+                <div class="trade-actions">
+                    <button type="button" class="cv-btn-secondary" disabled="@(!draft.CanAddPair)" @onclick="AddPair">Weiteres Kartenpaar hinzufügen</button>
+                    <button type="button" class="cv-btn-primary" id="trade-propose" disabled="@(isBusy || draft.Pairs.Count == 0)" @onclick="ProposeAsync">Tausch vorschlagen</button>
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "friend")]
+    public string? FriendQueryParameter { get; set; }
+
+    private string userId = string.Empty;
+    private bool isLoading = true;
+    private bool isLoadingSession;
+    private bool isBusy;
+    private string? loadError;
+    private string? message;
+    private bool messageIsError;
+    private TradeFinderOverview? overview;
+    private TradeFinderSession? session;
+    private TradeProposalDraft? draft;
+    private List<TradeSummary> incoming = [];
+    private List<TradeSummary> outgoing = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        await ReloadAsync();
+        isLoading = false;
+
+        if (!string.IsNullOrWhiteSpace(FriendQueryParameter) && loadError is null)
+        {
+            await SelectPartnerAsync(FriendQueryParameter);
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            overview = await TradeFinderService.LoadOverviewAsync(userId);
+            var trades = await TradeService.ListTradesAsync(userId);
+            incoming = trades.Where(t => !t.IsProposer && (t.Status is TradeStatus.Pending or TradeStatus.Executing)).ToList();
+            outgoing = trades.Where(t => t.IsProposer && (t.Status is TradeStatus.Pending or TradeStatus.Executing)).ToList();
+            loadError = null;
+        }
+        catch (Exception ex) when (ex is Grpc.Core.RpcException or HttpRequestException)
+        {
+            loadError = "Die Sammlungen konnten gerade nicht geladen werden. Bitte versuche es später erneut.";
+        }
+    }
+
+    private async Task SelectPartnerAsync(string userName)
+    {
+        isLoadingSession = true;
+        message = null;
+        try
+        {
+            session = await TradeFinderService.LoadSessionAsync(userId, userName);
+            if (session.Status != TradeFinderStatus.Ready)
+            {
+                session = null;
+                draft = null;
+                Fail("Mit dieser Person kann nicht getauscht werden. Die Sammlung ist nicht für dich sichtbar.");
+            }
+            else
+            {
+                draft = new TradeProposalDraft(session.Suggestion, session.GiveCandidates, session.ReceiveCandidates);
+            }
+        }
+        catch (Exception ex) when (ex is Grpc.Core.RpcException or HttpRequestException)
+        {
+            session = null;
+            draft = null;
+            Fail("Der Vorschlag konnte gerade nicht berechnet werden. Bitte versuche es später erneut.");
+        }
+        finally
+        {
+            isLoadingSession = false;
+        }
+    }
+
+    private Task RefreshAsync() => RunAsync(async () =>
+    {
+        await ReloadAsync();
+        if (session is not null)
+        {
+            await SelectPartnerAsync(session.PartnerUserName);
+        }
+    });
+
+    private void RemovePair(int index) => draft?.RemovePair(index);
+
+    private void SwapGive(int index, string? photoId)
+    {
+        if (photoId is not null)
+        {
+            draft?.SwapGive(index, photoId);
+        }
+    }
+
+    private void SwapReceive(int index, string? photoId)
+    {
+        if (photoId is not null)
+        {
+            draft?.SwapReceive(index, photoId);
+        }
+    }
+
+    private void AddPair() => draft?.AddPair();
+
+    private async Task ProposeAsync()
+    {
+        if (session is null || draft is null)
+        {
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            // The suggestion is a snapshot: re-check it against fresh data before proposing.
+            var fresh = await TradeFinderService.LoadSessionAsync(userId, session.PartnerUserName);
+            if (fresh.Status != TradeFinderStatus.Ready)
+            {
+                session = null;
+                draft = null;
+                Fail("Mit dieser Person kann nicht getauscht werden. Die Sammlung ist nicht für dich sichtbar.");
+                return;
+            }
+
+            if (draft.IsOutdatedAgainst(fresh.Suggestion, fresh.GiveCandidates, fresh.ReceiveCandidates))
+            {
+                session = fresh;
+                draft = new TradeProposalDraft(fresh.Suggestion, fresh.GiveCandidates, fresh.ReceiveCandidates);
+                await ReloadAsync();
+                Fail("Der Vorschlag hat sich geändert. Bitte prüfe die aktualisierten Karten und schlage den Tausch erneut vor.");
+                return;
+            }
+
+            var result = await TradeService.ProposeAsync(userId, fresh.PartnerUserId, draft.GivePhotoIds, draft.ReceivePhotoIds);
+            await ReloadAsync();
+            // Cards just proposed are reserved now: recompute the suggestion from fresh data.
+            await SelectPartnerAsync(session.PartnerUserName);
+            Report(result);
+        });
+    }
+
+    private Task AcceptAsync(string tradeId) => RunAsync(async () =>
+    {
+        Report(await TradeService.AcceptAsync(userId, tradeId));
+        await AfterTradeChangeAsync();
+    });
+
+    private Task DeclineAsync(string tradeId) => RunAsync(async () =>
+    {
+        Report(await TradeService.DeclineAsync(userId, tradeId));
+        await AfterTradeChangeAsync();
+    });
+
+    private Task CancelAsync(string tradeId) => RunAsync(async () =>
+    {
+        Report(await TradeService.CancelAsync(userId, tradeId));
+        await AfterTradeChangeAsync();
+    });
+
+    private async Task AfterTradeChangeAsync()
+    {
+        await ReloadAsync();
+        if (session is not null)
+        {
+            var keep = message;
+            var keepError = messageIsError;
+            await SelectPartnerAsync(session.PartnerUserName);
+            message = keep;
+            messageIsError = keepError;
+        }
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        isBusy = true;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is Grpc.Core.RpcException or HttpRequestException)
+        {
+            Fail("Der Tausch konnte gerade nicht ausgeführt werden. Bitte versuche es später erneut.");
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void Report(TradeActionResult result)
+    {
+        message = result.Message;
+        messageIsError = !result.Success;
+    }
+
+    private void Fail(string text)
+    {
+        message = text;
+        messageIsError = true;
+    }
+
+    private string? ImageFor(string photoId) =>
+        session is not null && session.ImageUrls.TryGetValue(photoId, out var url) ? url : null;
+
+    private static string OfferText(TradeCardOffer offer) =>
+        $"{offer.Series} Nr. {offer.CardNumber} · {offer.CardName} ({NinjagoScanner.Web.Models.CardRarity.Label(offer.Rarity)})";
+
+    private static string CardText(TradeCardSummary card) => $"{card.SeriesName} Nr. {card.CardNumber} · {card.CardName}";
+
+    private static RenderFragment RarityTag(string rarity) => builder =>
+    {
+        var badge = NinjagoScanner.Web.Models.CardRarity.BadgeLabel(rarity);
+        if (badge is not null)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "cv-chip cv-chip-gold");
+            builder.AddContent(2, badge);
+            builder.CloseElement();
+        }
+    };
+}

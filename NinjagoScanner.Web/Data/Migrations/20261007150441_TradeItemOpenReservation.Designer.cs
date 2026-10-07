@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NinjagoScanner.Web.Data;
 
@@ -10,9 +11,11 @@ using NinjagoScanner.Web.Data;
 namespace NinjagoScanner.Web.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007150441_TradeItemOpenReservation")]
+    partial class TradeItemOpenReservation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
@@ -356,19 +359,11 @@ namespace NinjagoScanner.Web.Data.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ProposerUserName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("RecipientCollectionId")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("RecipientUserId")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("RecipientUserName")
                         .IsRequired()
                         .HasColumnType("TEXT");
 

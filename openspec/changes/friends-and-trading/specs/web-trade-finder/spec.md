@@ -31,7 +31,7 @@ For a user, a card is **tradable** when they own more than one copy of that cata
 - **THEN** they are listed last with zero counts
 
 ### Requirement: Rarity-balanced suggestion
-For a chosen friend the finder SHALL propose an exchange where cards given and received have equal count and, where possible, equal rarity tiers (`common`, `limited`, `legendary`) pairwise. When no equal-tier pairing exists, it SHALL fall back to a value-balanced pairing using rarity weights (common 1, limited 3, legendary 9) and SHALL show the weight difference. Pairs whose difference exceeds one tier SHALL be flagged `Unausgewogen`.
+For a chosen friend the finder SHALL propose an exchange where cards given and received have equal count and, where possible, equal rarity tiers (`common`, `limited`, `legendary`) pairwise. When no equal-tier pairing exists, it SHALL fall back to a value-balanced pairing using rarity weights (common 1, limited 3, legendary 9) and SHALL show the weight difference. Any pair whose cards are of different rarity tiers SHALL be flagged `Unausgewogen`.
 
 #### Scenario: Equal-tier pairing
 - **WHEN** I offer two common duplicates the friend wants and the friend offers two common cards I want

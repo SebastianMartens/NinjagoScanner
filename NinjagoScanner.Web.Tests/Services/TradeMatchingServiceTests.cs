@@ -36,6 +36,24 @@ public class TradeMatchingServiceTests
     }
 
     [Fact]
+    public void Incorrect_photos_never_count_toward_surplus_or_get_offered()
+    {
+        var inv = InvDetailed("1",
+            new TradeOwnedPhoto("good", ReviewStatuses.Verified),
+            new TradeOwnedPhoto("bad", ReviewStatuses.Incorrect));
+
+        Assert.Empty(TradeMatchingService.GetTradableCards(inv, [Card("1")]));
+
+        var three = InvDetailed("1",
+            new TradeOwnedPhoto("a", ReviewStatuses.Unreviewed),
+            new TradeOwnedPhoto("b", ReviewStatuses.Unreviewed),
+            new TradeOwnedPhoto("bad", ReviewStatuses.Incorrect));
+        var t = Assert.Single(TradeMatchingService.GetTradableCards(three, [Card("1")]));
+        Assert.Equal(1, t.Surplus);
+        Assert.NotEqual("bad", t.OfferedPhoto.PhotoId);
+    }
+
+    [Fact]
     public void Single_copy_is_not_tradable()
     {
         Assert.Empty(TradeMatchingService.GetTradableCards(Inv(("1", ["a"])), [Card("1")]));

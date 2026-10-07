@@ -59,6 +59,13 @@ internal sealed class GamificationService(
         var state = await BuildStateAsync(cancellationToken);
         var (unlockDates, _) = await SyncUnlocksAsync(collectionId, state, cancellationToken);
 
+        return BuildProgress(state, unlockDates);
+    }
+
+    /// <summary>Pure projection of a collection state onto every achievement's progress; shared with the read-only friend view.</summary>
+    internal static IReadOnlyList<AchievementProgress> BuildProgress(
+        GamificationCollectionState state, IReadOnlyDictionary<string, DateTime> unlockDates)
+    {
         return AchievementDefinitions.All
             .Select(achievement =>
             {
@@ -78,6 +85,16 @@ internal sealed class GamificationService(
             })
             .ToArray();
     }
+
+    /// <summary>Side-effect-free XP for an arbitrary collection state (read-only friend view): no unlock rows are written.</summary>
+    internal static int ComputeXpForState(GamificationCollectionState state, int bonusXp) =>
+        ComputeXp(state, CurrentlyUnlockedIds(state), bonusXp);
+
+    /// <summary>Collection state derived from raw catalog + photo entries of any collection.</summary>
+    internal static GamificationCollectionState BuildStateFromEntries(
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> catalog,
+        IReadOnlyList<CardEntry> entries) =>
+        BuildState(catalog, entries.Select(entry => new PhotoFacts(entry.SetName, entry.CardNumber, entry.ReviewStatus)).ToArray());
 
     /// <summary>
     /// Re-evaluates the collection after an action that may have changed Owned Copies or review

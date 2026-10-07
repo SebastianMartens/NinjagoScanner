@@ -1,0 +1,6 @@
+.trade-log-page { display: flex; flex-direction: column; gap: 1.25rem; animation: cv-fadein 0.4s ease; }
+.trade-log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8rem; }
+.trade-log-entry { padding: 1rem; border: 1px solid var(--cv-border); border-radius: var(--cv-radius); background: var(--cv-surface); display: flex; flex-direction: column; gap: 0.7rem; }
+.trade-log-head { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+.trade-log-sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.trade-log-sides ul { margin: 0; padding-left: 1.1rem; }

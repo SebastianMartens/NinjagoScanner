@@ -98,7 +98,7 @@ public static class TradeMatchingService
 
     /// <summary>
     /// Cards a user could give away: more than one copy (not counting photos reserved in pending
-    /// trades), mapped to a catalog card. Ordered by series then card number.
+    /// trades or marked Review Status incorrect), mapped to a catalog card. Ordered by series then card number.
     /// </summary>
     public static IReadOnlyList<TradableCard> GetTradableCards(
         TradeInventory inventory,
@@ -115,6 +115,7 @@ public static class TradeMatchingService
 
             var effective = photos
                 .Where(p => reservedPhotoIds is null || !reservedPhotoIds.Contains(p.PhotoId))
+                .Where(p => !string.Equals(p.ReviewStatus, ReviewStatuses.Incorrect, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(Quality)
                 .ThenBy(p => p.PhotoId, StringComparer.Ordinal)
                 .ToList();

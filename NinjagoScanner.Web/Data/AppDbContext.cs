@@ -71,6 +71,8 @@ public class AppDbContext : IdentityDbContext<AppUser>
             entity.HasKey(item => item.Id);
             entity.Property(item => item.Side).HasConversion<string>();
             entity.HasIndex(item => item.PhotoId);
+            entity.HasIndex(item => item.PhotoId).IsUnique().HasFilter("\"Reserved\" = 1")
+                .HasDatabaseName("IX_TradeItems_PhotoId_OpenReservation");
         });
 
         builder.Entity<TradeLogEntry>(entity =>

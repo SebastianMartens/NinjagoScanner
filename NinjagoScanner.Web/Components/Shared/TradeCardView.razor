@@ -1,0 +1,32 @@
+@using NinjagoScanner.Web.Models
+
+<div class="trade-card @(Rarity == CardRarity.Legendary ? "is-legendary" : Rarity == CardRarity.Limited ? "is-limited" : null)">
+    @if (!string.IsNullOrEmpty(ImageUrl))
+    {
+        <img class="trade-card-image" src="@ImageUrl" alt="@CardName" loading="lazy" />
+    }
+    else
+    {
+        <span class="trade-card-image trade-card-placeholder">@CardName</span>
+    }
+    <span class="trade-card-caption">Nr. @CardNumber &middot; @CardName</span>
+    <span class="trade-card-series">@Series</span>
+    <span class="trade-card-tags">
+        @if (CardRarity.BadgeLabel(Rarity) is { } badge)
+        {
+            <span class="cv-chip cv-chip-gold">@badge</span>
+        }
+        else
+        {
+            <span class="cv-chip cv-chip-muted">@CardRarity.Label(Rarity)</span>
+        }
+    </span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Series { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string CardNumber { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string CardName { get; set; } = string.Empty;
+    [Parameter] public string? Rarity { get; set; }
+    [Parameter] public string? ImageUrl { get; set; }
+}

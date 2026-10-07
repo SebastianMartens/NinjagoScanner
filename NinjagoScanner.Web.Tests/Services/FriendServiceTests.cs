@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NinjagoScanner.Web.Data;
 using NinjagoScanner.Web.Services;
@@ -376,6 +377,63 @@ public class FriendServiceTests
         Assert.Equal(TradeStatus.Completed, trades[completed.Id].Status);
         Assert.Equal(TradeStatus.Pending, trades[otherPair.Id].Status);
         Assert.Equal(1, await db.DbContext.TradeLogEntries.CountAsync());
+    }
+
+    [Fact]
+    public async Task Remove_leaves_an_executing_trade_to_finish_and_releases_cancelled_reservations()
+    {
+        await using var db = await TestAppDb.CreateAsync();
+        var (a, ca) = await db.AddUserAsync("A");
+        var (b, cb) = await db.AddUserAsync("B");
+        var service = new FriendService(db.DbContext);
+        await service.SendRequestAsync(a, b);
+        await service.AcceptAsync(b, Assert.Single((await service.ListAsync(b)).Incoming).FriendshipId);
+
+        var pending = new Trade { ProposerUserId = a, RecipientUserId = b, ProposerCollectionId = ca, RecipientCollectionId = cb };
+        pending.Items.Add(new TradeItem { Side = TradeSide.FromProposer, PhotoId = "p1", Reserved = true });
+        var executing = new Trade { ProposerUserId = a, RecipientUserId = b, ProposerCollectionId = ca, RecipientCollectionId = cb, Status = TradeStatus.Executing };
+        executing.Items.Add(new TradeItem { Side = TradeSide.FromProposer, PhotoId = "p2", Reserved = true });
+        db.DbContext.Trades.AddRange(pending, executing);
+        await db.DbContext.SaveChangesAsync();
+
+        Assert.True(await service.RemoveAsync(a, b));
+
+        db.DbContext.ChangeTracker.Clear();
+        Assert.Equal(TradeStatus.Cancelled, (await db.DbContext.Trades.FindAsync(pending.Id))!.Status);
+        Assert.Equal(TradeStatus.Executing, (await db.DbContext.Trades.FindAsync(executing.Id))!.Status);
+        var items = await db.DbContext.TradeItems.ToDictionaryAsync(i => i.PhotoId);
+        Assert.False(items["p1"].Reserved);
+        Assert.True(items["p2"].Reserved);
+        Assert.Empty(await db.DbContext.Friendships.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Remove_racing_with_a_concurrent_accept_never_throws_and_leaves_no_pending_trade()
+    {
+        for (var round = 0; round < 5; round++)
+        {
+            await using var env = await TradeTestEnv.CreateAsync(fileBackedDb: true);
+            var tradeId = await env.ProposeStandardAsync();
+            var context = env.NewFileContext(out var connection);
+            try
+            {
+                var friendService = new FriendService(context);
+                var removeTask = Task.Run(async () => { try { return (bool?)await friendService.RemoveAsync(env.A, env.B); } catch (SqliteException) { return null; } });
+                var acceptTask = Task.Run(() => env.Service.AcceptAsync(env.B, tradeId));
+                await Task.WhenAll(removeTask, acceptTask);
+
+                // Removal itself never fails on the concurrent accept (no DbUpdateConcurrencyException).
+                Assert.NotNull(await removeTask);
+                var trade = await env.GetTradeAsync(tradeId);
+                Assert.NotEqual(TradeStatus.Pending, trade.Status);
+                Assert.Equal(0, await env.Db.Friendships.CountAsync());
+            }
+            finally
+            {
+                await context.DisposeAsync();
+                await connection.DisposeAsync();
+            }
+        }
     }
 
     // --- List / pending badge ---

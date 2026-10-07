@@ -194,20 +194,34 @@ public sealed class FriendService(AppDbContext dbContext)
             return false;
         }
 
-        var openTrades = await dbContext.Trades
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        // Atomic conditional Pending -> Cancelled per trade (no tracked entities, so a concurrent
+        // accept cannot make this throw). A trade that is already Executing is left to finish.
+        var openTradeIds = await dbContext.Trades
+            .AsNoTracking()
             .Where(t => t.Status == TradeStatus.Pending
                         && ((t.ProposerUserId == userId && t.RecipientUserId == otherUserId)
                             || (t.ProposerUserId == otherUserId && t.RecipientUserId == userId)))
+            .Select(t => t.Id)
             .ToListAsync(cancellationToken);
-        foreach (var trade in openTrades)
+        var now = DateTimeOffset.UtcNow;
+        foreach (var tradeId in openTradeIds)
         {
-            trade.Status = TradeStatus.Cancelled;
-            trade.ResolvedAt = DateTimeOffset.UtcNow;
-            trade.ConcurrencyStamp = Guid.NewGuid().ToString("n");
+            await dbContext.Trades
+                .Where(t => t.Id == tradeId && t.Status == TradeStatus.Pending)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(t => t.Status, TradeStatus.Cancelled)
+                    .SetProperty(t => t.ResolvedAt, now)
+                    .SetProperty(t => t.ConcurrencyStamp, Guid.NewGuid().ToString("n")),
+                    cancellationToken);
         }
+
+        await TradeService.ReleaseReservationsAsync(dbContext, openTradeIds, cancellationToken);
 
         dbContext.Friendships.Remove(friendship);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 

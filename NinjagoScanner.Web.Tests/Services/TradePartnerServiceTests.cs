@@ -34,7 +34,7 @@ public class TradePartnerServiceTests
         Inv(("1", ["a1", "b1"]), ("2", ["a2", "b2"]), ("3", ["a3", "b3"]), ("4", ["a4", "b4"]), ("5", ["a5", "b5"]));
 
     private static TradePartnerService Service(TestAppDb db, FakeLoader loader) =>
-        new(new FriendService(db.DbContext), new FriendAccessService(db.DbContext), loader);
+        new(new FriendService(db.DbContext), new FriendAccessService(db.DbContext), loader, db.DbContext);
 
     [Fact]
     public async Task Friend_with_more_swappable_cards_is_ranked_first()
@@ -103,6 +103,60 @@ public class TradePartnerServiceTests
         Assert.Equal(0, ranks[1].OfferCount);
         Assert.Equal(0, ranks[1].WantCount);
         Assert.Equal(0, ranks[1].ExchangeableCount);
+    }
+
+    [Fact]
+    public async Task Friends_photos_reserved_in_open_trades_do_not_count_as_want()
+    {
+        await using var db = await TestAppDb.CreateAsync();
+        var (me, cm) = await db.AddUserAsync("Me");
+        var (x, cx) = await db.AddUserAsync("X");
+        await MakeFriendsAsync(db, me, x);
+        // X owns two duplicated cards (6 and 7), but one copy of 6 is reserved in an open trade
+        // (X proposed to someone else), which leaves card 6 with a single free copy.
+        var (o, co) = await db.AddUserAsync("Other");
+        await AddTradeAsync(db, x, cx, o, co, TradeStatus.Pending, reserved: true, proposerPhoto: "x6b", recipientPhoto: "o1");
+        var loader = new FakeLoader(new() { [cx] = Inv(("6", ["x6", "x6b"]), ("7", ["x7", "x7b"])) });
+
+        var rank = Assert.Single(await Service(db, loader).RankPartnersAsync(me, Mine(), Catalog));
+
+        Assert.Equal(1, rank.WantCount); // only card 7 is still offerable
+        Assert.Equal(1, rank.ExchangeableCount);
+    }
+
+    [Fact]
+    public async Task Friends_photos_in_closed_trades_still_count_and_recipient_side_reservations_are_subtracted()
+    {
+        await using var db = await TestAppDb.CreateAsync();
+        var (me, cm) = await db.AddUserAsync("Me");
+        var (x, cx) = await db.AddUserAsync("X");
+        await MakeFriendsAsync(db, me, x);
+        var (o, co) = await db.AddUserAsync("Other");
+        // closed trade (reservation released): x6b counts again
+        await AddTradeAsync(db, x, cx, o, co, TradeStatus.Declined, reserved: false, proposerPhoto: "x6b", recipientPhoto: "o1");
+        // X is the recipient in an open trade: x7b is reserved
+        await AddTradeAsync(db, o, co, x, cx, TradeStatus.Pending, reserved: true, proposerPhoto: "o2", recipientPhoto: "x7b");
+        var loader = new FakeLoader(new() { [cx] = Inv(("6", ["x6", "x6b"]), ("7", ["x7", "x7b"])) });
+
+        var rank = Assert.Single(await Service(db, loader).RankPartnersAsync(me, Mine(), Catalog));
+
+        Assert.Equal(1, rank.WantCount); // card 6 only
+    }
+
+    private static async Task AddTradeAsync(
+        TestAppDb db, string proposer, string proposerColl, string recipient, string recipientColl,
+        TradeStatus status, bool reserved, string proposerPhoto, string recipientPhoto)
+    {
+        var trade = new Trade
+        {
+            ProposerUserId = proposer, ProposerCollectionId = proposerColl,
+            RecipientUserId = recipient, RecipientCollectionId = recipientColl,
+            Status = status
+        };
+        trade.Items.Add(new TradeItem { Side = TradeSide.FromProposer, PhotoId = proposerPhoto, Reserved = reserved });
+        trade.Items.Add(new TradeItem { Side = TradeSide.FromRecipient, PhotoId = recipientPhoto, Reserved = reserved });
+        db.DbContext.Trades.Add(trade);
+        await db.DbContext.SaveChangesAsync();
     }
 
     [Fact]

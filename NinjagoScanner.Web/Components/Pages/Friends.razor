@@ -1,0 +1,320 @@
+@page "/friends"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject FriendService FriendService
+@inject FriendAccessService FriendAccessService
+
+<PageTitle>Freunde</PageTitle>
+
+<div class="friends-page">
+    <header class="overview-header">
+        <p class="eyebrow">Ninjago Scanner</p>
+        <h1>Freunde</h1>
+        <p class="lede">Finde andere Sammler, schicke Freundschaftsanfragen und sieh dir die Sammlungen deiner Freunde an.</p>
+    </header>
+
+    @if (message is not null)
+    {
+        <div class="friends-message @(messageIsError ? "is-error" : "is-ok")" role="status">@message</div>
+    }
+
+    @if (isLoading)
+    {
+        <p>Lade Freunde...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="empty-state">
+            <h2>Freunde konnten nicht geladen werden</h2>
+            <p class="table-secondary">@loadError</p>
+        </div>
+    }
+    else
+    {
+        <section class="friends-section" id="friends-visibility">
+            <h2>Sichtbarkeit deiner Sammlung</h2>
+            <p class="table-secondary">Lege fest, wer deine Sammlung und deine Erfolge ansehen darf.</p>
+            <div class="friends-visibility">
+                <button type="button" class="chip-filter-btn @(visibility == CollectionVisibility.Private ? "is-active" : "")"
+                        disabled="@isBusy" @onclick="() => SetVisibilityAsync(CollectionVisibility.Private)">Nur ich</button>
+                <button type="button" class="chip-filter-btn @(visibility == CollectionVisibility.Friends ? "is-active" : "")"
+                        disabled="@isBusy" @onclick="() => SetVisibilityAsync(CollectionVisibility.Friends)">Freunde</button>
+            </div>
+        </section>
+
+        <section class="friends-section" id="friends-search">
+            <h2>Nutzer suchen</h2>
+            <form class="friends-search" @onsubmit="SearchAsync">
+                <input type="search" placeholder="Benutzername" aria-label="Benutzername suchen" @bind="query" @bind:event="oninput" />
+                <button type="submit" class="cv-btn-primary" disabled="@isBusy">Suchen</button>
+            </form>
+            @if (searchHint is not null)
+            {
+                <p class="table-secondary">@searchHint</p>
+            }
+            @if (searchResults is not null)
+            {
+                @if (searchResults.Count == 0)
+                {
+                    <p class="table-secondary">Keine Nutzer gefunden.</p>
+                }
+                else
+                {
+                    <ul class="friends-list">
+                        @foreach (var result in searchResults)
+                        {
+                            <li class="friends-row" data-user="@result.UserName">
+                                <span class="friends-name">@result.UserName</span>
+                                <span class="friends-state">@RelationshipLabel(result.Relationship)</span>
+                                @if (result.Relationship == FriendRelationship.None)
+                                {
+                                    <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => SendRequestAsync(result.UserId)">Anfrage senden</button>
+                                }
+                                else if (result.Relationship == FriendRelationship.RequestReceived)
+                                {
+                                    <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => SendRequestAsync(result.UserId)">Annehmen</button>
+                                }
+                                else if (result.Relationship == FriendRelationship.Friends)
+                                {
+                                    <a class="cv-btn-ghost" href="friends/@Uri.EscapeDataString(result.UserName)">Sammlung ansehen</a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+        </section>
+
+        <section class="friends-section" id="friends-incoming">
+            <h2>Eingehende Anfragen <span class="cv-chip cv-chip-muted">@lists.Incoming.Count</span></h2>
+            @if (lists.Incoming.Count == 0)
+            {
+                <p class="table-secondary">Keine offenen Anfragen.</p>
+            }
+            else
+            {
+                <ul class="friends-list">
+                    @foreach (var entry in lists.Incoming)
+                    {
+                        <li class="friends-row" data-user="@entry.UserName">
+                            <span class="friends-name">@entry.UserName</span>
+                            <button type="button" class="cv-btn-primary" disabled="@isBusy" @onclick="() => AcceptAsync(entry)">Annehmen</button>
+                            <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => DeclineAsync(entry)">Ablehnen</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="friends-section" id="friends-outgoing">
+            <h2>Gesendete Anfragen <span class="cv-chip cv-chip-muted">@lists.Outgoing.Count</span></h2>
+            @if (lists.Outgoing.Count == 0)
+            {
+                <p class="table-secondary">Keine gesendeten Anfragen.</p>
+            }
+            else
+            {
+                <ul class="friends-list">
+                    @foreach (var entry in lists.Outgoing)
+                    {
+                        <li class="friends-row" data-user="@entry.UserName">
+                            <span class="friends-name">@entry.UserName</span>
+                            <span class="friends-state">Wartet auf Antwort</span>
+                            <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => CancelAsync(entry)">Zurückziehen</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="friends-section" id="friends-list">
+            <h2>Meine Freunde <span class="cv-chip cv-chip-muted">@lists.Friends.Count</span></h2>
+            @if (lists.Friends.Count == 0)
+            {
+                <p class="table-secondary">Du hast noch keine Freunde. Suche oben nach einem Benutzernamen.</p>
+            }
+            else
+            {
+                <ul class="friends-list">
+                    @foreach (var entry in lists.Friends)
+                    {
+                        <li class="friends-row" data-user="@entry.UserName">
+                            <span class="friends-name">@entry.UserName</span>
+                            <a class="cv-btn-ghost" href="friends/@Uri.EscapeDataString(entry.UserName)">Sammlung ansehen</a>
+                            <a class="cv-btn-ghost" href="trade?friend=@Uri.EscapeDataString(entry.UserName)">Tauschen</a>
+                            @if (removeConfirmId == entry.UserId)
+                            {
+                                <span class="friends-state">Freundschaft wirklich beenden?</span>
+                                <button type="button" class="cv-btn-primary" disabled="@isBusy" @onclick="() => RemoveAsync(entry)">Ja, entfernen</button>
+                                <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => removeConfirmId = null">Abbrechen</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="cv-btn-secondary" disabled="@isBusy" @onclick="() => removeConfirmId = entry.UserId">Entfernen</button>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private string userId = string.Empty;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? loadError;
+    private string? message;
+    private bool messageIsError;
+    private string query = string.Empty;
+    private string? searchHint;
+    private IReadOnlyList<FriendSearchResult>? searchResults;
+    private string? removeConfirmId;
+    private CollectionVisibility visibility = CollectionVisibility.Friends;
+    private FriendLists lists = new([], [], []);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await ReloadAsync();
+        isLoading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        try
+        {
+            lists = await FriendService.ListAsync(userId);
+            visibility = await FriendAccessService.GetOwnVisibilityAsync(userId);
+            loadError = null;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            loadError = ex.Message;
+        }
+    }
+
+    private void Show(string text, bool isError = false)
+    {
+        message = text;
+        messageIsError = isError;
+    }
+
+    private async Task SearchAsync()
+    {
+        message = null;
+        searchHint = null;
+        var term = query.Trim();
+        if (term.Length < FriendService.MinSearchLength)
+        {
+            searchResults = null;
+            searchHint = $"Bitte mindestens {FriendService.MinSearchLength} Zeichen eingeben.";
+            return;
+        }
+
+        searchResults = await FriendService.SearchAsync(userId, term);
+    }
+
+    private Task SendRequestAsync(string otherUserId) => RunAsync(async () =>
+    {
+        var outcome = await FriendService.SendRequestAsync(userId, otherUserId);
+        switch (outcome)
+        {
+            case SendFriendRequestOutcome.Sent:
+                Show("Freundschaftsanfrage gesendet.");
+                break;
+            case SendFriendRequestOutcome.BecameFriends:
+                Show("Ihr seid jetzt befreundet.");
+                break;
+            case SendFriendRequestOutcome.AlreadyExists:
+                Show("Zwischen euch besteht bereits eine Anfrage oder Freundschaft.", true);
+                break;
+            case SendFriendRequestOutcome.CannotBefriendSelf:
+                Show("Du kannst dir nicht selbst eine Anfrage senden.", true);
+                break;
+            default:
+                Show("Nutzer nicht gefunden.", true);
+                break;
+        }
+
+        await ReloadAsync();
+        if (searchResults is not null && query.Trim().Length >= FriendService.MinSearchLength)
+        {
+            searchResults = await FriendService.SearchAsync(userId, query.Trim());
+        }
+    });
+
+    private Task AcceptAsync(FriendEntry entry) => RunAsync(async () =>
+    {
+        var ok = await FriendService.AcceptAsync(userId, entry.FriendshipId);
+        Show(ok ? $"Du bist jetzt mit {entry.UserName} befreundet." : "Die Anfrage existiert nicht mehr.", !ok);
+        await ReloadAsync();
+    });
+
+    private Task DeclineAsync(FriendEntry entry) => RunAsync(async () =>
+    {
+        var ok = await FriendService.DeclineAsync(userId, entry.FriendshipId);
+        Show(ok ? $"Anfrage von {entry.UserName} abgelehnt." : "Die Anfrage existiert nicht mehr.", !ok);
+        await ReloadAsync();
+    });
+
+    private Task CancelAsync(FriendEntry entry) => RunAsync(async () =>
+    {
+        var ok = await FriendService.CancelAsync(userId, entry.FriendshipId);
+        Show(ok ? $"Anfrage an {entry.UserName} zurückgezogen." : "Die Anfrage existiert nicht mehr.", !ok);
+        await ReloadAsync();
+    });
+
+    private Task RemoveAsync(FriendEntry entry) => RunAsync(async () =>
+    {
+        removeConfirmId = null;
+        var ok = await FriendService.RemoveAsync(userId, entry.UserId);
+        Show(ok ? $"{entry.UserName} wurde als Freund entfernt." : "Die Freundschaft existiert nicht mehr.", !ok);
+        await ReloadAsync();
+    });
+
+    private Task SetVisibilityAsync(CollectionVisibility value) => RunAsync(async () =>
+    {
+        if (await FriendAccessService.SetOwnVisibilityAsync(userId, value))
+        {
+            visibility = value;
+            Show(value == CollectionVisibility.Private
+                ? "Deine Sammlung ist jetzt nur für dich sichtbar."
+                : "Deine Sammlung ist jetzt für Freunde sichtbar.");
+        }
+        else
+        {
+            Show("Sichtbarkeit konnte nicht gespeichert werden.", true);
+        }
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string RelationshipLabel(FriendRelationship relationship) => relationship switch
+    {
+        FriendRelationship.RequestSent => "Anfrage gesendet",
+        FriendRelationship.RequestReceived => "Hat dir eine Anfrage gesendet",
+        FriendRelationship.Friends => "Befreundet",
+        _ => "Kein Kontakt"
+    };
+}

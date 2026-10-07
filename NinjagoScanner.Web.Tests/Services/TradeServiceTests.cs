@@ -206,6 +206,89 @@ public class TradeServiceTests
         Assert.Single(await env.Db.Trades.ToListAsync());
     }
 
+    [Fact]
+    public async Task Open_reservation_unique_index_rejects_a_second_open_item_for_the_same_photo()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        await env.ProposeStandardAsync();
+
+        env.Db.Trades.Add(new Trade
+        {
+            ProposerUserId = env.A, RecipientUserId = env.B, ProposerCollectionId = env.CollA, RecipientCollectionId = env.CollB,
+            Items = [new TradeItem { Side = TradeSide.FromProposer, PhotoId = "a4a", Reserved = true }]
+        });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => env.Db.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Proposal_losing_the_database_reservation_race_fails_with_already_reserved()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        // A reservation the validation query cannot see (trade not open) but the index still holds:
+        // models a proposal committed by another machine between validation and insert.
+        env.Db.Trades.Add(new Trade
+        {
+            ProposerUserId = env.A, RecipientUserId = env.B, ProposerCollectionId = env.CollA, RecipientCollectionId = env.CollB,
+            Status = TradeStatus.Cancelled,
+            Items = [new TradeItem { Side = TradeSide.FromProposer, PhotoId = "a4a", Reserved = true }]
+        });
+        await env.Db.SaveChangesAsync();
+
+        var result = await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6a"]);
+
+        Assert.False(result.Success);
+        Assert.Equal(TradeFailure.AlreadyReserved, result.Failure);
+        Assert.Single(await env.Db.Trades.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Second_proposal_for_the_same_photo_fails_and_reservation_is_released_when_trade_closes()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var tradeId = await env.ProposeStandardAsync();
+
+        var second = await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6b"]);
+        Assert.Equal(TradeFailure.AlreadyReserved, second.Failure);
+
+        await env.Service.DeclineAsync(env.B, tradeId);
+        Assert.DoesNotContain(await env.Db.TradeItems.AsNoTracking().ToListAsync(), i => i.Reserved);
+
+        var third = await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6b"]);
+        Assert.True(third.Success, third.Message);
+    }
+
+    [Fact]
+    public async Task Completed_trade_releases_its_reservations_and_open_trade_keeps_them()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var tradeId = await env.ProposeStandardAsync();
+        Assert.All(await env.Db.TradeItems.AsNoTracking().ToListAsync(), i => Assert.True(i.Reserved));
+
+        Assert.True((await env.Service.AcceptAsync(env.B, tradeId)).Success);
+
+        Assert.All(await env.Db.TradeItems.AsNoTracking().ToListAsync(), i => Assert.False(i.Reserved));
+    }
+
+    [Fact]
+    public async Task Photo_marked_incorrect_cannot_be_offered_or_requested_and_is_no_surplus()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        // a5 is Alice's single copy of #5; an incorrect extra photo must not make it a duplicate.
+        env.Pictures.WritePhoto("a5bad", TradeTestEnv.Sidecar("Serie 2", "5", "Zane", "incorrect"), env.CollA);
+        // an incorrect third copy of Bob's #6 cannot be requested
+        env.Pictures.WritePhoto("b6bad", TradeTestEnv.Sidecar("Serie 2", "6", "Jay", "incorrect"), env.CollB);
+
+        var noSurplus = await env.Service.ProposeAsync(env.A, env.B, ["a5"], ["b6a"]);
+        var incorrectOffered = await env.Service.ProposeAsync(env.A, env.B, ["a5bad"], ["b6a"]);
+        var incorrectRequested = await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6bad"]);
+
+        Assert.Equal(TradeFailure.NotTradable, noSurplus.Failure);
+        Assert.Equal(TradeFailure.NotTradable, incorrectOffered.Failure);
+        Assert.Equal(TradeFailure.NotTradable, incorrectRequested.Failure);
+        Assert.Empty(await env.Db.Trades.ToListAsync());
+    }
+
     // ---------------------------------------------------- decline / cancel
 
     [Fact]
