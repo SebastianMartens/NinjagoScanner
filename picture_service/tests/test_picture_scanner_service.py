@@ -40,6 +40,7 @@ def make_service(
     catalog=None,
     catalog_error=None,
     build_model=None,
+    **service_kwargs,
 ):
     """`stage1_result`/`stage2_result` fake each stage's parsed Gemini output - by default they
     resolve to CATALOG's one series/card (analysis_status ok, card_name "Kai") so tests that
@@ -64,7 +65,11 @@ def make_service(
 
     return (
         PictureScannerService(
-            store, photo_store, build_model=build_model, load_catalog_snapshot=load_catalog_snapshot
+            store,
+            photo_store,
+            build_model=build_model,
+            load_catalog_snapshot=load_catalog_snapshot,
+            **{"source_removal_backoff_seconds": (0, 0), **service_kwargs},
         ),
         sidecar_table,
         photo_store,

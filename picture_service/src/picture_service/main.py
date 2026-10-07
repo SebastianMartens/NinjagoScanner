@@ -98,6 +98,22 @@ async def _handle_liveness_connection(reader: asyncio.StreamReader, writer: asyn
         writer.close()
 
 
+_RECONCILE_INTERVAL_SECONDS = 300
+
+
+async def _reconcile_transfers_forever(service: PictureScannerService) -> None:
+    """Finishes interrupted TransferPhotos calls (leftover source photos, abandoned pending
+    transfers). Safe on every machine at once - see PictureScannerService.reconcile_transfers."""
+    while True:
+        try:
+            handled = await service.reconcile_transfers()
+            if handled:
+                logger.info("Transfer-Abgleich: %s Transfers abgeschlossen", handled)
+        except Exception:
+            logger.exception("Transfer-Abgleich fehlgeschlagen")
+        await asyncio.sleep(_RECONCILE_INTERVAL_SECONDS)
+
+
 async def _serve() -> None:
     logging.basicConfig(level=logging.INFO)
     resource = _resource()
@@ -118,7 +134,8 @@ async def _serve() -> None:
         sidecar_store = SidecarStore(sidecar_table)
 
         server = grpc.aio.server()
-        pb2_grpc.add_CardPictureServiceServicer_to_server(PictureScannerService(sidecar_store, photo_store), server)
+        picture_service = PictureScannerService(sidecar_store, photo_store)
+        pb2_grpc.add_CardPictureServiceServicer_to_server(picture_service, server)
         server.add_insecure_port(f"[::]:{grpc_port}")
 
         liveness_server = None
@@ -127,6 +144,7 @@ async def _serve() -> None:
 
         await server.start()
         logger.info("PictureService listening on port %s", grpc_port)
+        reconcile_task = asyncio.create_task(_reconcile_transfers_forever(picture_service))
 
         stop_event = asyncio.Event()
         loop = asyncio.get_running_loop()
@@ -139,6 +157,10 @@ async def _serve() -> None:
                 signal.signal(sig, lambda *_: stop_event.set())
 
         await stop_event.wait()
+
+        reconcile_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await reconcile_task
 
         if liveness_server is not None:
             liveness_server.close()

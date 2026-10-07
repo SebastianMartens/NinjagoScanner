@@ -5,6 +5,7 @@ FakePhotoStore/FakeSidecarStore.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import AsyncIterator
 
 from picture_service.models import SidecarRecord
@@ -14,6 +15,7 @@ class FakeSidecarTable:
     def __init__(self) -> None:
         self.items: dict[tuple[str, str], SidecarRecord] = {}
         self.get_calls: list[tuple[str, str]] = []
+        self.transfers: dict[str, dict] = {}
 
     async def get(self, collection_id: str, photo_id: str) -> SidecarRecord | None:
         self.get_calls.append((collection_id, photo_id))
@@ -24,6 +26,34 @@ class FakeSidecarTable:
 
     async def delete(self, collection_id: str, photo_id: str) -> None:
         self.items.pop((collection_id, photo_id), None)
+
+    async def get_transfer(self, transfer_id: str) -> dict | None:
+        record = self.transfers.get(transfer_id)
+        return None if record is None else copy.deepcopy(record)
+
+    async def create_transfer(self, transfer_id: str, record: dict) -> bool:
+        if transfer_id in self.transfers:
+            return False
+        self.transfers[transfer_id] = copy.deepcopy(record)
+        return True
+
+    async def replace_transfer(
+        self, transfer_id: str, record: dict, *, expected_lease_expires_at_ms: int | None = None
+    ) -> bool:
+        current = self.transfers.get(transfer_id)
+        if expected_lease_expires_at_ms is not None and (
+            current is None or current["lease_expires_at_ms"] != expected_lease_expires_at_ms
+        ):
+            return False
+        self.transfers[transfer_id] = copy.deepcopy(record)
+        return True
+
+    async def delete_transfer(self, transfer_id: str) -> None:
+        self.transfers.pop(transfer_id, None)
+
+    async def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
+        for transfer_id, record in list(self.transfers.items()):
+            yield transfer_id, copy.deepcopy(record)
 
     async def list_by_collection(self, collection_id: str) -> AsyncIterator[tuple[str, SidecarRecord]]:
         for (cid, pid), record in list(self.items.items()):
@@ -59,6 +89,14 @@ class FakePhotoStore:
 
     async def delete(self, collection_id: str, photo_id: str) -> None:
         self.bytes_by_key.pop((collection_id, photo_id), None)
+
+    async def copy(
+        self, source_collection_id: str, source_photo_id: str, dest_collection_id: str, dest_photo_id: str
+    ) -> None:
+        self.calls.append("copy")
+        self.bytes_by_key[(dest_collection_id, dest_photo_id)] = self.bytes_by_key[
+            (source_collection_id, source_photo_id)
+        ]
 
     async def create_download_url(self, collection_id: str, photo_id: str) -> str:
         self.calls.append("create_download_url")

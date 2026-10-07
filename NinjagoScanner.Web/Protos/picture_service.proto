@@ -38,6 +38,7 @@ service CardPictureService {
   rpc DeletePhoto (DeletePhotoRequest) returns (DeletePhotoResponse);
   rpc ReanalyzePhoto (ReanalyzePhotoRequest) returns (ReanalyzePhotoResponse);
   rpc ListSourceFileNames (ListSourceFileNamesRequest) returns (ListSourceFileNamesResponse);
+  rpc TransferPhotos (TransferPhotosRequest) returns (TransferPhotosResponse);
 }
 
 // Bulk backfill: analyzes every photo in S3 that has no sidecar record yet (or all of them, if
@@ -282,4 +283,41 @@ message ReanalyzePhotoRequest {
 
 message ReanalyzePhotoResponse {
   CardEntry card = 1;
+}
+
+// Moves photos (bytes + sidecar, all fields preserved) between collections under newly generated
+// photo ids. Used only by trade execution; Web has validated the trade, PictureService trusts it.
+// All-or-nothing: a transfer record is claimed first, destination copies are written and verified
+// before any source is removed, and a failure before the commit removes whatever was created and
+// leaves the sources untouched. Once committed the call is a SUCCESS even if removing the sources
+// keeps failing (retried with backoff inside the call; a same-transfer_id retry or PictureService's
+// background reconciler finishes it), so a successful response never means "rolled back".
+// Idempotent per transfer_id: repeating a completed transfer returns the original mapping and moves
+// nothing again; the same transfer_id with a different set of moves is rejected. Collection ids
+// must be well-formed ([A-Za-z0-9_-], 1-128 chars); a collection that holds no photos yet is a
+// valid destination. Errors: INVALID_ARGUMENT (empty/malformed ids, empty moves, source ==
+// destination, duplicate photo), NOT_FOUND (a photo is not in its source collection),
+// ALREADY_EXISTS (transfer_id reused with different moves), ABORTED (another attempt holds this
+// transfer_id right now - retry the same transfer_id), INTERNAL (storage failure before the commit,
+// after rollback; retrying the same transfer_id is safe).
+message PhotoMove {
+  string source_collection_id = 1;
+  string dest_collection_id = 2;
+  string photo_id = 3;
+}
+
+message TransferPhotosRequest {
+  string transfer_id = 1;
+  repeated PhotoMove moves = 2;
+}
+
+message PhotoMoveResult {
+  string old_photo_id = 1;
+  string new_photo_id = 2;
+  string source_collection_id = 3;
+  string dest_collection_id = 4;
+}
+
+message TransferPhotosResponse {
+  repeated PhotoMoveResult results = 1;
 }

@@ -29,6 +29,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
     private readonly InMemorySidecarStore sidecarStore = new();
     private readonly ReanalysisSettings reanalysisSettings = new();
     private readonly CallLog callLog = new();
+    private readonly TransferState transferState = new();
 
     private WebApplication? app;
 
@@ -98,6 +99,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         builder.Services.AddSingleton(sidecarStore);
         builder.Services.AddSingleton(reanalysisSettings);
         builder.Services.AddSingleton(callLog);
+        builder.Services.AddSingleton(transferState);
         builder.Services.AddScoped<FakeCardPictureService>();
 
         app = builder.Build();
@@ -125,6 +127,9 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         public void Seed(string collectionId, string photoId, byte[] bytes) => objects[(collectionId, photoId)] = bytes;
 
         public void Put(string collectionId, string photoId, byte[] bytes) => objects[(collectionId, photoId)] = bytes;
+
+        public byte[]? Get(string collectionId, string photoId) =>
+            objects.TryGetValue((collectionId, photoId), out var bytes) ? bytes : null;
 
         public string CreateDownloadUrl(string collectionId, string photoId) => $"https://fake-photo-store.test/{photoId}";
 
@@ -177,6 +182,60 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         public void RecordDownloadUrlCall() => Interlocked.Increment(ref downloadUrlCallCount);
     }
 
+    /// <summary>
+    /// When set, the fake's <c>TransferPhotos</c> fails with this status before moving anything
+    /// (all-or-nothing: the stores stay untouched), to exercise trade failure paths. Replays of an
+    /// already-completed transfer id still succeed, as in the real service.
+    /// </summary>
+    public StatusCode? TransferFailureStatusCode
+    {
+        get => transferState.FailureStatusCode;
+        set => transferState.FailureStatusCode = value;
+    }
+
+    /// <summary>
+    /// When true, the fake's source removal fails persistently, like the real service after its
+    /// in-call retries are exhausted: a transfer still succeeds (destination written, mapping
+    /// returned) but the sources linger until the same transfer id is replayed while this is
+    /// false again.
+    /// </summary>
+    public bool TransferSourceRemovalFails
+    {
+        get => transferState.SourceRemovalFails;
+        set => transferState.SourceRemovalFails = value;
+    }
+
+    /// <summary>Every <c>TransferPhotos</c> call received (including replays and failures), in order.</summary>
+    public IReadOnlyList<RecordedTransfer> Transfers => transferState.Calls.ToArray();
+
+    /// <summary>Whether a photo with a stored object exists in the collection (test assertion helper).</summary>
+    public bool HasPhoto(string collectionId, string photoId) => photoStore.Exists(collectionId, photoId);
+
+    /// <summary>Photo ids currently stored in a collection (test assertion helper).</summary>
+    public IReadOnlyList<string> PhotoIds(string collectionId) => photoStore.ListPhotoIds(collectionId).ToArray();
+
+    public sealed record RecordedTransfer(string TransferId, IReadOnlyList<(string SourceCollectionId, string DestCollectionId, string PhotoId)> Moves);
+
+    private sealed class TransferState
+    {
+        public object Gate { get; } = new();
+
+        public StatusCode? FailureStatusCode { get; set; }
+
+        public bool SourceRemovalFails { get; set; }
+
+        /// <summary>Transfer ids whose destination is written but whose sources are not yet removed.</summary>
+        public HashSet<string> SourcesPending { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>The moves each completed transfer id was executed with (payload check on replay).</summary>
+        public Dictionary<string, HashSet<(string, string, string)>> Payloads { get; } = new(StringComparer.Ordinal);
+
+        public ConcurrentQueue<RecordedTransfer> Calls { get; } = new();
+
+        /// <summary>Completed transfers by transfer id, holding the old to new photo id mapping.</summary>
+        public Dictionary<string, List<PhotoMoveResult>> Completed { get; } = new(StringComparer.Ordinal);
+    }
+
     private sealed class ReanalysisSettings
     {
         public StatusCode? FailureStatusCode { get; set; }
@@ -213,17 +272,151 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         private readonly InMemorySidecarStore sidecarStore;
         private readonly ReanalysisSettings reanalysisSettings;
         private readonly CallLog callLog;
+        private readonly TransferState transferState;
 
         public FakeCardPictureService(
             InMemoryPhotoStore photoStore,
             InMemorySidecarStore sidecarStore,
             ReanalysisSettings reanalysisSettings,
-            CallLog callLog)
+            CallLog callLog,
+            TransferState transferState)
         {
             this.photoStore = photoStore;
             this.sidecarStore = sidecarStore;
             this.reanalysisSettings = reanalysisSettings;
             this.callLog = callLog;
+            this.transferState = transferState;
+        }
+
+        public override Task<TransferPhotosResponse> TransferPhotos(TransferPhotosRequest request, ServerCallContext context)
+        {
+            if (string.IsNullOrWhiteSpace(request.TransferId))
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine transfer_id angegeben."));
+            }
+
+            if (request.Moves.Count == 0)
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine Verschiebungen angegeben."));
+            }
+
+            var seen = new HashSet<(string, string)>();
+            foreach (var move in request.Moves)
+            {
+                EnsureCollectionId(move.SourceCollectionId);
+                EnsureCollectionId(move.DestCollectionId);
+
+                if (!TransferCollectionIdPattern.IsMatch(move.SourceCollectionId) || !TransferCollectionIdPattern.IsMatch(move.DestCollectionId))
+                {
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, "Ungültige collection_id."));
+                }
+
+                if (string.IsNullOrWhiteSpace(move.PhotoId))
+                {
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, "Keine photo_id angegeben."));
+                }
+
+                if (move.SourceCollectionId == move.DestCollectionId)
+                {
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, "Quell- und Zielsammlung müssen verschieden sein."));
+                }
+
+                if (!seen.Add((move.SourceCollectionId, move.PhotoId)))
+                {
+                    throw new RpcException(new Status(StatusCode.InvalidArgument, $"Das Foto '{move.PhotoId}' ist doppelt angegeben."));
+                }
+            }
+
+            // One gate makes the whole transfer atomic and idempotency race-free, like the real
+            // service's transfer lock; failures happen before any mutation, so nothing half-moves.
+            lock (transferState.Gate)
+            {
+                transferState.Calls.Enqueue(new RecordedTransfer(
+                    request.TransferId,
+                    request.Moves.Select(move => (move.SourceCollectionId, move.DestCollectionId, move.PhotoId)).ToArray()));
+
+                if (transferState.Completed.TryGetValue(request.TransferId, out var recorded))
+                {
+                    var requested = request.Moves
+                        .Select(move => (move.SourceCollectionId, move.DestCollectionId, move.PhotoId))
+                        .ToHashSet();
+                    if (!transferState.Payloads[request.TransferId].SetEquals(requested))
+                    {
+                        throw new RpcException(new Status(
+                            StatusCode.AlreadyExists,
+                            $"Die transfer_id '{request.TransferId}' wurde bereits mit anderen Verschiebungen verwendet."));
+                    }
+
+                    if (transferState.SourcesPending.Contains(request.TransferId) && !transferState.SourceRemovalFails)
+                    {
+                        foreach (var move in request.Moves)
+                        {
+                            photoStore.Delete(move.SourceCollectionId, move.PhotoId);
+                            sidecarStore.Delete(move.SourceCollectionId, move.PhotoId);
+                        }
+
+                        transferState.SourcesPending.Remove(request.TransferId);
+                    }
+
+                    return Task.FromResult(new TransferPhotosResponse { Results = { recorded } });
+                }
+
+                if (transferState.FailureStatusCode is { } failureStatusCode)
+                {
+                    throw new RpcException(new Status(failureStatusCode, "Die Fotos konnten nicht verschoben werden."));
+                }
+
+                foreach (var move in request.Moves)
+                {
+                    if (!photoStore.Exists(move.SourceCollectionId, move.PhotoId))
+                    {
+                        throw new RpcException(new Status(StatusCode.NotFound, $"Das Foto '{move.PhotoId}' wurde in der Quellsammlung nicht gefunden."));
+                    }
+                }
+
+                var results = new List<PhotoMoveResult>();
+                foreach (var move in request.Moves)
+                {
+                    var newPhotoId = Guid.NewGuid().ToString("n");
+                    photoStore.Put(move.DestCollectionId, newPhotoId, photoStore.Get(move.SourceCollectionId, move.PhotoId)!);
+
+                    var sidecar = sidecarStore.Get(move.SourceCollectionId, move.PhotoId);
+                    if (sidecar is not null)
+                    {
+                        sidecarStore.Put(move.DestCollectionId, newPhotoId, sidecar);
+                    }
+
+                    results.Add(new PhotoMoveResult
+                    {
+                        OldPhotoId = move.PhotoId,
+                        NewPhotoId = newPhotoId,
+                        SourceCollectionId = move.SourceCollectionId,
+                        DestCollectionId = move.DestCollectionId
+                    });
+                }
+
+                transferState.Completed[request.TransferId] = results;
+                transferState.Payloads[request.TransferId] = request.Moves
+                    .Select(move => (move.SourceCollectionId, move.DestCollectionId, move.PhotoId))
+                    .ToHashSet();
+
+                // Sources are removed only after every destination copy exists and the transfer is
+                // recorded. A persistent removal failure leaves them in place but is still a success.
+                if (transferState.SourceRemovalFails)
+                {
+                    transferState.SourcesPending.Add(request.TransferId);
+                }
+                else
+                {
+                    foreach (var move in request.Moves)
+                    {
+                        photoStore.Delete(move.SourceCollectionId, move.PhotoId);
+                        sidecarStore.Delete(move.SourceCollectionId, move.PhotoId);
+                    }
+                }
+
+                return Task.FromResult(new TransferPhotosResponse { Results = { results } });
+            }
         }
 
         public override Task<ScanSummary> Scan(ScanRequest request, ServerCallContext context)
@@ -468,6 +661,9 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             var existing = sidecarStore.Get(collectionId, photoId) ?? new FakeSidecarRecord();
             sidecarStore.Put(collectionId, photoId, apply(existing));
         }
+
+        private static readonly System.Text.RegularExpressions.Regex TransferCollectionIdPattern =
+            new("^[A-Za-z0-9_-]{1,128}$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         private static void EnsureCollectionId(string collectionId)
         {

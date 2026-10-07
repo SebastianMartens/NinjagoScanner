@@ -151,6 +151,8 @@ builder.Services.AddScoped(provider => new GamificationService(
     provider.GetRequiredService<ICurrentCollectionContext>(),
     provider.GetRequiredService<AuthenticationStateProvider>()));
 builder.Services.AddScoped<GamificationCelebrationCenter>();
+builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<FriendAccessService>();
 
 // OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
 // automatically by AddOtlpExporter() from the standard OTel environment variables — see

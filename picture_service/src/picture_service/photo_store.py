@@ -89,6 +89,19 @@ class PhotoStore:
             Key=build_object_key(collection_id, photo_id),
         )
 
+    async def copy(
+        self, source_collection_id: str, source_photo_id: str, dest_collection_id: str, dest_photo_id: str
+    ) -> None:
+        """Server-side S3 copy within the bucket (no bytes pass through this service)."""
+        await self._s3.copy_object(
+            Bucket=self._bucket_name,
+            Key=build_object_key(dest_collection_id, dest_photo_id),
+            CopySource={
+                "Bucket": self._bucket_name,
+                "Key": build_object_key(source_collection_id, source_photo_id),
+            },
+        )
+
     async def list_photo_ids(self, collection_id: str) -> AsyncIterator[str]:
         prefix = _build_collection_prefix(collection_id)
         paginator = self._s3.get_paginator("list_objects_v2")
