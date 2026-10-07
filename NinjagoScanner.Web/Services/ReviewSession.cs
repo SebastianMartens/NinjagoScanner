@@ -274,6 +274,9 @@ internal sealed class ReviewSession
     internal static CardListItem WithLanguage(CardListItem photo, string? language) =>
         photo with { Language = NormalizeNullable(language) ?? Languages.Default };
 
+    internal static CardListItem WithRotated180(CardListItem photo, bool rotated180) =>
+        photo with { Rotated180 = rotated180 };
+
     private static string? NormalizeNullable(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     internal static bool MatchesFilters(CardReviewGroup group, string reviewStatusFilter, string analysisStatusFilter, string searchText)

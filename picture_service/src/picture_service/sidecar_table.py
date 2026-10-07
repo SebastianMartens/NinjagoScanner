@@ -40,6 +40,7 @@ _DETECTED_TEXT_ATTR = "DetectedText"
 _SCANNED_AT_UTC_ATTR = "ScannedAtUtc"
 _DETECTED_ATTR = "Detected"
 _DERIVED_ATTR = "Derived"
+_ROTATED_180_ATTR = "Rotated180"
 
 
 class SidecarTable:
@@ -151,6 +152,12 @@ def _to_item(collection_id: str, photo_id: str, record: SidecarRecord) -> dict:
     if record.derived is not None:
         item[_DERIVED_ATTR] = _encode_attribute_map(record.derived)
 
+    # Omitted when False, like every other optional field - absent reads back as unrotated
+    # (see SidecarRecord.rotated_180's default and picture-service-sidecar-sections' "Rotation
+    # flag defaults to unrotated").
+    if record.rotated_180:
+        item[_ROTATED_180_ATTR] = True
+
     return item
 
 
@@ -188,4 +195,5 @@ def _from_item(item: dict) -> SidecarRecord:
         scanned_at_utc=scanned_at_utc,
         detected=_decode_attribute_map(detected_raw) if detected_raw is not None else None,
         derived=_decode_attribute_map(derived_raw) if derived_raw is not None else None,
+        rotated_180=bool(item.get(_ROTATED_180_ATTR, False)),
     )

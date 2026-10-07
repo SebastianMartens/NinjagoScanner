@@ -97,7 +97,8 @@
 					<div class="review-photo-image">
 						@if (!string.IsNullOrEmpty(photo.ImageUrl))
 						{
-							<img src="@photo.ImageUrl" alt="@photo.SourceFileName" loading="lazy" />
+							<img class="@(photo.Rotated180 ? "rotated-180" : null)" src="@photo.ImageUrl" alt="@photo.SourceFileName" loading="lazy" />
+							<button type="button" class="review-rotate-btn" disabled="@isBusy" title="Foto um 180° drehen" @onclick="() => ToggleRotationAsync(photo)">↻</button>
 						}
 					</div>
 
@@ -437,6 +438,15 @@
 			photo,
 			() => PictureServiceClient.UpdateCardLanguageAsync(photo.PhotoId, language),
 			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithLanguage(current, language)));
+	}
+
+	private async Task ToggleRotationAsync(CardListItem photo)
+	{
+		var rotated180 = !photo.Rotated180;
+		await RunPhotoActionAsync(
+			photo,
+			() => PictureServiceClient.UpdateRotationAsync(photo.PhotoId, rotated180),
+			() => session.ReplacePhoto(photo.PhotoId, current => ReviewSession.WithRotated180(current, rotated180)));
 	}
 
 	private static string GetSegmentClass(CardListItem photo, string reviewStatus)

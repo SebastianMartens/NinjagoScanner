@@ -37,7 +37,7 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
         await catalogHost.StartAsync();
         await pictureHost.StartAsync();
 
-        pictureHost.WritePhoto("photo-cole-b", Sidecar(setName: "Serie 2", cardNumber: "4"));
+        pictureHost.WritePhoto("photo-cole-b", Sidecar(setName: "Serie 2", cardNumber: "4", rotated180: true));
         pictureHost.WritePhoto("photo-cole-a", Sidecar(setName: "Serie 2", cardNumber: "4"));
         pictureHost.WritePhoto("photo-zane", Sidecar(setName: "Serie 2", cardNumber: "5"));
         pictureHost.WritePhoto("photo-stray", Sidecar(setName: "Unknown Series", cardNumber: "1"));
@@ -56,7 +56,7 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
         await pictureHost.DisposeAsync();
     }
 
-    private static string Sidecar(string setName, string cardNumber)
+    private static string Sidecar(string setName, string cardNumber, bool rotated180 = false)
     {
         return $$"""
         {
@@ -64,7 +64,8 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "ReviewStatus": "unreviewed"
+          "ReviewStatus": "unreviewed",
+          "Rotated180": {{(rotated180 ? "true" : "false")}}
         }
         """;
     }
@@ -89,5 +90,15 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
 
         Assert.Null(details);
         Assert.Empty(pictureHost.DownloadUrlsRequests);
+    }
+
+    [Fact]
+    public async Task GetCollectionCardDetailsAsync_ExposesEachPhotosRotationFlag()
+    {
+        var details = await collectionQueryService.GetCollectionCardDetailsAsync("Serie 2", "4");
+
+        Assert.NotNull(details);
+        Assert.True(details.Photos.Single(photo => photo.PhotoId == "photo-cole-b").Rotated180);
+        Assert.False(details.Photos.Single(photo => photo.PhotoId == "photo-cole-a").Rotated180);
     }
 }

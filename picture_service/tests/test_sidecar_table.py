@@ -57,6 +57,22 @@ async def test_put_and_get_round_trips_all_fields(sidecar_table: SidecarTable):
     assert result == record
 
 
+async def test_rotated_180_round_trips(sidecar_table: SidecarTable):
+    await sidecar_table.put("col-1", "photo-rot", SidecarRecord(rotated_180=True))
+
+    result = await sidecar_table.get("col-1", "photo-rot")
+
+    assert result.rotated_180 is True
+
+
+async def test_rotated_180_defaults_to_false_when_absent(sidecar_table: SidecarTable):
+    await sidecar_table.put("col-1", "photo-unrot", SidecarRecord())
+
+    result = await sidecar_table.get("col-1", "photo-unrot")
+
+    assert result.rotated_180 is False
+
+
 async def test_detected_text_with_duplicates_is_preserved(sidecar_table: SidecarTable):
     record = SidecarRecord(detected_text=("Kai", "Kai", "1"))
 

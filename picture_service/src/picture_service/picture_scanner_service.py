@@ -468,6 +468,15 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         )
         return pb2.UpdateReviewStatusResponse(success=True)
 
+    async def UpdateRotation(
+        self, request: pb2.UpdateRotationRequest, context: grpc.aio.ServicerContext
+    ) -> pb2.UpdateRotationResponse:
+        await _ensure_collection_id(request.collection_id, context)
+        existing = await self._sidecar_store.get(request.collection_id, request.photo_id) or SidecarRecord()
+        updated = dataclasses.replace(existing, rotated_180=request.rotated_180)
+        await self._sidecar_store.set_record(request.collection_id, request.photo_id, updated)
+        return pb2.UpdateRotationResponse(success=True)
+
     async def _apply_single_field_update(
         self, collection_id: str, photo_id: str, field_name: str, value: str, context: grpc.aio.ServicerContext
     ) -> None:
@@ -582,6 +591,7 @@ def _to_card_entry(photo_id: str, sidecar: SidecarRecord | None) -> pb2.CardEntr
         set_name=sidecar.set_name if sidecar and sidecar.set_name else "",
         language=sidecar.language if sidecar and sidecar.language else Languages.DEFAULT,
         review_status=sidecar.review_status if sidecar and sidecar.review_status else ReviewStatuses.UNREVIEWED,
+        rotated_180=sidecar.rotated_180 if sidecar else False,
     )
 
 

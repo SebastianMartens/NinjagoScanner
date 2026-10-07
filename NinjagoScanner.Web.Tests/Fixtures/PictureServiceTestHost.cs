@@ -198,6 +198,7 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         public string? SetName { get; init; }
         public string? Language { get; init; }
         public string? SourceFileName { get; init; }
+        public bool Rotated180 { get; init; }
     }
 
     /// <summary>
@@ -407,6 +408,12 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
             return Task.FromResult(new UpdateReviewStatusResponse { Success = true });
         }
 
+        public override Task<UpdateRotationResponse> UpdateRotation(UpdateRotationRequest request, ServerCallContext context)
+        {
+            ApplySingleFieldUpdate(request.CollectionId, request.PhotoId, record => record with { Rotated180 = request.Rotated180 });
+            return Task.FromResult(new UpdateRotationResponse { Success = true });
+        }
+
         public override Task<MigrateSidecarsResponse> MigrateSidecars(MigrateSidecarsRequest request, ServerCallContext context)
         {
             // No legacy-shaped records are ever seeded by this fake; nothing to migrate.
@@ -483,7 +490,8 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 CardNumber = record?.CardNumber ?? string.Empty,
                 SetName = record?.SetName ?? string.Empty,
                 Language = record?.Language ?? "de",
-                ReviewStatus = record?.ReviewStatus ?? "unreviewed"
+                ReviewStatus = record?.ReviewStatus ?? "unreviewed",
+                Rotated180 = record?.Rotated180 ?? false
             };
         }
     }

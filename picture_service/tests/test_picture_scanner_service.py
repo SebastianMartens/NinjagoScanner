@@ -1048,6 +1048,76 @@ async def test_editing_other_sidecar_fields_does_not_change_review_status():
     assert table.items[("col-a", "p1")].review_status == "verified"
 
 
+# --- UpdateRotation ---
+
+
+async def test_update_rotation_creates_sidecar_reporting_not_analyzed():
+    service, _, photo_store = make_service()
+    photo_store.bytes_by_key[("col-a", "p1")] = b"data"
+
+    await service.UpdateRotation(
+        pb2.UpdateRotationRequest(photo_id="p1", rotated_180=True, collection_id="col-a"), FakeServicerContext()
+    )
+    response = await service.ListCards(pb2.ListCardsRequest(collection_id="col-a"), FakeServicerContext())
+
+    assert response.cards[0].rotated_180 is True
+    assert response.cards[0].analysis_status == AnalysisStatuses.NOT_ANALYZED
+
+
+async def test_update_rotation_only_changes_rotation_flag():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(
+        analysis_status="ok", review_status="verified", set_name="Serie 1", card_number="1"
+    )
+
+    await service.UpdateRotation(
+        pb2.UpdateRotationRequest(photo_id="p1", rotated_180=True, collection_id="col-a"), FakeServicerContext()
+    )
+
+    updated = table.items[("col-a", "p1")]
+    assert updated.rotated_180 is True
+    assert updated.analysis_status == "ok"
+    assert updated.review_status == "verified"
+    assert updated.set_name == "Serie 1"
+    assert updated.card_number == "1"
+
+
+async def test_update_rotation_toggles_back():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(rotated_180=True)
+
+    await service.UpdateRotation(
+        pb2.UpdateRotationRequest(photo_id="p1", rotated_180=False, collection_id="col-a"), FakeServicerContext()
+    )
+
+    assert table.items[("col-a", "p1")].rotated_180 is False
+
+
+async def test_update_rotation_scoped_to_collection():
+    service, table, _ = make_service()
+
+    await service.UpdateRotation(
+        pb2.UpdateRotationRequest(photo_id="p1", rotated_180=True, collection_id="col-a"), FakeServicerContext()
+    )
+    await service.UpdateRotation(
+        pb2.UpdateRotationRequest(photo_id="p1", rotated_180=False, collection_id="col-b"), FakeServicerContext()
+    )
+
+    assert table.items[("col-a", "p1")].rotated_180 is True
+    assert table.items[("col-b", "p1")].rotated_180 is False
+
+
+async def test_editing_other_sidecar_fields_does_not_change_rotation():
+    service, table, _ = make_service()
+    table.items[("col-a", "p1")] = SidecarRecord(rotated_180=True, set_name="Old")
+
+    await service.UpdateSetName(
+        pb2.UpdateSetNameRequest(photo_id="p1", set_name="New", collection_id="col-a"), FakeServicerContext()
+    )
+
+    assert table.items[("col-a", "p1")].rotated_180 is True
+
+
 # --- MigrateSidecars idempotency ---
 
 

@@ -22,6 +22,12 @@ public sealed record CardListItem
     public string? SetName { get; init; }
     public string? Language { get; init; }
     public required string ReviewStatus { get; init; }
+
+    /// <summary>
+    /// Display-only: whether this photo should be rendered rotated 180 degrees to correct an
+    /// upside-down upload. Never touches the stored photo bytes. See web-photo-rotation.
+    /// </summary>
+    public bool Rotated180 { get; init; }
 }
 
 /// <summary>

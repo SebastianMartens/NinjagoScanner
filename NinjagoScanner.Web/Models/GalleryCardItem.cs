@@ -13,4 +13,5 @@ public sealed class GalleryCardItem
     /// <summary>The catalog card's rarity (not a photo's).</summary>
     public string Rarity { get; init; } = CardRarity.Common;
     public string? ReviewStatus { get; init; }
+    public bool Rotated180 { get; init; }
 }
