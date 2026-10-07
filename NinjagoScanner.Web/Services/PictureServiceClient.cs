@@ -296,6 +296,16 @@ internal sealed class PictureServiceClient
             cancellationToken: cancellationToken);
     }
 
+    public async Task UpdateRotationAsync(string photoId, bool rotated180, CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var collectionId = await GetCollectionIdAsync(cancellationToken);
+
+        await client.UpdateRotationAsync(
+            new UpdateRotationRequest { PhotoId = photoId, Rotated180 = rotated180, CollectionId = collectionId },
+            cancellationToken: cancellationToken);
+    }
+
     public async Task DeletePhotoAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
@@ -383,7 +393,8 @@ internal sealed class PictureServiceClient
             SetName = NormalizeNullable(entry.SetName),
             Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
-            ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
+            ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed,
+            Rotated180 = entry.Rotated180
         };
     }
 

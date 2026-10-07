@@ -108,6 +108,9 @@ class SidecarRecord:
     # on this record are the Judged section.
     detected: AttributeMap | None = None
     derived: AttributeMap | None = None
+    # Human-only, display-only: whether the photo should be shown rotated 180 degrees. Never set
+    # by AI Analysis, never affects AnalysisStatus. See web-photo-rotation.
+    rotated_180: bool = False
 
     @staticmethod
     def from_analysis_result(result: CardAnalysisResult) -> SidecarRecord:

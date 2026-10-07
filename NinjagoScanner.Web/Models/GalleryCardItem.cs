@@ -12,4 +12,5 @@ public sealed class GalleryCardItem
     public int PhotoCount { get; init; }
     public string? Rarity { get; init; }
     public string? ReviewStatus { get; init; }
+    public bool Rotated180 { get; init; }
 }

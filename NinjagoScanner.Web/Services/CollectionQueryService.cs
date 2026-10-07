@@ -97,7 +97,8 @@ internal sealed class CollectionQueryService(
                 ImageUrl = matchedPhoto is not null && downloadUrls.TryGetValue(matchedPhoto.PhotoId, out var imageUrl) ? imageUrl : null,
                 PhotoCount = photoCount,
                 Rarity = matchedPhoto?.Rarity,
-                ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus)
+                ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus),
+                Rotated180 = matchedPhoto?.Rotated180 ?? false
             });
         }
 
@@ -351,6 +352,7 @@ internal sealed class CollectionQueryService(
                 PhotoId = entry.PhotoId,
                 SourceFileName = string.IsNullOrWhiteSpace(entry.SourceFileName) ? entry.PhotoId : entry.SourceFileName,
                 ImageUrl = downloadUrls.GetValueOrDefault(entry.PhotoId, string.Empty),
+                Rotated180 = entry.Rotated180,
                 Sidecar = ToCollectionSidecar(entry, details)
             });
         }

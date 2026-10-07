@@ -49,6 +49,7 @@ EXPECTED_SIDECAR_RECORD_FIELDS = {
     "raw_model_response",
     "detected",
     "derived",
+    "rotated_180",
 }
 
 

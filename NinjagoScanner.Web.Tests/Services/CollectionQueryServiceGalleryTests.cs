@@ -49,8 +49,8 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
         await catalogHost.StartAsync();
         await pictureHost.StartAsync();
 
-        // Cole: exactly one matched photo.
-        pictureHost.WritePhoto("photo-1", Sidecar(setName: "Serie 2", cardNumber: "4"));
+        // Cole: exactly one matched photo, rotated.
+        pictureHost.WritePhoto("photo-1", Sidecar(setName: "Serie 2", cardNumber: "4", rotated180: true));
         // Zane: two matched photos -> the pick must be deterministic (lowest photo ID).
         pictureHost.WritePhoto("photo-3", Sidecar(setName: "Serie 2", cardNumber: "5"));
         pictureHost.WritePhoto("photo-2", Sidecar(setName: "Serie 2", cardNumber: "5"));
@@ -72,7 +72,7 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
         await pictureHost.DisposeAsync();
     }
 
-    private static string Sidecar(string setName, string cardNumber)
+    private static string Sidecar(string setName, string cardNumber, bool rotated180 = false)
     {
         return $$"""
         {
@@ -82,7 +82,8 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "SetName": "{{setName}}",
           "Rarity": "Common",
           "Confidence": 0.9,
-          "ReviewStatus": "unreviewed"
+          "ReviewStatus": "unreviewed",
+          "Rotated180": {{(rotated180 ? "true" : "false")}}
         }
         """;
     }
@@ -186,5 +187,23 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
         var puzzle = cards.Single(card => card.CardName == "Puzzle1");
         Assert.Null(puzzle.PhotoId);
         Assert.Null(puzzle.ReviewStatus);
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_ExposesTheMatchedPhotosRotationFlag()
+    {
+        var cards = await collectionQueryService.GetGalleryCardsAsync("Serie 2");
+
+        Assert.True(cards.Single(card => card.CardName == "Cole").Rotated180);
+        Assert.False(cards.Single(card => card.CardName == "Zane").Rotated180);
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_CardWithNoMatchedPhoto_RotationFlagIsFalse()
+    {
+        var cards = await collectionQueryService.GetGalleryCardsAsync("Serie 2");
+
+        var puzzle = cards.Single(card => card.CardName == "Puzzle1");
+        Assert.False(puzzle.Rotated180);
     }
 }

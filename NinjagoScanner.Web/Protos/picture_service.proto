@@ -33,6 +33,7 @@ service CardPictureService {
   rpc UpdateCardNumber (UpdateCardNumberRequest) returns (UpdateCardNumberResponse);
   rpc UpdateCardLanguage (UpdateCardLanguageRequest) returns (UpdateCardLanguageResponse);
   rpc UpdateReviewStatus (UpdateReviewStatusRequest) returns (UpdateReviewStatusResponse);
+  rpc UpdateRotation (UpdateRotationRequest) returns (UpdateRotationResponse);
   rpc MigrateSidecars (MigrateSidecarsRequest) returns (MigrateSidecarsResponse);
   rpc DeletePhoto (DeletePhotoRequest) returns (DeletePhotoResponse);
   rpc ReanalyzePhoto (ReanalyzePhotoRequest) returns (ReanalyzePhotoResponse);
@@ -79,6 +80,7 @@ message CardEntry {
   string language = 13;
   reserved 15;
   reserved "download_url";
+  bool rotated_180 = 16;
 }
 
 message ListCardsRequest {
@@ -234,6 +236,16 @@ message UpdateReviewStatusRequest {
 }
 
 message UpdateReviewStatusResponse {
+  bool success = 1;
+}
+
+message UpdateRotationRequest {
+  string photo_id = 1;
+  bool rotated_180 = 3;
+  string collection_id = 4;
+}
+
+message UpdateRotationResponse {
   bool success = 1;
 }
 

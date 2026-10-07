@@ -19,6 +19,7 @@ public sealed class CollectionCardPhotoItem
     public required string PhotoId { get; init; }
     public required string SourceFileName { get; init; }
     public required string ImageUrl { get; init; }
+    public bool Rotated180 { get; init; }
     public CollectionCardSidecarData? Sidecar { get; init; }
 }
 

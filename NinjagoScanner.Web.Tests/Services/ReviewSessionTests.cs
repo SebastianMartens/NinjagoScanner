@@ -335,6 +335,18 @@ public sealed class ReviewSessionTests
         Assert.Equal(Languages.Default, photo.Language);
     }
 
+    [Fact]
+    public void WithRotated180_TogglesTheFlag()
+    {
+        var photo = Photo("p-1", "Serie 2", "2");
+
+        var rotated = ReviewSession.WithRotated180(photo, true);
+        Assert.True(rotated.Rotated180);
+
+        var unrotated = ReviewSession.WithRotated180(rotated, false);
+        Assert.False(unrotated.Rotated180);
+    }
+
     // --- Re-analysis ---
 
     [Fact]

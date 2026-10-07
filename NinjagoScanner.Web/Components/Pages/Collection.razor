@@ -169,7 +169,7 @@
 
                             @if (SelectedPhoto is not null && !string.IsNullOrEmpty(SelectedPhoto.ImageUrl))
                             {
-                                <img class="detail-image" src="@SelectedPhoto.ImageUrl" alt="@SelectedPhoto.SourceFileName" loading="lazy" />
+                                <img class="detail-image @(SelectedPhoto.Rotated180 ? "rotated-180" : null)" src="@SelectedPhoto.ImageUrl" alt="@SelectedPhoto.SourceFileName" loading="lazy" />
                             }
                         }
                     </div>
