@@ -12,8 +12,8 @@
             <NavLink class="cv-nav-link" href="review">Review</NavLink>
             <NavLink class="cv-nav-link" href="upload">Upload</NavLink>
             <NavLink class="cv-nav-link" href="achievements">Erfolge</NavLink>
-            <NavLink class="cv-nav-link" href="friends">Freunde@if (_pendingFriendRequests > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingFriendRequests} offene Freundschaftsanfragen")">@_pendingFriendRequests</span>}</NavLink>
-            <NavLink class="cv-nav-link" href="trade" Match="NavLinkMatch.All">Tauschen@if (_pendingTrades > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingTrades} offene Tauschvorschläge")">@_pendingTrades</span>}</NavLink>
+            <NavLink class="cv-nav-link" href="friends">Freunde @if (_pendingFriendRequests > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingFriendRequests} offene Freundschaftsanfragen")">@_pendingFriendRequests</span>}</NavLink>
+            <NavLink class="cv-nav-link" href="trade" Match="NavLinkMatch.All">Tauschen @if (_pendingTrades > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingTrades} offene Tauschvorschläge")">@_pendingTrades</span>}</NavLink>
             <NavLink class="cv-nav-link" href="trade/log">Tauschprotokoll</NavLink>
             <NavLink class="cv-nav-link" href="about">Über</NavLink>
         </nav>
@@ -72,11 +72,11 @@
     </NavLink>
     <NavLink class="cv-tab" href="friends">
         <span class="cv-tab-dot"></span>
-        <span>Freunde@if (_pendingFriendRequests > 0){<span class="cv-nav-badge">@_pendingFriendRequests</span>}</span>
+        <span>Freunde @if (_pendingFriendRequests > 0){<span class="cv-nav-badge">@_pendingFriendRequests</span>}</span>
     </NavLink>
     <NavLink class="cv-tab" href="trade" Match="NavLinkMatch.All">
         <span class="cv-tab-dot"></span>
-        <span>Tauschen@if (_pendingTrades > 0){<span class="cv-nav-badge">@_pendingTrades</span>}</span>
+        <span>Tauschen @if (_pendingTrades > 0){<span class="cv-nav-badge">@_pendingTrades</span>}</span>
     </NavLink>
     <NavLink class="cv-tab" href="trade/log">
         <span class="cv-tab-dot"></span>
