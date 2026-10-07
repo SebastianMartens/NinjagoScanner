@@ -1,6 +1,9 @@
 .trade-page { display: flex; flex-direction: column; gap: 1.25rem; animation: cv-fadein 0.4s ease; }
 .trade-section { display: flex; flex-direction: column; gap: 0.9rem; }
 
+.trade-section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.trade-section-head h2 { margin: 0; }
+
 .trade-message { padding: 0.8rem 1rem; border-radius: var(--cv-radius); border: 1px solid var(--cv-border); }
 .trade-message.is-ok { background: var(--cv-status-ok-bg); color: var(--cv-status-ok-fg); }
 .trade-message.is-error { background: var(--cv-status-failed-bg); color: var(--cv-status-failed-fg); }

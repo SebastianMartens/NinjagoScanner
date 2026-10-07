@@ -15,6 +15,14 @@ A user SHALL be able to propose a trade to an accepted friend consisting of one 
 - **WHEN** a trade is proposed to a non-friend
 - **THEN** it is rejected
 
+#### Scenario: Recipient's collection is private
+- **WHEN** a trade is proposed to an accepted friend whose collection visibility is "Nur ich"
+- **THEN** it is rejected in German before any of their cards are validated, and no card data of theirs is stored or revealed
+
+#### Scenario: Recipient goes private after the proposal
+- **WHEN** the recipient sets their visibility to "Nur ich" while a trade is pending
+- **THEN** the recipient can still accept or decline that trade; the visibility is only checked when proposing
+
 #### Scenario: Unequal counts
 - **WHEN** the two sides have different numbers of cards
 - **THEN** the proposal is rejected
@@ -29,6 +37,10 @@ When the recipient accepts, the system SHALL re-validate every card (still owned
 #### Scenario: Successful trade
 - **WHEN** B accepts a valid trade
 - **THEN** each offered photo and its sidecar belong to the other collection, no card exists in both or neither, and the trade is `completed`
+
+#### Scenario: Concurrent first trades
+- **WHEN** two trades involving a collection without a gamification profile complete concurrently
+- **THEN** both complete, each grants its +25 bonus XP exactly once (the grant is an atomic upsert-increment in the completion transaction), and each writes its log entry
 
 #### Scenario: Stale trade
 - **WHEN** one offered photo was deleted or traded elsewhere before acceptance

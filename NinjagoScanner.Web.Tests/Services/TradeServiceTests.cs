@@ -56,6 +56,60 @@ public class TradeServiceTests
     }
 
     [Fact]
+    public async Task Proposal_to_a_friend_with_a_private_collection_is_rejected_and_stores_nothing()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        env.Db.CollectionSharingSettings.Add(new CollectionSharingSettings { CollectionId = env.CollB, Visibility = CollectionVisibility.Private });
+        await env.Db.SaveChangesAsync();
+
+        var result = await env.Service.ProposeAsync(env.A, env.B, ["a4a", "la1"], ["b6a", "b6b"]);
+
+        Assert.False(result.Success);
+        Assert.Equal(TradeFailure.CollectionPrivate, result.Failure);
+        Assert.Empty(await env.Db.Trades.ToListAsync());
+    }
+
+    [Fact]
+    public async Task Proposal_succeeds_again_after_the_recipient_makes_the_collection_visible()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        env.Db.CollectionSharingSettings.Add(new CollectionSharingSettings { CollectionId = env.CollB, Visibility = CollectionVisibility.Private });
+        await env.Db.SaveChangesAsync();
+        Assert.False((await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6a"])).Success);
+
+        await env.Db.CollectionSharingSettings.ExecuteUpdateAsync(s => s.SetProperty(x => x.Visibility, CollectionVisibility.Friends));
+
+        Assert.True((await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6a"])).Success);
+    }
+
+    [Fact]
+    public async Task Recipient_going_private_after_the_proposal_can_still_accept_and_decline()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var acceptId = await env.ProposeStandardAsync();
+        env.Db.CollectionSharingSettings.Add(new CollectionSharingSettings { CollectionId = env.CollB, Visibility = CollectionVisibility.Private });
+        await env.Db.SaveChangesAsync();
+
+        var accepted = await env.Service.AcceptAsync(env.B, acceptId);
+
+        Assert.True(accepted.Success);
+        Assert.Equal(TradeStatus.Completed, accepted.Status);
+    }
+
+    [Fact]
+    public async Task Recipient_going_private_after_the_proposal_can_still_decline()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var tradeId = await env.ProposeStandardAsync();
+        env.Db.CollectionSharingSettings.Add(new CollectionSharingSettings { CollectionId = env.CollB, Visibility = CollectionVisibility.Private });
+        await env.Db.SaveChangesAsync();
+
+        var declined = await env.Service.DeclineAsync(env.B, tradeId);
+
+        Assert.True(declined.Success);
+    }
+
+    [Fact]
     public async Task Proposal_with_only_pending_friend_request_is_rejected()
     {
         await using var env = await TradeTestEnv.CreateAsync();
@@ -820,6 +874,34 @@ public class TradeServiceTests
             Assert.Equal(25, await env.BonusXpAsync(env.CollB));
             Assert.Equal(5, (await env.CardsAsync(env.CollA)).Count);
             Assert.Equal(5, (await env.CardsAsync(env.CollB)).Count);
+        }
+        finally
+        {
+            await secondContext.DisposeAsync();
+            await secondConnection.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Concurrent_first_trades_for_collections_without_a_profile_both_complete_and_grant_xp_once_each()
+    {
+        await using var env = await TradeTestEnv.CreateAsync(fileBackedDb: true);
+        Assert.Equal(0, await env.Db.GamificationProfiles.CountAsync());
+        var first = await env.Service.ProposeAsync(env.A, env.B, ["a4a"], ["b6a"]);
+        var secondProposal = await env.Service.ProposeAsync(env.A, env.B, ["la1"], ["b6b"]);
+        Assert.True(first.Success);
+        Assert.True(secondProposal.Success);
+        var (second, secondContext, secondConnection) = env.NewConcurrentService();
+        try
+        {
+            var results = await Task.WhenAll(
+                Task.Run(() => env.Service.AcceptAsync(env.B, first.TradeId!)),
+                Task.Run(() => second.AcceptAsync(env.B, secondProposal.TradeId!)));
+
+            Assert.All(results, r => Assert.True(r.Success, r.Message));
+            Assert.Equal(2, await env.Db.TradeLogEntries.CountAsync());
+            Assert.Equal(50, await env.BonusXpAsync(env.CollA));
+            Assert.Equal(50, await env.BonusXpAsync(env.CollB));
         }
         finally
         {

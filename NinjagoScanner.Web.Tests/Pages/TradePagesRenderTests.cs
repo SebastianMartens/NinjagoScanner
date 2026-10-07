@@ -114,6 +114,28 @@ public class TradePagesRenderTests
     }
 
     [Fact]
+    public async Task Without_possible_trade_the_propose_and_add_pair_buttons_are_hidden()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        using var ctx = NewContext(env, env.A);
+        var cut = RenderLoaded<TradePage>(ctx);
+        cut.Find(".trade-partner button").Click();
+        cut.WaitForElement("#trade-suggestion");
+
+        while (cut.FindAll(".trade-pair").Count > 0)
+        {
+            cut.Find(".trade-pair-middle button").Click();
+        }
+
+        Assert.Empty(cut.FindAll(".trade-pair"));
+        Assert.Contains("Kein Tausch möglich", cut.Markup);
+        Assert.Empty(cut.FindAll("#trade-propose"));
+        Assert.DoesNotContain("Tausch vorschlagen", cut.Find("#trade-suggestion").TextContent);
+        Assert.DoesNotContain("Weiteres Kartenpaar hinzufügen", cut.Find("#trade-suggestion").TextContent);
+        Assert.NotEmpty(cut.FindAll("#trade-partners .trade-section-head #trade-refresh"));
+    }
+
+    [Fact]
     public async Task Unausgewogen_flag_and_balance_indicator_update_after_swap_and_remove()
     {
         await using var env = await TradeTestEnv.CreateAsync();
@@ -141,7 +163,7 @@ public class TradePagesRenderTests
         cut.Find(".trade-pair-middle button").Click();
         Assert.Empty(cut.FindAll(".trade-pair"));
         Assert.Contains("Noch keine Karten ausgewählt", cut.Find("#trade-balance").TextContent);
-        Assert.NotNull(cut.Find("#trade-propose").GetAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#trade-propose"));
     }
 
     [Fact]

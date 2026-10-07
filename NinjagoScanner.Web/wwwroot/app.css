@@ -259,6 +259,39 @@ h1:focus {
     border-color: var(--cv-purple);
 }
 
+.cv-input, .cv-select {
+    color-scheme: dark;
+}
+
+.cv-input::placeholder {
+    color: var(--cv-text-faint);
+}
+
+.cv-input:focus-visible, .cv-select:focus-visible {
+    border-color: var(--cv-purple);
+    box-shadow: 0 0 0 3px oklch(65% 0.19 300 / 0.3);
+}
+
+.cv-select {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--cv-surface);
+    border: 1px solid var(--cv-border);
+    color: var(--cv-text-soft);
+    padding: 0.5rem 0.7rem;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    outline: none;
+}
+
+.cv-select:focus {
+    border-color: var(--cv-purple);
+}
+
+.cv-select option {
+    background: var(--cv-surface);
+    color: var(--cv-text);
+}
+
 .cv-card {
     background: var(--cv-surface);
     border: 1px solid var(--cv-border);

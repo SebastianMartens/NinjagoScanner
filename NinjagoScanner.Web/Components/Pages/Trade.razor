@@ -118,8 +118,10 @@
         }
 
         <section class="trade-section" id="trade-partners">
-            <h2>Tauschpartner</h2>
-            <button type="button" class="cv-btn-ghost" id="trade-refresh" disabled="@isBusy" @onclick="RefreshAsync">Aktualisieren</button>
+            <div class="trade-section-head">
+                <h2>Tauschpartner</h2>
+                <button type="button" class="cv-btn-ghost" id="trade-refresh" disabled="@isBusy" @onclick="RefreshAsync">Aktualisieren</button>
+            </div>
             @if (overview is null || overview.Partners.Count == 0)
             {
                 <div class="empty-state">
@@ -183,7 +185,7 @@
                             <h4>Du gibst</h4>
                             <TradeCardView Series="@pair.Give.Series" CardNumber="@pair.Give.CardNumber" CardName="@pair.Give.CardName"
                                            Rarity="@pair.Give.Rarity" ImageUrl="@ImageFor(pair.Give.PhotoId)" />
-                            <select aria-label="Eigene Karte ersetzen" value="@pair.Give.PhotoId" @onchange="e => SwapGive(index, e.Value?.ToString())">
+                            <select class="cv-select" aria-label="Eigene Karte ersetzen" value="@pair.Give.PhotoId" @onchange="e => SwapGive(index, e.Value?.ToString())">
                                 <option value="@pair.Give.PhotoId">@OfferText(pair.Give)</option>
                                 @foreach (var option in draft.UnusedGive)
                                 {
@@ -204,7 +206,7 @@
                             <h4>Du erhältst</h4>
                             <TradeCardView Series="@pair.Receive.Series" CardNumber="@pair.Receive.CardNumber" CardName="@pair.Receive.CardName"
                                            Rarity="@pair.Receive.Rarity" ImageUrl="@ImageFor(pair.Receive.PhotoId)" />
-                            <select aria-label="Karte des Freundes ersetzen" value="@pair.Receive.PhotoId" @onchange="e => SwapReceive(index, e.Value?.ToString())">
+                            <select class="cv-select" aria-label="Karte des Freundes ersetzen" value="@pair.Receive.PhotoId" @onchange="e => SwapReceive(index, e.Value?.ToString())">
                                 <option value="@pair.Receive.PhotoId">@OfferText(pair.Receive)</option>
                                 @foreach (var option in draft.UnusedReceive)
                                 {
@@ -215,10 +217,13 @@
                     </div>
                 }
 
-                <div class="trade-actions">
-                    <button type="button" class="cv-btn-secondary" disabled="@(!draft.CanAddPair)" @onclick="AddPair">Weiteres Kartenpaar hinzufügen</button>
-                    <button type="button" class="cv-btn-primary" id="trade-propose" disabled="@(isBusy || draft.Pairs.Count == 0)" @onclick="ProposeAsync">Tausch vorschlagen</button>
-                </div>
+                @if (draft.Pairs.Count > 0)
+                {
+                    <div class="trade-actions">
+                        <button type="button" class="cv-btn-secondary" disabled="@(!draft.CanAddPair)" @onclick="AddPair">Weiteres Kartenpaar hinzufügen</button>
+                        <button type="button" class="cv-btn-primary" id="trade-propose" disabled="@isBusy" @onclick="ProposeAsync">Tausch vorschlagen</button>
+                    </div>
+                }
             </section>
         }
     }
@@ -332,7 +337,7 @@
 
     private async Task ProposeAsync()
     {
-        if (session is null || draft is null)
+        if (session is null || draft is null || draft.Pairs.Count == 0)
         {
             return;
         }

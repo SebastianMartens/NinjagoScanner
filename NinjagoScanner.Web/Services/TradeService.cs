@@ -11,6 +11,8 @@ public enum TradeFailure
     NotFound,
     NotAllowed,
     NotFriends,
+    /// <summary>The recipient's collection visibility is "Nur ich", so it cannot be browsed or traded with.</summary>
+    CollectionPrivate,
     InvalidSelection,
     UnequalCounts,
     NotTradable,
@@ -114,6 +116,22 @@ internal sealed class TradeService(
         if (proposerCollectionId is null || recipientCollectionId is null)
         {
             return TradeActionResult.Fail(TradeFailure.NotFriends, "Mit dieser Person kann nicht getauscht werden.");
+        }
+
+        // Proposing means choosing from the recipient's collection (and snapshotting card name,
+        // number and rarity into the trade), so it requires the same visibility as browsing it.
+        // This is checked before any photo is validated so a private collection leaks nothing.
+        // Deliberately NOT re-checked in AcceptAsync: the recipient going private afterwards must
+        // not take away their own ability to accept/decline the incoming trade (the cards were
+        // snapshotted before they went private and the proposer only sees what they already saw).
+        var recipientVisibility = (await dbContext.CollectionSharingSettings
+            .AsNoTracking()
+            .Where(s => s.CollectionId == recipientCollectionId)
+            .Select(s => (CollectionVisibility?)s.Visibility)
+            .FirstOrDefaultAsync(cancellationToken)) ?? CollectionVisibility.Friends;
+        if (recipientVisibility != CollectionVisibility.Friends)
+        {
+            return TradeActionResult.Fail(TradeFailure.CollectionPrivate, "Die Sammlung dieser Person ist privat. Mit ihr kann nicht getauscht werden.");
         }
 
         await ProposalGate.WaitAsync(cancellationToken);
@@ -430,16 +448,19 @@ internal sealed class TradeService(
         return TradeActionResult.Ok("Der Tausch wurde abgeschlossen.", trade.Id, TradeStatus.Completed);
     }
 
+    /// <summary>
+    /// Atomic upsert-increment: insert-or-ignore the profile row, then increment in SQL. Two
+    /// first-ever trades for one collection can no longer both take an "Add" path and hit the
+    /// primary key; each increment is applied exactly once inside the caller's transaction.
+    /// </summary>
     private async Task AddBonusXpAsync(string collectionId)
     {
-        var updated = await dbContext.GamificationProfiles
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT OR IGNORE INTO GamificationProfiles (CollectionId, BonusXp) VALUES ({collectionId}, 0)",
+            CancellationToken.None);
+        await dbContext.GamificationProfiles
             .Where(p => p.CollectionId == collectionId)
             .ExecuteUpdateAsync(set => set.SetProperty(p => p.BonusXp, p => p.BonusXp + TradeXp), CancellationToken.None);
-        if (updated == 0)
-        {
-            dbContext.GamificationProfiles.Add(new GamificationProfile { CollectionId = collectionId, BonusXp = TradeXp });
-            await dbContext.SaveChangesAsync(CancellationToken.None);
-        }
     }
 
     // ---------------------------------------------------------------- recovery

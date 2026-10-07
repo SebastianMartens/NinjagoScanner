@@ -47,7 +47,7 @@
         <section class="friends-section" id="friends-search">
             <h2>Nutzer suchen</h2>
             <form class="friends-search" @onsubmit="SearchAsync">
-                <input type="search" placeholder="Benutzername" aria-label="Benutzername suchen" @bind="query" @bind:event="oninput" />
+                <input type="search" class="cv-input" placeholder="Benutzername" aria-label="Benutzername suchen" @bind="query" @bind:event="oninput" />
                 <button type="submit" class="cv-btn-primary" disabled="@isBusy">Suchen</button>
             </form>
             @if (searchHint is not null)
