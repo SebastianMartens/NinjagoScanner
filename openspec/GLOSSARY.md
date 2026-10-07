@@ -237,6 +237,58 @@ for photos that don't exactly match any series). Not to be confused with
 full filter/search/detail — Overview shows summary tiles only and links
 through to Collection List for a selected series.
 
+## Friends & Trading
+
+### Friend
+Another registered person with whom the signed-in person has an accepted
+**Friendship**. Only friends can see a person's collection (subject to
+**Visibility**) and trade with them; there are no public profiles.
+
+### Friendship
+The relationship between two people, stored as one row per pair in the Web
+app's database: `Pending` (a request sent by the requester, awaiting the
+addressee) or `Accepted`. Declining, cancelling and removing delete the row.
+A **Friendship** is the precondition for viewing a **Friend**'s collection and
+for any **Trade**.
+
+### Visibility
+A per-collection setting that decides who may view it: `Freunde` (accepted
+**Friend**s, read-only; the default when nothing is stored) or `Nur ich`
+(nobody but the owner). Resolved in one place (`FriendAccessService`); a
+friend's view never exposes write operations, and a collection with `Nur ich`
+is excluded from **Trade** suggestions.
+
+### Tradable Card
+A catalog **Card** of which a person owns more than one copy (see **Owned
+Copies**); the surplus (copies - 1) may be offered in a **Trade**. A **Card**
+with no copies is "wanted" by that person. An **Unmapped Photo** is never
+tradable, and neither is a photo already reserved in an open **Trade**. When
+several copies exist, the one with the worst review quality is offered first
+so the owner keeps the best photo. Balance between offered cards is judged by
+**Rarity** (weights common 1, limited 3, legendary 9; pairs of different
+rarity are flagged `Unausgewogen`).
+
+### Trade
+An exchange of **Card Photo**s between two **Friend**s, with the same number
+of cards on each side. Status: `Pending`, `Executing`, `Completed`,
+`Declined`, `Cancelled` or `Failed`. Only the recipient can accept or decline,
+only the proposer can cancel; there are no counter-offers (decline and
+re-propose). On execution the **Picture Service** moves the photos between the
+two collections (each moved photo gets a new photo ID and keeps its
+**Sidecar** data); no card is lost or duplicated. Each participating
+collection earns 25 bonus XP for a completed **Trade**.
+
+### Trade Offer
+The proposal part of a **Trade**: the concrete **Tradable Card**s (card
+snapshots with the chosen photos) the proposer gives and asks for, taken from
+the trade finder's suggestion or edited by hand. It remains a **Trade Offer**
+while the **Trade** is `Pending`.
+
+### Trade Log
+The permanent, append-only history of `Completed` **Trade**s, with username
+and card snapshots so entries stay readable if names change or photos are
+later deleted. Declined, cancelled and failed **Trade**s are not log entries.
+
 ## System / Software Components
 
 ### Catalog Service
@@ -247,8 +299,8 @@ components. It doesn't know about photos or scanning.
 ### Picture Service
 The software component that manages **Card Photo**s and their **Sidecar**s:
 receiving uploads, running **AI Analysis**, and applying manual sidecar
-edits. It consults the **Catalog Service** for known series when analyzing
-or matching photos.
+edits, and moving photos between collections for a **Trade**. It consults the
+**Catalog Service** for known series when analyzing or matching photos.
 
 ### Web App
 The software component a person actually uses: the **Collection List**,

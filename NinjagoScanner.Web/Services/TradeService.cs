@@ -269,6 +269,21 @@ internal sealed class TradeService(
                     excludeTradeId: trade.Id,
                     cancellationToken);
                 staleMessage = selection.Failure?.Message;
+                if (staleMessage is null)
+                {
+                    // The card a photo shows must still be the one the proposal snapshotted.
+                    var snapshots = trade.Items.ToDictionary(i => i.PhotoId, StringComparer.Ordinal);
+                    var changed = selection.Items.Any(fresh =>
+                        !snapshots.TryGetValue(fresh.PhotoId, out var snap)
+                        || !string.Equals(snap.SeriesName, fresh.SeriesName, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(snap.CardNumber, fresh.CardNumber, StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(snap.CardName, fresh.CardName, StringComparison.Ordinal)
+                        || !string.Equals(snap.Rarity, fresh.Rarity, StringComparison.Ordinal));
+                    if (changed)
+                    {
+                        staleMessage = "Eine der Karten wurde nach dem Angebot geändert.";
+                    }
+                }
             }
             catch (RpcException)
             {
@@ -322,12 +337,14 @@ internal sealed class TradeService(
         }
         catch (RpcException exception)
         {
-            var outcomeUnknown = exception.StatusCode is StatusCode.DeadlineExceeded or StatusCode.Cancelled;
-            var retryable = recovering && exception.StatusCode == StatusCode.Unavailable;
-            if (outcomeUnknown || retryable)
+            // Only definitive failures (PictureService rolled back, or rejected the request) fail
+            // the trade. Anything else (Aborted "transfer busy", Unavailable, Unknown, timeouts,
+            // unclassified codes) may have committed or be in progress elsewhere: stay Executing.
+            var definitive = exception.StatusCode is StatusCode.Internal or StatusCode.NotFound
+                or StatusCode.InvalidArgument or StatusCode.AlreadyExists;
+            if (!definitive)
             {
-                // The transfer may or may not have happened. Stay Executing; the recovery sweep
-                // retries with the same (idempotent) transfer id and then finalizes.
+                // The recovery sweep retries with the same (idempotent) transfer id and then finalizes.
                 return TradeActionResult.Fail(
                     TradeFailure.Unavailable,
                     "Der Tausch wird gerade ausgeführt. Bitte prüfe es in Kürze erneut.",

@@ -663,8 +663,8 @@ public class TradeServiceTests
 
     [Theory]
     [InlineData(StatusCode.Internal)]
-    [InlineData(StatusCode.Unavailable)]
     [InlineData(StatusCode.NotFound)]
+    [InlineData(StatusCode.InvalidArgument)]
     public async Task Transfer_failure_marks_the_trade_failed_and_leaves_both_collections_unchanged(StatusCode code)
     {
         await using var env = await TradeTestEnv.CreateAsync();
@@ -686,6 +686,39 @@ public class TradeServiceTests
         Assert.Equal(0, await env.BonusXpAsync(env.CollA));
         Assert.Equal(0, await env.BonusXpAsync(env.CollB));
         Assert.Single(env.Pictures.Transfers);
+    }
+
+    [Theory]
+    [InlineData(StatusCode.Aborted)]
+    [InlineData(StatusCode.Unavailable)]
+    [InlineData(StatusCode.Unknown)]
+    [InlineData(StatusCode.ResourceExhausted)]
+    public async Task Indefinite_transfer_failure_keeps_the_trade_executing(StatusCode code)
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var tradeId = await env.ProposeStandardAsync();
+        env.Pictures.TransferFailureStatusCode = code;
+
+        var result = await env.Service.AcceptAsync(env.B, tradeId);
+
+        Assert.False(result.Success);
+        Assert.Equal(TradeStatus.Executing, result.Status);
+        Assert.Equal(TradeStatus.Executing, (await env.GetTradeAsync(tradeId)).Status);
+    }
+
+    [Fact]
+    public async Task Relabelled_photo_after_proposal_makes_the_trade_stale()
+    {
+        await using var env = await TradeTestEnv.CreateAsync();
+        var tradeId = await env.ProposeStandardAsync();
+        // a4a was offered as Cole #4; relabel it to Zane #5 (still a valid catalog card).
+        env.Pictures.WritePhoto("a4a", TradeTestEnv.Sidecar("Serie 2", "5", "Zane"), env.CollA);
+
+        var result = await env.Service.AcceptAsync(env.B, tradeId);
+
+        Assert.Equal(TradeFailure.Stale, result.Failure);
+        Assert.Equal(TradeStatus.Failed, (await env.GetTradeAsync(tradeId)).Status);
+        Assert.Empty(env.Pictures.Transfers);
     }
 
     [Fact]
