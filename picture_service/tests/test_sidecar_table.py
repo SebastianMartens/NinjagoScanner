@@ -40,7 +40,6 @@ async def test_put_and_get_round_trips_all_fields(sidecar_table: SidecarTable):
         card_name="Kai",
         card_number="1",
         set_name="Serie 1",
-        rarity="common",
         language="de",
         confidence=0.92,
         reasoning_summary="clear image",
@@ -65,6 +64,22 @@ async def test_detected_text_with_duplicates_is_preserved(sidecar_table: Sidecar
     result = await sidecar_table.get("col-1", "photo-dup")
 
     assert result.detected_text == ("Kai", "Kai", "1")
+
+
+async def test_legacy_rarity_attribute_is_ignored_and_not_written_back(sidecar_table: SidecarTable):
+    table = await sidecar_table._table()
+    await table.put_item(
+        Item={"CollectionId": "col-1", "PhotoId": "legacy", "AnalysisStatus": "ok", "Rarity": "legendary"}
+    )
+
+    record = await sidecar_table.get("col-1", "legacy")
+    assert record is not None
+    assert record.analysis_status == "ok"
+    assert not hasattr(record, "rarity")
+
+    await sidecar_table.put("col-1", "legacy", record)
+    stored = (await table.get_item(Key={"CollectionId": "col-1", "PhotoId": "legacy"}))["Item"]
+    assert "Rarity" not in stored
 
 
 async def test_delete_removes_item(sidecar_table: SidecarTable):

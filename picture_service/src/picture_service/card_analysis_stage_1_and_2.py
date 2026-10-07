@@ -27,7 +27,7 @@ from langchain_core.exceptions import ModelError, ModelNotFoundError
 from opentelemetry import trace
 
 from picture_service.config import ScannerConfig
-from picture_service.models import CARD_CLASSES, AttributeMap
+from picture_service.models import CARD_CLASSES, CARD_RARITIES, AttributeMap
 from picture_service.prompts import ATTRIBUTE_DETECTION_PROMPT, DERIVED_ATTRIBUTES_PROMPT
 
 _tracer = trace.get_tracer("picture_service.gemini")
@@ -217,5 +217,8 @@ async def compute_derived_attributes(
 
     if "class" in attributes and attributes["class"] not in CARD_CLASSES:
         attributes = {key: value for key, value in attributes.items() if key != "class"}
+
+    if "rarity" in attributes and attributes["rarity"] not in CARD_RARITIES:
+        attributes = {key: value for key, value in attributes.items() if key != "rarity"}
 
     return AttributeStageResult(success=True, attributes=attributes, raw_model_response=raw_text)

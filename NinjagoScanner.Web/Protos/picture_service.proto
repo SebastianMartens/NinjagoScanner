@@ -74,7 +74,9 @@ message CardEntry {
   string card_name = 3;
   string card_number = 4;
   string set_name = 5;
-  string rarity = 6;
+  // Rarity is catalog data now (catalog-owned-rarity); the sidecar no longer carries it.
+  reserved 6;
+  reserved "rarity";
   string review_status = 12;
   string language = 13;
   reserved 15;
@@ -184,8 +186,8 @@ message UpdateSidecarRequest {
   string card_name = 4;
   string card_number = 5;
   string set_name = 6;
-  string rarity = 7;
-  reserved 8, 9, 10;
+  reserved 7, 8, 9, 10;
+  reserved "rarity";
   reserved "confidence", "reasoning_summary", "detected_text";
   string error_message = 11;
   string review_status = 12;

@@ -25,6 +25,7 @@ public sealed class CatalogCardItem
     public required string SeriesName { get; init; }
     public required string Category { get; init; }
     public required string Class { get; init; }
+    public required string Rarity { get; init; }
     public required string CardNumber { get; init; }
     public required string CardName { get; init; }
     public int SortOrder { get; init; }
@@ -36,6 +37,28 @@ public sealed class CatalogCardItem
 /// </summary>
 public sealed class CatalogDataException(string message, Exception? innerException = null)
     : Exception(message, innerException);
+
+/// <summary>
+/// The catalog's fixed set of card rarities. Declared per category (and optionally per card) in
+/// the series data; see <c>catalog-service-card-catalog</c>.
+/// </summary>
+public static class CatalogRarities
+{
+    public const string Common = "common";
+    public const string Limited = "limited";
+    public const string Legendary = "legendary";
+
+    public static readonly IReadOnlyList<string> All = [Common, Limited, Legendary];
+
+    /// <summary>Returns the normalized rarity, or throws <see cref="CatalogDataException"/> for a value outside the set.</summary>
+    public static string Validate(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return All.Contains(normalized)
+            ? normalized
+            : throw new CatalogDataException($"Unknown Rarity '{value}'; expected one of: {string.Join(", ", All)}.");
+    }
+}
 
 public sealed class SeriesMetadataItem
 {

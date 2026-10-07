@@ -2,11 +2,11 @@
 
 Stages 1/2 do not reliably yield a series, so this stage does not resolve a series first.
 Instead every catalog card, of any series, is scored against the *derived* attributes
-(`card_number`, `class`, `card_name`) and the highest-scoring card is the match - its series is
-the resolved series. Stage 1's `detected` attributes are deliberately not consulted for now;
-the derived card number is the reliable signal.
+(`card_number`, `class`, `rarity`, `card_name`) and the highest-scoring card is the match - its
+series is the resolved series. Stage 1's `detected` attributes are deliberately not consulted for
+now; the derived card number is the reliable signal.
 
-Scoring, per catalog card (maximum 100):
+Scoring, per catalog card (maximum 110):
 - card number equals the derived one: 50 - unless both sides carry a class and the classes
   differ. That combination means something is wrong (the number was misread or the class
   was misjudged), so the number earns nothing rather than backing a card of the wrong class.
@@ -15,6 +15,8 @@ Scoring, per catalog card (maximum 100):
   detected) earns 30 scaled by its similarity, and nothing below a minimum similarity. Most
   catalog names exist in English only, so a card in another language is also compared by the
   English name stage 2 derived for it (`card_name_en`); the better of the two similarities counts.
+- rarity equals the derived one: 10. A bonus only - a different or unknown rarity costs nothing,
+  and rarity points never count toward the minimum score; they just break ties.
 
 A card must reach `_MIN_MATCH_SCORE` and be the single best candidate to be the match.
 """
@@ -27,6 +29,7 @@ from difflib import SequenceMatcher
 
 from picture_service.models import (
     CARD_CLASSES,
+    CARD_RARITIES,
     AnalysisStatuses,
     AttributeMap,
     CatalogCardInfo,
@@ -39,6 +42,7 @@ _WHITESPACE_RUN = re.compile(r"\s+")
 _NUMBER_POINTS = 50.0
 _CLASS_POINTS = 20.0
 _NAME_POINTS = 30.0
+_RARITY_POINTS = 10.0
 
 # Below this similarity a card name is treated as unrelated rather than as a partial detection.
 _MIN_NAME_SIMILARITY = 0.6
@@ -90,9 +94,16 @@ def match_catalog(
 
     derived_class = derived.get("class")
     derived_class = derived_class if isinstance(derived_class, str) and derived_class in CARD_CLASSES else None
+    derived_rarity = derived.get("rarity")
+    derived_rarity = derived_rarity if isinstance(derived_rarity, str) and derived_rarity in CARD_RARITIES else None
 
     winner = resolve_card(
-        card_number_guess, card_name_guess, derived_class, list(catalog.cards), card_name_english_guess
+        card_number_guess,
+        card_name_guess,
+        derived_class,
+        list(catalog.cards),
+        card_name_english_guess,
+        derived_rarity,
     )
 
     if winner is None:
@@ -121,6 +132,7 @@ def resolve_card(
     derived_class: str | None,
     catalog_cards: list[CatalogCardInfo],
     card_name_english_guess: str | None = None,
+    derived_rarity: str | None = None,
 ) -> CatalogCardInfo | None:
     """The single best-scoring catalog card across all series, or None when no card reaches the
     minimum score or the best score is shared by cards that are not the same series + number."""
@@ -128,8 +140,11 @@ def resolve_card(
     best_cards: list[CatalogCardInfo] = []
 
     for card in catalog_cards:
-        score = _score_card(card, card_number_guess, card_name_guess, derived_class, card_name_english_guess)
-        if score < _MIN_MATCH_SCORE:
+        score = _score_card(
+            card, card_number_guess, card_name_guess, derived_class, card_name_english_guess, derived_rarity
+        )
+        # Rarity is only a tie-breaker: a card must reach the minimum without its points.
+        if score - _rarity_points(card, derived_rarity) < _MIN_MATCH_SCORE:
             continue
         if score > best_score:
             best_score = score
@@ -153,6 +168,7 @@ def _score_card(
     card_name_guess: str | None,
     derived_class: str | None,
     card_name_english_guess: str | None = None,
+    derived_rarity: str | None = None,
 ) -> float:
     class_known = derived_class is not None and card.card_class is not None
     class_matches = class_known and card.card_class == derived_class
@@ -172,7 +188,14 @@ def _score_card(
         if similarity >= _MIN_NAME_SIMILARITY:
             score += _NAME_POINTS * similarity
 
-    return score
+    return score + _rarity_points(card, derived_rarity)
+
+
+def _rarity_points(card: CatalogCardInfo, derived_rarity: str | None) -> float:
+    """Bonus for an equal rarity; a missing or different rarity earns nothing and costs nothing."""
+    if derived_rarity is not None and card.card_rarity is not None and card.card_rarity == derived_rarity:
+        return _RARITY_POINTS
+    return 0.0
 
 
 def _name_similarity(name_guess: str, catalog_name: str) -> float:

@@ -5,11 +5,11 @@ namespace NinjagoScanner.Web.Tests.Services;
 
 public sealed class ReviewSessionTests
 {
-    private static readonly IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> Catalog =
+    private static readonly IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> Catalog =
     [
-        ("Serie 2", "Good Guys", "2", "Two", 2),
-        ("Serie 2", "Good Guys", "10", "Ten", 2),
-        ("Serie 10", "Good Guys", "1", "Kai", 10)
+        ("Serie 2", "Good Guys", "2", "Two", 2, "common"),
+        ("Serie 2", "Good Guys", "10", "Ten", 2, "common"),
+        ("Serie 10", "Good Guys", "1", "Kai", 10, "common")
     ];
 
     private static CardListItem Photo(

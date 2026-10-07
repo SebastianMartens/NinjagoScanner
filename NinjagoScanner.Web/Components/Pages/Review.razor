@@ -156,7 +156,7 @@
 						@if (IsExpanded(photo))
 						{
 							<div class="review-details">
-								<span>Seltenheit: @(photo.Rarity ?? "-")</span>
+								<span>Seltenheit: @(group.Rarity is null ? "-" : CardRarity.Label(group.Rarity))</span>
 								@{ var details = GetDetails(photo); }
 								@if (details is null)
 								{
@@ -667,7 +667,7 @@
 
 			if (string.IsNullOrWhiteSpace(newKey) || string.Equals(newKey, oldKey, StringComparison.Ordinal))
 			{
-				// The matched card didn't change (e.g. a re-analysis only updated Rarity), so this
+				// The matched card didn't change (e.g. a re-analysis only updated the language), so this
 				// isn't an Owned Copies change and gets no overlay - but it can still have crossed an
 				// achievement (e.g. first-legendary), which still deserves its toast.
 				await CelebrateSilentlyIfAnythingUnlockedAsync(xpBefore);
@@ -695,7 +695,7 @@
 			}
 
 			var evaluation = await GamificationService.EvaluateAsync(xpBefore.Value, snapshot);
-			CelebrationCenter.CelebrateCard(UnlockCelebrationKind.NewCard,matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, after.Rarity, ownedCopies, evaluation);
+			CelebrationCenter.CelebrateCard(UnlockCelebrationKind.NewCard,matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, matchedCard.Rarity, ownedCopies, evaluation);
 		}
 		catch (Exception)
 		{

@@ -45,7 +45,6 @@ public sealed class PictureServiceClientGetCardsAsyncTests : IAsyncLifetime
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "Rarity": "Common",
           "Confidence": 0.9,
           "ReviewStatus": "unreviewed"
         }

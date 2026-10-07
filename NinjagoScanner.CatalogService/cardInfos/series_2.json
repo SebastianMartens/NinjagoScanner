@@ -11,6 +11,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Undercover Kai"}},
           {"Karten-Nr.": 2, "Name": {"en": "Action Kai"}},
@@ -66,6 +67,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 51, "Name": {"en": "Acronix"}},
           {"Karten-Nr.": 52, "Name": {"en": "Super Acronix"}},
@@ -121,6 +123,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 101, "Name": {"en": "Surrounded"}},
           {"Karten-Nr.": 102, "Name": {"en": "Snake's Cry"}},
@@ -166,6 +169,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 141, "Name": {"en": "Airjitzu Lloyd"}},
           {"Karten-Nr.": 142, "Name": {"en": "Airjitzu Kai"}},
@@ -191,6 +195,7 @@
       },
       "Mega_Good_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 161, "Name": {"en": "Mega Kai"}},
           {"Karten-Nr.": 162, "Name": {"en": "Mega Jay"}},
@@ -206,6 +211,7 @@
       },
       "Mega_Villains_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 171, "Name": {"en": "Mega Acronix"}},
           {"Karten-Nr.": 172, "Name": {"en": "Mega Krux"}},
@@ -221,6 +227,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Day_of_the_Departed": [
           {"Karten-Nr.": 181, "Name": {"en": "Day of the Departed"}},
           {"Karten-Nr.": 182, "Name": {"en": "Day of the Departed"}},
@@ -268,6 +275,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Classic Kai"}},
           {"Karten-Nr.": "LE2", "Name": {"en": "Classic Jay"}},
@@ -291,6 +299,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL4", "Name": {"en": "Ultra Kai Airjitzu"}},
           {"Karten-Nr.": "XXL8", "Name": {"en": "Ultra Jay Airjitzu"}}

@@ -19,6 +19,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Power Duel Dragon Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Power Duel Acid Monster"}},
@@ -94,6 +95,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 71, "Name": {"en": "Power Duel Earth Monster"}},
           {"Karten-Nr.": 72, "Name": {"en": "Power Duel Dragon Cole"}},
@@ -164,6 +166,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Final_Showdown": [
           {"Karten-Nr.": 136, "Name": {"en": "Final Showdown 1"}},
           {"Karten-Nr.": 137, "Name": {"en": "Final Showdown 2"}},
@@ -198,6 +201,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 163, "Name": {"en": "Mysterious Ronin"}},
           {"Karten-Nr.": 164, "Name": {"en": "Little Guardian"}},
@@ -225,6 +229,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 185, "Name": {"en": "Sparkling Stone"}},
           {"Karten-Nr.": 186, "Name": {"en": "Ill"}},
@@ -248,6 +253,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 203, "Name": {"en": "The Temple Bounty"}},
           {"Karten-Nr.": 204, "Name": {"en": "Lloyd's Jet"}},
@@ -271,6 +277,7 @@
       },
       "Shattered_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 221, "Name": {"en": "Cole Shattered"}},
           {"Karten-Nr.": 222, "Name": {"en": "Zane Shattered"}},
@@ -284,6 +291,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Powerful Lloyd Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "09.01.2026"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Powerful Kai Limited Edition"}, "Fundort": "LEGO Ninjago Magazin 136/2026", "Erscheinungsdatum": "29.12.2025"},
@@ -313,6 +321,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Zane"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Cole"}},

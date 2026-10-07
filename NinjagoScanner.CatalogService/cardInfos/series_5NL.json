@@ -16,6 +16,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Proud Never-Realm Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Power Lloyd's Avatar"}},
@@ -58,6 +59,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 38, "Name": {"en": "Malicious Unagami"}},
           {"Karten-Nr.": 39, "Name": {"en": "Hideous Unagami"}},
@@ -96,6 +98,7 @@
       },
       "Level_Up_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 71, "Name": {"en": "Level Up Lloyd"}},
           {"Karten-Nr.": 72, "Name": {"en": "Level Up Cole"}},
@@ -139,6 +142,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 109, "Name": {"en": "Thieves!"}},
           {"Karten-Nr.": 110, "Name": {"en": "Helping Hand"}},
@@ -153,6 +157,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 118, "Name": {"en": "Wu's Battle Dragon"}},
           {"Karten-Nr.": 119, "Name": {"en": "Zane's Mino Creature"}},
@@ -167,6 +172,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Arcade Kai Limited Edition"}, "Fundort": "Starter-Pack", "Erscheinungsdatum": "04.08.2020"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Arcade Jay Limited Edition"}, "Fundort": "Ninjago Magazin #66", "Erscheinungsdatum": "04.08.2020"},
@@ -190,6 +196,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Level Up Jay"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Level Up Lloyd"}},

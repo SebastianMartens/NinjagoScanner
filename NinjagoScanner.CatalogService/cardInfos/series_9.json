@@ -15,6 +15,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Ultra Arin"}},
           {"Karten-Nr.": 2, "Name": {"en": "Sora"}},
@@ -101,6 +102,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 82, "Name": {"en": "Ultra Beatrix"}},
           {"Karten-Nr.": 83, "Name": {"en": "Ras"}},
@@ -178,6 +180,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Nap"}},
           {"Karten-Nr.": 155, "Name": {"en": "Begging"}},
@@ -219,6 +222,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Old Cap"}},
           {"Karten-Nr.": 191, "Name": {"en": "Tumbling"}},
@@ -242,6 +246,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 208, "Name": {"en": "Kai's Dragon Car"}},
           {"Karten-Nr.": 209, "Name": {"en": "Photac Beast"}},
@@ -265,6 +270,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Rapid_Vehicles_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Rapid Vehicles Puzzle 1"}},
           {"Karten-Nr.": 227, "Name": {"en": "Rapid Vehicles Puzzle 2"}},
@@ -301,6 +307,7 @@
       },
       "Gold_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 253, "Name": {"en": "Overpower Lloyd"}},
           {"Karten-Nr.": 254, "Name": {"en": "Overpower Kai"}},
@@ -310,6 +317,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Brave Lloyd Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "29.12.2023"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Brave Arin Limited Edition"}, "Fundort": "LEGO Ninjago Magazin #110", "Erscheinungsdatum": "29.12.2023"},
@@ -345,6 +353,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Ultra Arin"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Ultra Lloyd"}}

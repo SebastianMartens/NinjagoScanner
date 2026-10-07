@@ -67,6 +67,7 @@ message CatalogCardEntry {
   string card_name = 4;
   int32 sort_order = 5;
   string class = 6;
+  string rarity = 7;
 }
 
 message SeriesMetadata {

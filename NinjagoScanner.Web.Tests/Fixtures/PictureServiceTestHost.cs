@@ -196,7 +196,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
         public string? CardName { get; init; }
         public string? CardNumber { get; init; }
         public string? SetName { get; init; }
-        public string? Rarity { get; init; }
         public string? Language { get; init; }
         public string? SourceFileName { get; init; }
     }
@@ -378,7 +377,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 CardName = NormalizeNullable(request.CardName),
                 CardNumber = NormalizeNullable(request.CardNumber),
                 SetName = NormalizeNullable(request.SetName),
-                Rarity = NormalizeNullable(request.Rarity),
                 Language = NormalizeNullable(request.Language),
                 ReviewStatus = NormalizeNullable(request.ReviewStatus)
             });
@@ -484,7 +482,6 @@ public sealed class PictureServiceTestHost : IAsyncDisposable
                 CardName = record?.CardName ?? string.Empty,
                 CardNumber = record?.CardNumber ?? string.Empty,
                 SetName = record?.SetName ?? string.Empty,
-                Rarity = record?.Rarity ?? string.Empty,
                 Language = record?.Language ?? "de",
                 ReviewStatus = record?.ReviewStatus ?? "unreviewed"
             };

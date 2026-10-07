@@ -12,6 +12,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Ninja Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Proud Lloyd"}},
@@ -75,6 +76,7 @@
         ]},
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 74, "Name": {"en": "Wicked Garmadon"}},
           {"Karten-Nr.": 75, "Name": {"en": "Angry Garmadon"}},
@@ -142,6 +144,7 @@
       },
       "Ultra_Good_vs_Evil_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 4, "Name": {"en": "Ultra Duel Lloyd"}},
           {"Karten-Nr.": 5, "Name": {"en": "Ultra Duel Garmadon"}},
@@ -161,6 +164,7 @@
       },
       "Dragon_and_Dragon_Master_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 136, "Name": {"en": "Fire Dragon"}},
           {"Karten-Nr.": 137, "Name": {"en": "Fire Dragon"}},
@@ -184,6 +188,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Lloyd's Spinjitzu Attack"}},
           {"Karten-Nr.": 155, "Name": {"en": "Cole's Spinjitzu Attack"}},
@@ -234,6 +239,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 199, "Name": {"en": "Destiny's Wing"}},
           {"Karten-Nr.": 200, "Name": {"en": "Huntercopter"}},
@@ -266,6 +272,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Rescue_of_Firstbourne_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Rescue of Firstbourne Puzzle"}},
           {"Karten-Nr.": 227, "Name": {"en": "Rescue of Firstbourne Puzzle"}},
@@ -302,6 +309,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Mega Power Kai"}},
           {"Karten-Nr.": "LE2", "Name": {"en": "Mega Power Cole"}},
@@ -332,6 +340,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL138", "Name": {"en": "Dragon Master Kai"}},
           {"Karten-Nr.": "XXL141", "Name": {"en": "Dragon Master Jay"}},
@@ -343,6 +352,7 @@
       },
       "XXXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXXL136", "Name": {"en": "Fire Dragon"}},
           {"Karten-Nr.": "XXXL137", "Name": {"en": "Fire Dragon"}},

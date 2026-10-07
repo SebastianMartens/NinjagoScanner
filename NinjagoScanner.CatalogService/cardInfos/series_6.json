@@ -12,6 +12,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Shintaro Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Brave Shintaro Lloyd"}},
@@ -78,6 +79,7 @@
       },
       "Ultra_Good_vs_Evil_Double_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 5, "Name": {"en": "Ultra Beastmaster Lloyd"}},
           {"Karten-Nr.": 6, "Name": {"en": "Ultra Magma Monster"}},
@@ -95,6 +97,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 74, "Name": {"en": "Skull Sorcerer"}},
           {"Karten-Nr.": 75, "Name": {"en": "Mean Skull Sorcerer"}},
@@ -162,6 +165,7 @@
       },
       "Mega_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 136, "Name": {"en": "Mega Creature Grief Bringer"}},
           {"Karten-Nr.": 137, "Name": {"en": "Mega Creature Mino"}},
@@ -185,6 +189,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Gaming Chicken"}},
           {"Karten-Nr.": 155, "Name": {"en": "Invitation"}},
@@ -226,6 +231,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Covered in Leaves"}},
           {"Karten-Nr.": 191, "Name": {"en": "Abducted"}},
@@ -249,6 +255,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 208, "Name": {"en": "Boulder Blaster"}},
           {"Karten-Nr.": 209, "Name": {"en": "X-1 Ninja Charger"}},
@@ -272,6 +279,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Shintaro_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Shintaro Puzzle"}},
           {"Karten-Nr.": 227, "Name": {"en": "Shintaro Puzzle"}},
@@ -308,6 +316,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Golden Lloyd Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "28.12.2020"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Shintaro Lloyd Limited Edition"}, "Fundort": "Ninjago Magazin #73", "Erscheinungsdatum": "23.02.2021"},
@@ -340,6 +349,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Shintaro Kai Limited Edition"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Shintaro Lloyd Limited Edition"}},

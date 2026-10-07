@@ -423,7 +423,6 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             card_name=_normalize_nullable(request.card_name),
             card_number=_normalize_nullable(request.card_number),
             set_name=_normalize_nullable(request.set_name),
-            rarity=_normalize_nullable(request.rarity),
             language=_normalize_nullable(request.language),
             error_message=_normalize_nullable(request.error_message),
             review_status=_normalize_nullable(request.review_status),
@@ -581,7 +580,6 @@ def _to_card_entry(photo_id: str, sidecar: SidecarRecord | None) -> pb2.CardEntr
         card_name=sidecar.card_name if sidecar and sidecar.card_name else "",
         card_number=sidecar.card_number if sidecar and sidecar.card_number else "",
         set_name=sidecar.set_name if sidecar and sidecar.set_name else "",
-        rarity=sidecar.rarity if sidecar and sidecar.rarity else "",
         language=sidecar.language if sidecar and sidecar.language else Languages.DEFAULT,
         review_status=sidecar.review_status if sidecar and sidecar.review_status else ReviewStatuses.UNREVIEWED,
     )

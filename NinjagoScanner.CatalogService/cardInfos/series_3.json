@@ -11,6 +11,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"de": "Schüler Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"de": "Geheimer Ninja Lloyd"}},
@@ -86,6 +87,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 71, "Name": {"de": "Erster Haimonster General #1"}},
           {"Karten-Nr.": 72, "Name": {"de": "Gefeuerter Hai General #1"}},
@@ -143,6 +145,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 123, "Name": {"de": "Böser Nebel"}},
           {"Karten-Nr.": 124, "Name": {"de": "Handschellen"}},
@@ -188,6 +191,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 163, "Name": {"de": "Katana V11"}},
           {"Karten-Nr.": 164, "Name": {"de": "Straßenmotorrad"}},
@@ -213,6 +217,7 @@
       },
       "Mega_Duel_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 183, "Name": {"de": "Mega Duell Lloyd"}},
           {"Karten-Nr.": 184, "Name": {"de": "Mega Duell Kai"}},
@@ -234,6 +239,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Die_Helden_Ninjago_Citys": [
           {"Karten-Nr.": 199, "Name": {"de": "Die Helden Ninjago Citys 1"}},
           {"Karten-Nr.": 200, "Name": {"de": "Die Helden Ninjago Citys 2"}},
@@ -281,6 +287,7 @@
       },
       "Villains_Level_2": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 235, "Name": {"de": "Unheimlicher Garmadon"}},
           {"Karten-Nr.": 236, "Name": {"de": "Fieser Garmadon"}},
@@ -302,6 +309,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"de": "Spinjitzu Meister Lloyd"}},
           {"Karten-Nr.": "LE2", "Name": {"de": "Spinjitzu Meister Kai"}},
@@ -331,6 +339,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL6", "Name": {"de": "XXL – Ultra Power Lloyd"}},
           {"Karten-Nr.": "XXL12", "Name": {"de": "XXL – Ultra Power Kai"}},

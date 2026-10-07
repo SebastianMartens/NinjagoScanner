@@ -243,6 +243,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 SeriesName = seriesName,
                 Category = category,
                 Class = entry.Class,
+                Rarity = entry.Rarity,
                 CardNumber = normalizedNumber,
                 CardName = cardName,
                 SortOrder = sortOrder
@@ -252,10 +253,11 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         return cards.ToArray();
     }
 
-    private static IEnumerable<(string CardNumber, string CardName, string Category, string Class)> EnumerateCardEntries(
+    private static IEnumerable<(string CardNumber, string CardName, string Category, string Class, string Rarity)> EnumerateCardEntries(
         JsonElement element,
         IReadOnlyList<string> categoryPath,
-        string? categoryClass = null)
+        string? categoryClass = null,
+        string? categoryRarity = null)
     {
         if (element.ValueKind == JsonValueKind.Object)
         {
@@ -266,6 +268,20 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                 && !string.IsNullOrWhiteSpace(classProperty.GetString()))
             {
                 categoryClass = classProperty.GetString()!.Trim();
+            }
+
+            // Rarity works like Class: a category declares it once and its cards inherit it, and a
+            // single card entry may declare its own, which overrides the category's for that card.
+            var rarity = categoryRarity;
+            if (element.TryGetProperty("Rarity", out var rarityProperty)
+                && rarityProperty.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(rarityProperty.GetString()))
+            {
+                rarity = CatalogRarities.Validate(rarityProperty.GetString()!);
+                if (!element.TryGetProperty("Karten-Nr.", out _))
+                {
+                    categoryRarity = rarity;
+                }
             }
 
             if (element.TryGetProperty("Karten-Nr.", out var numberProperty)
@@ -290,7 +306,13 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                             $"Card '{name}' (number {number}) in category '{categoryLabel}' has no Class; every category must declare a \"Class\".");
                     }
 
-                    yield return (number, name, categoryLabel, categoryClass);
+                    if (rarity is null)
+                    {
+                        throw new CatalogDataException(
+                            $"Card '{name}' (number {number}) in category '{categoryLabel}' has no Rarity; every category must declare a \"Rarity\".");
+                    }
+
+                    yield return (number, name, categoryLabel, categoryClass, rarity);
                 }
             }
 
@@ -307,7 +329,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                     nextCategoryPath = [.. categoryPath, ToCategoryDisplayName(property.Name)];
                 }
 
-                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath, categoryClass))
+                foreach (var entry in EnumerateCardEntries(property.Value, nextCategoryPath, categoryClass, categoryRarity))
                 {
                     yield return entry;
                 }
@@ -317,7 +339,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
         {
             foreach (var item in element.EnumerateArray())
             {
-                foreach (var entry in EnumerateCardEntries(item, categoryPath, categoryClass))
+                foreach (var entry in EnumerateCardEntries(item, categoryPath, categoryClass, categoryRarity))
                 {
                     yield return entry;
                 }
@@ -360,6 +382,7 @@ public sealed partial class CatalogRepository(ILogger<CatalogRepository> logger,
                && !normalized.Equals("Sondereditionen", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Kategorien", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Class", StringComparison.OrdinalIgnoreCase)
+               && !normalized.Equals("Rarity", StringComparison.OrdinalIgnoreCase)
                && !normalized.Equals("Karten", StringComparison.OrdinalIgnoreCase)
                && !normalized.StartsWith("Serie", StringComparison.OrdinalIgnoreCase);
     }

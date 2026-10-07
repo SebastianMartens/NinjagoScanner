@@ -26,7 +26,7 @@ For an image file that has no sidecar file yet, `ListCards` SHALL return a `Card
 
 #### Scenario: Unscanned image
 - **WHEN** an image file has never been scanned and has no sidecar file
-- **THEN** its `CardEntry` has `AnalysisStatus` `notAnalyzed`, `ReviewStatus` `unreviewed`, `Language` `de`, and empty card name/number/set name/rarity fields
+- **THEN** its `CardEntry` has `AnalysisStatus` `notAnalyzed`, `ReviewStatus` `unreviewed`, `Language` `de`, and empty card name/number/set name fields
 
 ### Requirement: Image with an unreadable sidecar reports a failed entry
 For an image file whose sidecar file exists but cannot be read or parsed, `ListCards` SHALL return a `CardEntry` with `AnalysisStatus` `failed`, `ReviewStatus` `unreviewed`, `Language` defaulted to German (`de`), and an error message describing the read failure, rather than raising an error for the whole call.
@@ -36,7 +36,7 @@ For an image file whose sidecar file exists but cannot be read or parsed, `ListC
 - **THEN** its `CardEntry` has `AnalysisStatus` `failed`, `ReviewStatus` `unreviewed`, `Language` `de`, and a non-empty error message, and the call still returns entries for the remaining images
 
 ### Requirement: Image with a readable sidecar reports its stored data
-For an image file whose sidecar file exists and can be read, `ListCards` SHALL return a `CardEntry` populated from the sidecar's stored fields (card name, card number, set name, rarity, confidence, reasoning summary, detected text, scanned-at timestamp, error message, review status, and language — defaulted to German (`de`) if the sidecar has no explicit `Language` value), where `AnalysisStatus` is reported as the stored value if it case-insensitively matches `ok`, `uncertain`, or `failed`, and as `notAnalyzed` otherwise (see "Unrecognized or missing stored analysis status reports as not-analyzed").
+For an image file whose sidecar file exists and can be read, `ListCards` SHALL return a `CardEntry` populated from the sidecar's stored fields (card name, card number, set name, confidence, reasoning summary, detected text, scanned-at timestamp, error message, review status, and language - defaulted to German (`de`) if the sidecar has no explicit `Language` value), where `AnalysisStatus` is reported as the stored value if it case-insensitively matches `ok`, `uncertain`, or `failed`, and as `notAnalyzed` otherwise (see "Unrecognized or missing stored analysis status reports as not-analyzed"). A `CardEntry` SHALL NOT carry a rarity.
 
 #### Scenario: Successfully scanned image
 - **WHEN** an image has a valid sidecar file from a prior scan

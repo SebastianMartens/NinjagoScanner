@@ -20,7 +20,6 @@ public sealed record CardListItem
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
-    public string? Rarity { get; init; }
     public string? Language { get; init; }
     public required string ReviewStatus { get; init; }
 }

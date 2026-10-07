@@ -14,7 +14,7 @@ internal sealed class ReviewSession
 {
     internal const string AllFilterValue = "all";
 
-    private IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> catalog;
+    private IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> catalog;
     private List<CardListItem> photos;
     private IReadOnlyList<CardReviewGroup> groups;
     private IReadOnlyList<CardReviewGroup>? filteredGroups;

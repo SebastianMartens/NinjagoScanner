@@ -18,6 +18,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Ultra Edition Arin"}},
           {"Karten-Nr.": 2, "Name": {"en": "Tournament Sora"}},
@@ -104,6 +105,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 82, "Name": {"en": "Ultra Edition Ras"}},
           {"Karten-Nr.": 83, "Name": {"en": "Tournament Cinder"}},
@@ -181,6 +183,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Group Photo"}},
           {"Karten-Nr.": 155, "Name": {"en": "Dazzled"}},
@@ -222,6 +225,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Golden Wolf's Head"}},
           {"Karten-Nr.": 191, "Name": {"en": "Slimy Cords"}},
@@ -245,6 +249,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 208, "Name": {"en": "Young Dragon Riyu"}},
           {"Karten-Nr.": 209, "Name": {"en": "Arin's Ninja Off-Road Buggy Car"}},
@@ -268,6 +273,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Puzzle_One": [
           {"Karten-Nr.": 226, "Name": {"en": "Puzzle One 1"}},
           {"Karten-Nr.": 227, "Name": {"en": "Puzzle One 2"}},
@@ -293,6 +299,7 @@
       },
       "Art_Cards": {
         "Class": "art",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 244, "Name": {"en": "Lloyd"}},
           {"Karten-Nr.": 245, "Name": {"en": "Arin"}},
@@ -307,6 +314,7 @@
       },
       "Shadow_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 253, "Name": {"en": "Shadow Arin"}},
           {"Karten-Nr.": 254, "Name": {"en": "Shadow Sora"}},
@@ -328,6 +336,7 @@
       },
       "Ruby_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 269, "Name": {"en": "Ruby Lloyd"}},
           {"Karten-Nr.": 270, "Name": {"en": "Ruby Kai"}},
@@ -343,6 +352,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Tournament Lloyd Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "27.12.2024"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Tournament Arin Limited Edition"}, "Fundort": "LEGO Ninjago Magazin #123", "Erscheinungsdatum": "27.12.2024"},
@@ -380,6 +390,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Cole"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Kai"}},

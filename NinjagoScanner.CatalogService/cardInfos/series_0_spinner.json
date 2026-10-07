@@ -12,6 +12,7 @@
     "Kategorien": {
       "Character Cards Deck 1": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Kai"}},
           {"Karten-Nr.": 2, "Name": {"en": "Nya"}},
@@ -34,6 +35,7 @@
       },
       "Battle Cards Deck 1": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 18, "Name": {"en": "Smoke Screen"}},
           {"Karten-Nr.": 19, "Name": {"en": "Gold Rush"}},
@@ -103,6 +105,7 @@
       },
       "Special Edition Cards Deck 1": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Sensei Wu"}},
           {"Karten-Nr.": "LE2", "Name": {"en": "Kai"}},
@@ -117,6 +120,7 @@
       },
       "Character Cards Deck 2": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "WB1", "Name": {"en": "Lloyd ZX"}},
           {"Karten-Nr.": "WB2", "Name": {"en": "Kai ZX"}},
@@ -147,6 +151,7 @@
       },
       "Battle Cards Deck 2": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "WB26", "Name": {"en": "Crown of Fire"}},
           {"Karten-Nr.": "WB27", "Name": {"en": "Cinder Storm"}},
@@ -252,6 +257,7 @@
       },
       "Special Edition Cards Deck 2": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "WBLE1", "Name": {"en": "Fangpyre Leap"}},
           {"Karten-Nr.": "WBLE2", "Name": {"en": "Venomari Acid"}},

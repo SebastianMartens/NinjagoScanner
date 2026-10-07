@@ -23,12 +23,12 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
-                {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
+                {"Karten-Nr.": 5, "Rarity": "limited", "Name": {"de": "Zane"}}
               ] },
               "Puzzle_Cards": {
-                "Class": "puzzle-piece",
+                "Class": "puzzle-piece", "Rarity": "common",
                 "Day_of_the_Departed": [
                   {"Karten-Nr.": 6, "Name": {"de": "Puzzle1"}}
                 ]
@@ -38,7 +38,7 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "Serie_10": {
             "SortOrder": 10,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
               ] }
             }
@@ -80,7 +80,6 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "Rarity": "Common",
           "Confidence": 0.9,
           "ReviewStatus": "unreviewed"
         }
@@ -105,6 +104,17 @@ public sealed class CollectionQueryServiceGalleryTests : IAsyncLifetime
         var cole = cards.Single(card => card.CardName == "Cole");
         Assert.NotNull(cole.ImageUrl);
         Assert.Contains("photo-1", cole.ImageUrl);
+    }
+
+    [Fact]
+    public async Task GetGalleryCardsAsync_RarityComesFromTheCatalogCard_WithOrWithoutAPhoto()
+    {
+        var cards = await collectionQueryService.GetGalleryCardsAsync("Serie 2");
+
+        Assert.Equal("common", cards.Single(card => card.CardName == "Cole").Rarity);
+        Assert.Equal("limited", cards.Single(card => card.CardName == "Zane").Rarity);
+        // No photo at all: still carries the catalog rarity.
+        Assert.Equal("common", cards.Single(card => card.CardName == "Puzzle1").Rarity);
     }
 
     [Fact]

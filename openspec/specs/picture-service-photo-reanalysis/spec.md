@@ -41,7 +41,7 @@ Defines the `ReanalyzePhoto` RPC, which re-runs AI Analysis on one already-store
 - **THEN** the analysis runs and a sidecar record is created holding its result
 
 ### Requirement: ReanalyzePhoto preserves review status and pins a verified match
-`ReanalyzePhoto` SHALL leave the photo's `ReviewStatus` exactly as it is at the moment the result is written, never resetting or setting it. When the photo's `ReviewStatus` is `verified` and its sidecar has both a series name and a card number, the analysis SHALL still re-run, but the resulting sidecar SHALL keep that series name and card number instead of a newly matched pair, consistent with how `Scan` treats verified photos. Every other analysis-derived field (card name, rarity, language, and the series name and card number of a photo that is not verified) SHALL be replaced by the new result, including values a person had previously edited by hand.
+`ReanalyzePhoto` SHALL leave the photo's `ReviewStatus` exactly as it is at the moment the result is written, never resetting or setting it. When the photo's `ReviewStatus` is `verified` and its sidecar has both a series name and a card number, the analysis SHALL still re-run, but the resulting sidecar SHALL keep that series name and card number instead of a newly matched pair, consistent with how `Scan` treats verified photos. Every other analysis-derived field (card name, language, and the series name and card number of a photo that is not verified) SHALL be replaced by the new result, including values a person had previously edited by hand.
 
 #### Scenario: Review status survives re-analysis
 - **WHEN** `ReanalyzePhoto` completes for a photo whose `ReviewStatus` is `incorrect`
@@ -83,7 +83,7 @@ On success, `ReanalyzePhoto` SHALL return the photo's card entry as it stands af
 
 #### Scenario: Response reflects the new result
 - **WHEN** `ReanalyzePhoto` succeeds
-- **THEN** the returned card entry carries the photo's newly written analysis status, card name, card number, series name, rarity, and language
+- **THEN** the returned card entry carries the photo's newly written analysis status, card name, card number, series name, and language
 
 #### Scenario: Subsequent reads see the new result
 - **WHEN** `ListCards` or `GetCardDetails` is called for the photo after `ReanalyzePhoto` succeeded

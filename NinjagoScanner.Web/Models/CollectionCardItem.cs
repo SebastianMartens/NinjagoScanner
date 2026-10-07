@@ -7,6 +7,7 @@ public sealed class CollectionCardItem
     public required string Category { get; init; }
     public required string CardNumber { get; init; }
     public required string CardName { get; init; }
+    public string Rarity { get; init; } = CardRarity.Common;
     public int OwnedCopies { get; init; }
 
     public bool IsOwned => OwnedCopies > 0;

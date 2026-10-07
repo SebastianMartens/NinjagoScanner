@@ -13,14 +13,14 @@ public sealed class DedupMergeCachingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
+            "Kategorien": { "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
           }
         }
         """);
         directory.WriteFile("series_1_copy.json", """
         {
           "Serie 1": {
-            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Zane"}} ] } }
+            "Kategorien": { "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Zane"}} ] } }
           }
         }
         """);
@@ -39,7 +39,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "SortOrder": 10,
-            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
+            "Kategorien": { "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] } }
           }
         }
         """);
@@ -47,7 +47,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_0": {
             "SortOrder": 0,
-            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Spinner Kai"}} ] } }
+            "Kategorien": { "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Spinner Kai"}} ] } }
           }
         }
         """);
@@ -67,7 +67,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
                 {"Karten-Nr.": "01", "Name": {"de": "Kai"}}
               ] }
@@ -88,7 +88,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": "1", "Name": {"de": "Kai"}},
                 {"Karten-Nr.": "01", "Name": {"en": "Kai"}}
               ] }
@@ -110,7 +110,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         {
           "Serie_1": {
             "Jahr": 2016,
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -132,7 +132,7 @@ public sealed class DedupMergeCachingTests : IDisposable
             "Jahr": 2016,
             "Besonderheiten": ["Feature A"],
             "Sondereditionen": ["Edition A"],
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -153,7 +153,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);
@@ -172,7 +172,7 @@ public sealed class DedupMergeCachingTests : IDisposable
         var filePath = directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);

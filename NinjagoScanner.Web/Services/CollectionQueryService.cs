@@ -33,6 +33,7 @@ internal sealed class CollectionQueryService(
                     Category = card.Category,
                     CardNumber = card.CardNumber,
                     CardName = card.CardName,
+                    Rarity = card.Rarity,
                     OwnedCopies = ownedCopies
                 };
             })
@@ -96,7 +97,7 @@ internal sealed class CollectionQueryService(
                 PhotoId = matchedPhoto?.PhotoId,
                 ImageUrl = matchedPhoto is not null && downloadUrls.TryGetValue(matchedPhoto.PhotoId, out var imageUrl) ? imageUrl : null,
                 PhotoCount = photoCount,
-                Rarity = matchedPhoto?.Rarity,
+                Rarity = card.Rarity,
                 ReviewStatus = matchedPhoto is null ? null : NormalizeNullable(matchedPhoto.ReviewStatus)
             });
         }
@@ -187,6 +188,7 @@ internal sealed class CollectionQueryService(
             Category = card.Category,
             CardNumber = card.CardNumber,
             CardName = card.CardName,
+            Rarity = card.Rarity,
             Year = metadata.Year,
             Logo = metadata.Logo,
             Theme = metadata.Theme,
@@ -220,10 +222,10 @@ internal sealed class CollectionQueryService(
     /// instances, so regrouping after a local change leaves every unchanged photo untouched.
     /// </summary>
     internal static IReadOnlyList<CardReviewGroup> BuildReviewGroups(
-        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> cardsFromCatalog,
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> cardsFromCatalog,
         IReadOnlyList<CardListItem> photos)
     {
-        var catalogByKey = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder)>(StringComparer.Ordinal);
+        var catalogByKey = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder, string Rarity)>(StringComparer.Ordinal);
         foreach (var card in cardsFromCatalog)
         {
             var key = BuildOwnershipKey(card.Series, card.CardNumber);
@@ -232,10 +234,10 @@ internal sealed class CollectionQueryService(
                 continue;
             }
 
-            catalogByKey.TryAdd(key, (card.Series, card.CardNumber, card.CardName, card.SortOrder));
+            catalogByKey.TryAdd(key, (card.Series, card.CardNumber, card.CardName, card.SortOrder, card.Rarity));
         }
 
-        var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder, List<CardListItem> Photos)>(StringComparer.Ordinal);
+        var catalogGroups = new Dictionary<string, (string SeriesName, string CardNumber, string CardName, int SortOrder, string Rarity, List<CardListItem> Photos)>(StringComparer.Ordinal);
         var catchAll = new List<CardListItem>();
 
         foreach (var photo in photos)
@@ -245,7 +247,7 @@ internal sealed class CollectionQueryService(
             {
                 if (!catalogGroups.TryGetValue(key, out var group))
                 {
-                    group = (catalogCard.SeriesName, catalogCard.CardNumber, catalogCard.CardName, catalogCard.SortOrder, new List<CardListItem>());
+                    group = (catalogCard.SeriesName, catalogCard.CardNumber, catalogCard.CardName, catalogCard.SortOrder, catalogCard.Rarity, new List<CardListItem>());
                     catalogGroups[key] = group;
                 }
 
@@ -266,6 +268,7 @@ internal sealed class CollectionQueryService(
                 SeriesName = group.SeriesName,
                 CardNumber = group.CardNumber,
                 CardName = group.CardName,
+                Rarity = group.Rarity,
                 Photos = group.Photos.OrderBy(photo => photo.PhotoId, StringComparer.OrdinalIgnoreCase).ToArray()
             })
             .ToList();
@@ -314,7 +317,6 @@ internal sealed class CollectionQueryService(
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),
             SetName = NormalizeNullable(entry.SetName),
-            Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
             AttributesJson = details.AttributesJson,
             ScannedAtUtc = details.ScannedAtUtc,

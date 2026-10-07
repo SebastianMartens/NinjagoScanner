@@ -193,21 +193,21 @@ internal sealed class GamificationService(
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
         return BuildState(
             cardsFromCatalog,
-            photoEntries.Select(entry => new PhotoFacts(entry.SetName, entry.CardNumber, entry.Rarity, entry.ReviewStatus)).ToArray());
+            photoEntries.Select(entry => new PhotoFacts(entry.SetName, entry.CardNumber, entry.ReviewStatus)).ToArray());
     }
 
     private static GamificationCollectionState BuildState(ReviewSnapshot snapshot)
     {
         return BuildState(
             snapshot.Catalog,
-            snapshot.Photos.Select(photo => new PhotoFacts(photo.SetName, photo.CardNumber, photo.Rarity, photo.ReviewStatus)).ToArray());
+            snapshot.Photos.Select(photo => new PhotoFacts(photo.SetName, photo.CardNumber, photo.ReviewStatus)).ToArray());
     }
 
     /// <summary>The only photo fields gamification reads, shared by gRPC CardEntry and in-memory CardListItem sources.</summary>
-    private sealed record PhotoFacts(string? SetName, string? CardNumber, string? Rarity, string? ReviewStatus);
+    private sealed record PhotoFacts(string? SetName, string? CardNumber, string? ReviewStatus);
 
     private static GamificationCollectionState BuildState(
-        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> cardsFromCatalog,
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> cardsFromCatalog,
         IReadOnlyList<PhotoFacts> photoEntries)
     {
         var photosByKey = photoEntries.ToLookup(entry => CollectionQueryService.BuildOwnershipKey(entry.SetName, entry.CardNumber));
@@ -241,14 +241,15 @@ internal sealed class GamificationService(
                 distinctOwnedCards++;
                 duplicateCopies += matches.Length - 1;
 
-                if (matches.Any(entry => IsRarity(entry.Rarity, "legendary")))
+                // Rarity belongs to the catalog card, not to its photos; each owned card counts once.
+                switch (CardRarity.Normalize(card.Rarity))
                 {
-                    legendaryOwnedCards++;
-                }
-
-                if (matches.Any(entry => IsRarity(entry.Rarity, "limited edition")))
-                {
-                    limitedEditionOwnedCards++;
+                    case CardRarity.Legendary:
+                        legendaryOwnedCards++;
+                        break;
+                    case CardRarity.Limited:
+                        limitedEditionOwnedCards++;
+                        break;
                 }
             }
 
@@ -278,11 +279,6 @@ internal sealed class GamificationService(
             LegendaryOwnedCards = legendaryOwnedCards,
             LimitedEditionOwnedCards = limitedEditionOwnedCards
         };
-    }
-
-    private static bool IsRarity(string? rarity, string expected)
-    {
-        return !string.IsNullOrWhiteSpace(rarity) && string.Equals(rarity.Trim(), expected, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeNullable(string? value)

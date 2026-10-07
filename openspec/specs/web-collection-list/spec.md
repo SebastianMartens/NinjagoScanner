@@ -38,15 +38,15 @@ The overview SHALL let a user group cards by series, category, ownership status 
 - **THEN** the options appear ordered by each category's lowest card number, not alphabetically by category name
 
 ### Requirement: Selecting a card loads its full details
-Selecting a card row SHALL load that card's series metadata (year, logo, theme, highlights) and its matching photos, and SHALL clear the currently displayed details while loading.
+Selecting a card row SHALL load that card's series metadata (year, logo, theme, highlights), its catalog rarity and its matching photos, and SHALL clear the currently displayed details while loading.
 
 #### Scenario: Selecting a card
 - **WHEN** a user clicks a card row (or navigates to it via keyboard)
-- **THEN** the detail pane shows a loading state, then the card's title, series/category/number, metadata, and its list of matching photos once loaded
+- **THEN** the detail pane shows a loading state, then the card's title, series/category/number, rarity, metadata, and its list of matching photos once loaded
 
 #### Scenario: Card has no matching photos
 - **WHEN** the selected card has no matching photos
-- **THEN** the detail pane indicates no photo is available for the card and disables sidecar editing
+- **THEN** the detail pane indicates no photo is available for the card and offers no way to open the card in the review page
 
 ### Requirement: A card's photo can be chosen when multiple exist
 When a selected card has more than one matching photo, the detail pane SHALL let the user pick which photo's image and sidecar are shown, defaulting to the first photo (ordered by file name) when the card is first selected.
@@ -61,25 +61,6 @@ While focus is within the card list, pressing the down or up arrow key SHALL mov
 #### Scenario: Navigating past the last visible card
 - **WHEN** the last card in the filtered list is selected and the user presses the down arrow key
 - **THEN** the selection does not change
-
-### Requirement: A selected photo's sidecar can be edited and saved
-The detail pane SHALL provide a form to edit the selected photo's card name, card number, set name (chosen from known series), rarity, language (chosen from German, English, Polish, or Unknown), confidence, reasoning summary, detected text (one entry per line), error message, and review status, and saving SHALL persist all of those fields via a single sidecar update, then reload the overview and re-select the current card.
-
-#### Scenario: Saving valid sidecar edits
-- **WHEN** a user edits sidecar fields and submits the form with a valid numeric confidence value
-- **THEN** the update is saved, the overview and detail pane are refreshed to reflect it, and a success message is shown
-
-#### Scenario: Saving with an invalid confidence value
-- **WHEN** a user submits the form with a confidence value that is not a valid number
-- **THEN** the save is rejected client-side with an error message and no update is sent
-
-#### Scenario: Language control offers a closed set of options
-- **WHEN** a user opens the Language control on the sidecar edit form
-- **THEN** German, English, Polish, and Unknown are the only selectable options
-
-#### Scenario: Language control is pre-filled with the resolved value
-- **WHEN** the detail pane loads a photo's sidecar into the edit form
-- **THEN** the Language control shows that photo's currently resolved language (defaulting to German if no explicit language was recorded) as the selected option
 
 ### Requirement: Series lists and groupings follow catalog sort order
 Wherever series are listed or cards are grouped by series — the series filter dropdown, the "group by series" view, and manual sorting of the series column — series SHALL appear ordered by the catalog's `SortOrder`, not alphabetically by series name.
@@ -121,3 +102,29 @@ The `/collection` page SHALL read an optional `series` query-string parameter on
 #### Scenario: Arriving without a series parameter
 - **WHEN** a user navigates to `/collection` with no `series` parameter
 - **THEN** the page behaves exactly as before this change, with no series filter pre-selected
+
+### Requirement: The detail pane links to the review page for the card
+When the selected card has at least one matching photo, the detail pane SHALL provide a button that opens the review page on that card's group, using the review page's card address (series name and card number). The collection page SHALL NOT provide a form for editing a photo's sidecar.
+
+#### Scenario: Opening the card in the review page
+- **WHEN** a user activates the review button for a selected card that has matching photos
+- **THEN** the review page opens on the group for that card's series and card number
+
+#### Scenario: No review button without photos
+- **WHEN** the selected card has no matching photos
+- **THEN** the detail pane shows no review button
+
+#### Scenario: No sidecar edit form
+- **WHEN** a user selects any card on the collection page
+- **THEN** the detail pane contains no editable sidecar fields
+
+### Requirement: The detail pane shows the card's catalog rarity
+The detail pane SHALL show the selected card's rarity as defined by the catalog (`common`, `limited` or `legendary`), read-only and independent of whether the card has photos.
+
+#### Scenario: Limited card
+- **WHEN** a user selects a card whose catalog rarity is `limited`
+- **THEN** the detail pane shows that rarity
+
+#### Scenario: Card without photos still shows its rarity
+- **WHEN** a user selects a card that has no photos
+- **THEN** the detail pane still shows the card's catalog rarity

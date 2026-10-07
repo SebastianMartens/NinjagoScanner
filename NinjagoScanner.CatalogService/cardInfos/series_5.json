@@ -12,6 +12,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Desert Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Never-Realm Lloyd"}},
@@ -78,6 +79,7 @@
       },
       "Ultra_Good_vs_Evil_Double_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 4, "Name": {"en": "Ultra Duel Digi Lloyd"}},
           {"Karten-Nr.": 5, "Name": {"en": "Ultra Duel Richie"}},
@@ -95,6 +97,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 74, "Name": {"en": "Aspheera"}},
           {"Karten-Nr.": 75, "Name": {"en": "Nasty Aspheera"}},
@@ -162,6 +165,7 @@
       },
       "Mega_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 136, "Name": {"en": "Mega Digi Lloyd"}},
           {"Karten-Nr.": 137, "Name": {"en": "Lloyd's Avatar"}},
@@ -185,6 +189,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Couch Potatoes"}},
           {"Karten-Nr.": 155, "Name": {"en": "Relaxing Workout"}},
@@ -226,6 +231,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Scroll Of Forbidden Spinjitzu"}},
           {"Karten-Nr.": 191, "Name": {"en": "Cobweb Trap"}},
@@ -240,6 +246,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 199, "Name": {"en": "Land Bounty"}},
           {"Karten-Nr.": 200, "Name": {"en": "Land Bounty Flyer"}},
@@ -272,6 +279,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Desert_of_Doom_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Desert of Doom Puzzle"}},
           {"Karten-Nr.": 227, "Name": {"en": "Desert of Doom Puzzle"}},
@@ -308,6 +316,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Digi Lloyd Limited Edition"}, "Fundort": "Starter-Pack", "Erscheinungsdatum": "21.01.2020"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Digi Kai Limited Edition"}, "Fundort": "Ninjago Magazin #59", "Erscheinungsdatum": "21.01.2020"},
@@ -340,6 +349,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Forbidden Spinjitzu Lloyd"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Forbidden Spinjitzu Kai"}},

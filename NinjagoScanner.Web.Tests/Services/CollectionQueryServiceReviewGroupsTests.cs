@@ -23,7 +23,7 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
                 {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
               ] }
@@ -32,7 +32,7 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
           "Serie_10": {
             "SortOrder": 10,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
               ] }
             }
@@ -80,7 +80,6 @@ public sealed class CollectionQueryServiceReviewGroupsTests : IAsyncLifetime
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "Rarity": "Common",
           "Confidence": 0.9,
           "ReviewStatus": "unreviewed"
         }
@@ -144,11 +143,11 @@ public sealed class CollectionQueryServiceReviewGroupsCardNumberOrderingTests : 
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 10, "Name": {"de": "Ten"}},
                 {"Karten-Nr.": 2, "Name": {"de": "Two"}}
               ] },
-              "Limited_Edition_Cards": { "Class": "limited edition", "Karten": [
+              "Limited_Edition_Cards": { "Class": "limited edition", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": "LE1", "Name": {"de": "LE One"}},
                 {"Karten-Nr.": "XXL1", "Name": {"de": "XXL One"}}
               ] }
@@ -187,7 +186,6 @@ public sealed class CollectionQueryServiceReviewGroupsCardNumberOrderingTests : 
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "Rarity": "Common",
           "Confidence": 0.9,
           "ReviewStatus": "unreviewed"
         }

@@ -11,6 +11,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Cool Legacy Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Armed Shintaro Lloyd"}},
@@ -53,6 +54,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 38, "Name": {"en": "Island Guard Chief Mammatus"}},
           {"Karten-Nr.": 39, "Name": {"en": "Furious Chief Mammatus"}},
@@ -91,6 +93,7 @@
       },
       "Level_Up_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 71, "Name": {"en": "Level Up Shock Lloyd"}},
           {"Karten-Nr.": 72, "Name": {"en": "Level Up Shock Cole"}},
@@ -116,6 +119,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 91, "Name": {"en": "Keeper's Amulet"}},
           {"Karten-Nr.": 92, "Name": {"en": "Servant"}},
@@ -139,6 +143,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 109, "Name": {"en": "Lightning Breath"}},
           {"Karten-Nr.": 110, "Name": {"en": "Shuriken Attack"}},
@@ -153,6 +158,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 118, "Name": {"en": "Action Jungle Chopper Bike"}},
           {"Karten-Nr.": 119, "Name": {"en": "Action Ninja Catamaran"}},
@@ -167,6 +173,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Island Lloyd Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "10.08.2021"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Brave Legacy Lloyd Limited Edition"}, "Fundort": "Ninjago Magazin #80", "Erscheinungsdatum": "07.09.2021"},
@@ -190,6 +197,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Level Up Shock Cole"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Level Up Shock Kai"}}

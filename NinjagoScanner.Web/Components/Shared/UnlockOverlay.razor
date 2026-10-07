@@ -25,9 +25,9 @@
                 <div class="unlock-sub">@Subline(celebration)</div>
             </div>
 
-            @if (celebration.Kind != UnlockCelebrationKind.RankUp && !string.IsNullOrWhiteSpace(celebration.Rarity))
+            @if (celebration.Kind != UnlockCelebrationKind.RankUp && CardRarity.BadgeLabel(celebration.Rarity) is { } rarityLabel)
             {
-                <span class="cv-chip cv-chip-purple">@celebration.Rarity</span>
+                <span class="cv-chip cv-chip-purple">@rarityLabel</span>
             }
 
             <p class="unlock-note">@Note(celebration)</p>
@@ -100,13 +100,10 @@
         _ => RarityColor(celebration.Rarity)
     };
 
-    private static string RarityColor(string? rarity) => (rarity ?? string.Empty).Trim().ToLowerInvariant() switch
+    private static string RarityColor(string? rarity) => CardRarity.Normalize(rarity) switch
     {
-        "common" => "oklch(60% 0.01 290)",
-        "rare" => "oklch(75% 0.17 150)",
-        "ultra rare" => "oklch(70% 0.19 300)",
-        "legendary" => "oklch(78% 0.15 85)",
-        "limited edition" => "oklch(70% 0.19 300)",
+        CardRarity.Limited => "oklch(70% 0.19 300)",
+        CardRarity.Legendary => "oklch(78% 0.15 85)",
         _ => "oklch(75% 0.17 150)"
     };
 

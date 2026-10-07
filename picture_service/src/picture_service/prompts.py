@@ -68,6 +68,11 @@ than other numbers or text and shown in the lower left corner of the card. Addit
 the prefix "LE" if it's a limited edition card (e.g. "LE6"). Puzzle cards may have the 
 card number shown in the lower right corner.
 
+rarity_hint: a short text describing only what you can visually observe on the card that may hint at its rarity,
+e.g. a card number with the prefix "LE" (limited edition), a text such as "Limited Edition", or an unusual finish
+or border (gold, holographic, glitter). Do not judge or classify the rarity, only report what you see. Empty text if
+you see no such hint.
+
 card_found: true if the picture shows any trading card. False if you see something else.
 """
 
@@ -91,6 +96,10 @@ In particular, derive:
   "trap": trap cards have the "trap_tag" detected as true, a text_box and detected text_box_text.  
   "puzzle-piece": puzzle-piece cards have the "puzzle-piece_card" detected as true. 
   Puzzle-piece cards and art cards typically have no card_name attribute.  
+- "rarity": exclusively one of the following values: common, limited.
+  "limited": the detected "rarity_hint" or "card_number" indicates a limited edition card (e.g. a card number
+  prefixed with "LE", or the text "Limited Edition"), or the derived "class" is "limited edition".
+  "common": every other card, including cards without any rarity hint.
 - "card_number": take over card number from the detected attributes.
 - "card_name": take over card name from the detected attributes.
 - "card_name_en": the English name of the card, used to look the card up in an English-only

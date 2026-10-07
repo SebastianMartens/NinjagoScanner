@@ -35,6 +35,12 @@ AttributeMap = dict[str, AttributeValue]
 # class is one of the catalog's fixed class values").
 CARD_CLASSES = frozenset({"character", "action", "vehicle", "puzzle-piece", "trap", "limited edition", "art"})
 
+# The catalog's fixed card-rarity set (catalog-service-card-catalog). A derived `rarity`
+# attribute outside this set is treated as absent (picture-service-derived-attributes' "Derived
+# rarity is one of the catalog's fixed rarity values"). Stage 2's prompt only offers `common`
+# and `limited`; `legendary` cannot be recognised from a photo yet.
+CARD_RARITIES = frozenset({"common", "limited", "legendary"})
+
 
 @dataclass(frozen=True)
 class VerifiedMatch:
@@ -62,7 +68,6 @@ class CardAnalysisResult:
     card_name: str | None = None
     card_number: str | None = None
     set_name: str | None = None
-    rarity: str | None = None
     language: str | None = None
     confidence: float = 0.0
     reasoning_summary: str | None = None
@@ -91,7 +96,6 @@ class SidecarRecord:
     card_name: str | None = None
     card_number: str | None = None
     set_name: str | None = None
-    rarity: str | None = None
     language: str | None = None
     confidence: float = 0.0
     reasoning_summary: str | None = None
@@ -117,7 +121,6 @@ class SidecarRecord:
             card_name=result.card_name,
             card_number=result.card_number,
             set_name=result.set_name,
-            rarity=result.rarity,
             language=result.language,
             confidence=result.confidence,
             reasoning_summary=result.reasoning_summary,
@@ -158,11 +161,11 @@ class CatalogCardInfo:
     card_number: str
     card_name: str
     category: str
-    # Populated once catalog-service-card-class ships and CatalogCardEntry carries a class
-    # field; until then this is always None, which stage 3 treats as "no narrowing signal"
-    # (see picture-service-staged-analysis-pipeline's design.md "Class-based narrowing is
-    # advisory, not required").
+    # Both come from CatalogCardEntry; an empty value there is None here, which stage 3 treats as
+    # "no signal" (see picture-service-staged-analysis-pipeline's design.md "Class-based
+    # narrowing is advisory, not required").
     card_class: str | None = None
+    card_rarity: str | None = None
 
 
 @dataclass(frozen=True)

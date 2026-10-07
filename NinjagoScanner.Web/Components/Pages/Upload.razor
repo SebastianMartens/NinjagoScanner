@@ -416,7 +416,7 @@
 
             var evaluation = await GamificationService.EvaluateAsync(xpBefore);
             var kind = matchedCard.OwnedCopies == 1 ? UnlockCelebrationKind.NewCard : UnlockCelebrationKind.Duplicate;
-            CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, card.Rarity, matchedCard.OwnedCopies, evaluation);
+            CelebrationCenter.CelebrateCard(kind, matchedCard.CardName, matchedCard.Series, matchedCard.CardNumber, matchedCard.Rarity, matchedCard.OwnedCopies, evaluation);
         }
         catch (Exception)
         {

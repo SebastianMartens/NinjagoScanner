@@ -55,7 +55,7 @@ NinjagoScanner/
 
 ### Card photos and sidecar data
 
-Photo bytes live in an S3 bucket, keyed by a generated photo ID (`photos/<photo_id>`). Sidecar records — the AI analysis result plus any manual corrections (series, card number, rarity, review status, etc.) — live in a DynamoDB table, one item per photo ID. Nothing is written to the local filesystem at runtime; PictureService is the only service that talks to S3/DynamoDB, exclusively through `photo_store.py` / `sidecar_table.py`.
+Photo bytes live in an S3 bucket, keyed by a generated photo ID (`photos/<photo_id>`). Sidecar records — the AI analysis result plus any manual corrections (series, card number, review status, etc.) — live in a DynamoDB table, one item per photo ID. Nothing is written to the local filesystem at runtime; PictureService is the only service that talks to S3/DynamoDB, exclusively through `photo_store.py` / `sidecar_table.py`.
 
 ### CatalogService
 

@@ -1,6 +1,5 @@
 @page "/collection"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
-@inject PictureServiceClient PictureServiceClient
 @inject CollectionQueryService CollectionQueryService
 @inject IJSRuntime JS
 
@@ -175,95 +174,34 @@
                     </div>
 
                     <div class="detail-section">
-                        <h4>Sidecar bearbeiten</h4>
-
-                        @if (SelectedPhoto is null)
-                        {
-                            <p class="table-secondary">Ohne Foto ist keine Sidecar-Bearbeitung moeglich.</p>
-                        }
-                        else
-                        {
-                            <EditForm Model="sidecarDraft" OnValidSubmit="SaveSelectedSidecarAsync">
-                                <div class="detail-form-grid">
-                                    <label>
-                                        <span>Review-Status</span>
-                                        <select @bind="sidecarDraft.ReviewStatus">
-                                            <option value="@ReviewStatuses.Unreviewed">Nicht geprüft</option>
-                                            <option value="@ReviewStatuses.Verified">Bestätigt</option>
-                                            <option value="@ReviewStatuses.Incorrect">Fehlerhaft</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        <span>Kartenname</span>
-                                        <input @bind="sidecarDraft.CardName" />
-                                    </label>
-                                    <label>
-                                        <span>Kartennummer</span>
-                                        <input @bind="sidecarDraft.CardNumber" />
-                                    </label>
-                                    <label>
-                                        <span>Setname</span>
-                                        <select @bind="sidecarDraft.SetName">
-                                            <option value="">– bitte wählen –</option>
-                                            @foreach (var series in availableSeries)
-                                            {
-                                                <option value="@series">@series</option>
-                                            }
-                                        </select>
-                                    </label>
-                                    <label>
-                                        <span>Seltenheit</span>
-                                        <input @bind="sidecarDraft.Rarity" />
-                                    </label>
-                                    <label>
-                                        <span>Sprache</span>
-                                        <select @bind="sidecarDraft.Language">
-                                            <option value="@Languages.German">Deutsch</option>
-                                            <option value="@Languages.English">Englisch</option>
-                                            <option value="@Languages.Polish">Polnisch</option>
-                                            <option value="@Languages.Unknown">Unbekannt</option>
-                                        </select>
-                                    </label>
-                                </div>
-
-                                <label class="detail-textarea-field">
-                                    <span>Error Message</span>
-                                    <textarea rows="2" @bind="sidecarDraft.ErrorMessage"></textarea>
-                                </label>
-
-                                <p class="table-secondary">Analyse-Status (durch Gemini ermittelt, nicht editierbar): @(SelectedPhoto.Sidecar?.AnalysisStatus ?? "-")</p>
-
-                                @if (SelectedPhoto.Sidecar?.ScannedAtUtc is not null)
-                                {
-                                    <p class="table-secondary">Zuletzt gescannt: @SelectedPhoto.Sidecar.ScannedAtUtc.Value.LocalDateTime</p>
-                                }
-
-                                @if (!string.IsNullOrWhiteSpace(SelectedPhoto.Sidecar?.AttributesJson))
-                                {
-                                    <label class="detail-textarea-field">
-                                        <span>Erkannte/abgeleitete Attribute (JSON, zur Fehlersuche)</span>
-                                        <textarea rows="6" readonly>@SelectedPhoto.Sidecar.AttributesJson</textarea>
-                                    </label>
-                                }
-
-                                <div class="detail-actions">
-                                    <button type="submit" class="btn btn-primary" disabled="@isSavingSidecar">
-                                        @(isSavingSidecar ? "Speichert..." : "Sidecar speichern")
-                                    </button>
-                                </div>
-                            </EditForm>
-
-                            @if (!string.IsNullOrWhiteSpace(sidecarMessage))
-                            {
-                                <p class="sidecar-message">@sidecarMessage</p>
-                            }
-
-                            @if (!string.IsNullOrWhiteSpace(sidecarError))
-                            {
-                                <p class="error-text">@sidecarError</p>
-                            }
-                        }
+                        <h4>Seltenheit</h4>
+                        <p>@CardRarity.Label(selectedDetails.Rarity)</p>
                     </div>
+
+                    @if (SelectedPhoto is not null)
+                    {
+                        <div class="detail-section">
+                            <h4>Analyse</h4>
+                            <p class="table-secondary">Analyse-Status (durch Gemini ermittelt): @(SelectedPhoto.Sidecar?.AnalysisStatus ?? "-")</p>
+
+                            @if (SelectedPhoto.Sidecar?.ScannedAtUtc is not null)
+                            {
+                                <p class="table-secondary">Zuletzt gescannt: @SelectedPhoto.Sidecar.ScannedAtUtc.Value.LocalDateTime</p>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(SelectedPhoto.Sidecar?.AttributesJson))
+                            {
+                                <label class="detail-textarea-field">
+                                    <span>Erkannte/abgeleitete Attribute (JSON, zur Fehlersuche)</span>
+                                    <textarea rows="6" readonly>@SelectedPhoto.Sidecar.AttributesJson</textarea>
+                                </label>
+                            }
+                        </div>
+
+                        <div class="detail-actions">
+                            <a class="btn btn-primary" href="@ReviewHref(selectedDetails)">Im Review öffnen</a>
+                        </div>
+                    }
                 }
             </div>
         </aside>
@@ -285,7 +223,6 @@
     private bool showOnlyMissing;
     private bool showOnlyDuplicates;
     private bool isDetailsLoading;
-    private bool isSavingSidecar;
     private string selectedSeries = string.Empty;
     private string selectedCategory = string.Empty;
     private string groupBy = "series";
@@ -293,9 +230,6 @@
     private CollectionCardItem? selectedCard;
     private CollectionCardDetails? selectedDetails;
     private string? selectedPhotoId;
-    private SidecarDraft sidecarDraft = new();
-    private string? sidecarMessage;
-    private string? sidecarError;
     private ElementReference collectionMainRef;
 
     protected override async Task OnInitializedAsync()
@@ -441,16 +375,12 @@
         selectedCard = card;
         selectedDetails = null;
         selectedPhotoId = null;
-        sidecarDraft = new SidecarDraft();
-        sidecarMessage = null;
-        sidecarError = null;
         isDetailsLoading = true;
 
         try
         {
             selectedDetails = await CollectionQueryService.GetCollectionCardDetailsAsync(card.Series, card.CardNumber);
             selectedPhotoId = selectedDetails?.Photos.FirstOrDefault()?.PhotoId;
-            sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, card);
         }
         finally
         {
@@ -461,67 +391,6 @@
     private void OnSelectedPhotoChanged(ChangeEventArgs args)
     {
         selectedPhotoId = args.Value?.ToString();
-        sidecarDraft = BuildDraft(SelectedPhoto?.Sidecar, selectedCard);
-        sidecarMessage = null;
-        sidecarError = null;
-    }
-
-    private async Task SaveSelectedSidecarAsync()
-    {
-        if (selectedCard is null || SelectedPhoto is null)
-        {
-            return;
-        }
-
-        isSavingSidecar = true;
-        sidecarMessage = null;
-        sidecarError = null;
-
-        try
-        {
-            var update = new CollectionCardSidecarUpdate
-            {
-                AnalysisStatus = sidecarDraft.AnalysisStatus,
-                CardName = sidecarDraft.CardName,
-                CardNumber = sidecarDraft.CardNumber,
-                SetName = sidecarDraft.SetName,
-                Rarity = sidecarDraft.Rarity,
-                Language = sidecarDraft.Language,
-                ErrorMessage = sidecarDraft.ErrorMessage,
-                ReviewStatus = sidecarDraft.ReviewStatus
-            };
-
-            await PictureServiceClient.UpdateCardSidecarAsync(SelectedPhoto.PhotoId, update);
-            await ReloadOverviewAsync();
-            await SelectCardAsync(selectedCard);
-            sidecarMessage = "Sidecar gespeichert.";
-        }
-        catch (Exception exception)
-        {
-            sidecarError = $"Speichern fehlgeschlagen: {exception.Message}";
-        }
-        finally
-        {
-            isSavingSidecar = false;
-        }
-    }
-
-    private async Task ReloadOverviewAsync()
-    {
-        overview = await CollectionQueryService.GetCollectionOverviewAsync();
-        allCards = overview.Cards.ToList();
-        availableSeries = allCards
-            .Select(card => (card.Series, card.SortOrder))
-            .DistinctBy(pair => pair.Series, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(pair => pair.SortOrder)
-            .Select(pair => pair.Series)
-            .ToList();
-
-        if (!string.IsNullOrWhiteSpace(selectedCategory)
-            && !AvailableCategories.Contains(selectedCategory, StringComparer.OrdinalIgnoreCase))
-        {
-            selectedCategory = string.Empty;
-        }
     }
 
     private static IEnumerable<CardGroup> BuildGroups(
@@ -560,32 +429,9 @@
         return card.IsDuplicateOwned ? "Mehrfach vorhanden" : "Einmal vorhanden";
     }
 
-    private static SidecarDraft BuildDraft(CollectionCardSidecarData? sidecar, CollectionCardItem? fallbackCard)
-    {
-        return new SidecarDraft
-        {
-            AnalysisStatus = sidecar?.AnalysisStatus ?? "ok",
-            CardName = sidecar?.CardName ?? fallbackCard?.CardName ?? string.Empty,
-            CardNumber = sidecar?.CardNumber ?? fallbackCard?.CardNumber ?? string.Empty,
-            SetName = sidecar?.SetName ?? fallbackCard?.Series ?? string.Empty,
-            Rarity = sidecar?.Rarity ?? string.Empty,
-            Language = sidecar?.Language ?? Languages.Default,
-            ErrorMessage = sidecar?.ErrorMessage ?? string.Empty,
-            ReviewStatus = sidecar?.ReviewStatus ?? ReviewStatuses.Unreviewed
-        };
-    }
-
-    private sealed class SidecarDraft
-    {
-        public string AnalysisStatus { get; set; } = "ok";
-        public string CardName { get; set; } = string.Empty;
-        public string CardNumber { get; set; } = string.Empty;
-        public string SetName { get; set; } = string.Empty;
-        public string Rarity { get; set; } = string.Empty;
-        public string Language { get; set; } = Languages.Default;
-        public string ErrorMessage { get; set; } = string.Empty;
-        public string ReviewStatus { get; set; } = ReviewStatuses.Unreviewed;
-    }
+    /// <summary>The review page's card address (same shape the gallery links with).</summary>
+    private static string ReviewHref(CollectionCardDetails details) =>
+        $"/review?series={Uri.EscapeDataString(details.Series)}&card={Uri.EscapeDataString(details.CardNumber)}";
 
     private sealed record CardGroup(string Key, List<CollectionCardItem> Items);
 }

@@ -15,6 +15,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Dragon Team Matriarch"}},
           {"Karten-Nr.": 2, "Name": {"en": "Dragon Team Lloyd"}},
@@ -120,6 +121,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 101, "Name": {"en": "Level Up Ras"}},
           {"Karten-Nr.": 102, "Name": {"en": "Cinder"}},
@@ -191,6 +193,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 167, "Name": {"en": "Wyld Baby"}},
           {"Karten-Nr.": 168, "Name": {"en": "Failed Project"}},
@@ -214,6 +217,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 185, "Name": {"en": "Don't Let Go!"}},
           {"Karten-Nr.": 186, "Name": {"en": "The Floor is Lava", "de": "Der Boden ist Lava"}},
@@ -228,6 +232,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 194, "Name": {"en": "Kai's Rising Dragon Strike"}},
           {"Karten-Nr.": 195, "Name": {"en": "Nya's Rising Dragon Strike"}},
@@ -242,6 +247,7 @@
       },
       "Platinum_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 203, "Name": {"en": "Climber Jay Platinum Edition"}},
           {"Karten-Nr.": 204, "Name": {"en": "Cinder Platinum Edition"}},
@@ -251,6 +257,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Strong Kai Limited Edition"}, "Fundort": "Starterpack", "Erscheinungsdatum": "09.08.2024"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Strong Arin Limited Edition"}, "Fundort": "LEGO Ninjago Magazin #118", "Erscheinungsdatum": "09.08.2024"},
@@ -275,6 +282,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Mighty Duo"}}
         ]

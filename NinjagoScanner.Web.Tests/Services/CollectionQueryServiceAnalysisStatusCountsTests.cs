@@ -23,7 +23,7 @@ public sealed class CollectionQueryServiceAnalysisStatusCountsTests : IAsyncLife
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}}
               ] }
             }
@@ -62,7 +62,6 @@ public sealed class CollectionQueryServiceAnalysisStatusCountsTests : IAsyncLife
           "CardName": "irrelevant",
           "CardNumber": "4",
           "SetName": "Serie 2",
-          "Rarity": "Common",
           "Confidence": 0.9,
           "ReviewStatus": "unreviewed"
         }

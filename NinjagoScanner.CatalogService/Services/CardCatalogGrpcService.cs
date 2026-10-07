@@ -50,6 +50,7 @@ public sealed class CardCatalogGrpcService(CatalogRepository repository) : CardC
                 SeriesName = card.SeriesName,
                 Category = card.Category,
                 Class = card.Class,
+                Rarity = card.Rarity,
                 CardNumber = card.CardNumber,
                 CardName = card.CardName,
                 SortOrder = card.SortOrder

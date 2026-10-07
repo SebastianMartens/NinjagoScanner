@@ -38,8 +38,22 @@ Category. Unlike Category (fine-grained, per-series, inconsistently named), Clas
 is small and stable, so it can narrow catalog matching across series. Some
 Categories are a format or rarity tier layered on top of a depiction (e.g.
 "XXL_Cards", "Platinum_Cards"); those are force-fit into their closest Class,
-so Class is not a rarity or format indicator. Like Category, it is descriptive
-metadata and not part of a card's identity.
+so Class is not a rarity or format indicator (rarity is its own catalog
+attribute, see **Rarity**). Like Category, it is descriptive metadata and not
+part of a card's identity.
+
+### Rarity
+How scarce a **Card** is, as defined by the catalog: `common`, `limited` or
+`legendary`. Declared in the series data like **Card Class** (a **Category**
+declares it once, a single card may override it), so it is catalog data owned
+by CatalogService and is never stored on a **Sidecar**. The values were seeded
+once from the Class (`limited edition` → `limited`, everything else →
+`common`); afterwards rarity is independent of Class, so single rare cards can
+be flagged anywhere in the catalog. No card is `legendary` yet. AI Analysis
+only collects visual hints and derives `common` or `limited` as evidence for
+catalog matching; the Web app shows the rarity of the matched catalog card
+(gallery tag, unlock overlay, "Seltenheit" lines) and rewards it through the
+rarity achievements.
 
 ### Puzzle Sub-Group
 A **Category** whose cards are pieces of one image meant to be assembled
@@ -91,8 +105,8 @@ person's collection photos.
 
 ### Sidecar
 A record stored alongside a **Card Photo** holding everything known about
-it: its **Analysis Status**, detected card data (name, number, set name,
-rarity), **Language**, **Confidence**, **Reasoning Summary**, **Detected
+it: its **Analysis Status**, detected card data (name, number, set name),
+**Language**, **Confidence**, **Reasoning Summary**, **Detected
 Text**, and its independent **Review Status**. Created automatically on
 first scan, or manually when a person edits a card before it's scanned.
 
@@ -148,7 +162,7 @@ card the way it did — useful for a human reviewing an `uncertain` or
 
 ### Detected Text
 The raw pieces of text the **AI Analysis** read off a card photo (e.g.
-printed name, number, rarity markings), stored on the **Sidecar** as
+printed name, number, rarity hints), stored on the **Sidecar** as
 supporting evidence alongside the interpreted fields.
 
 ### Language

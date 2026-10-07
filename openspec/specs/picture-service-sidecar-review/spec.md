@@ -48,7 +48,7 @@ Every sidecar record SHALL carry a `ReviewStatus` field, separate from `Analysis
 - **THEN** its `ReviewStatus` remains unchanged
 
 #### Scenario: Editing other sidecar fields does not change ReviewStatus
-- **WHEN** any sidecar field other than `ReviewStatus` itself is updated (e.g. card name, card number, set name, rarity)
+- **WHEN** any sidecar field other than `ReviewStatus` itself is updated (e.g. card name, card number, set name)
 - **THEN** `ReviewStatus` is not modified by that update
 
 #### Scenario: Confidence does not gate ReviewStatus

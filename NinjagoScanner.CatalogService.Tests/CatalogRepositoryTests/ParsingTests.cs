@@ -15,7 +15,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Jahr": 2016,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"}}
               ] }
             }
@@ -40,7 +40,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai", "en": "Fire Ninja"}}
               ] }
             }
@@ -61,7 +61,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"en": "Kai"}}
               ] }
             }
@@ -83,7 +83,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Villains": {
-                "Class": "character",
+                "Class": "character", "Rarity": "common",
                 "Sub_Bosses": [
                   {"Karten-Nr.": 99, "Name": {"de": "Garmadon"}}
                 ]
@@ -105,7 +105,7 @@ public sealed class ParsingTests : IDisposable
     {
         directory.WriteFile("series_1.json", """
         {
-          "Serie_1": {"Class": "character", "Karten-Nr.": 1, "Name": {"de": "Kai"}}
+          "Serie_1": {"Class": "character", "Rarity": "common", "Karten-Nr.": 1, "Name": {"de": "Kai"}}
         }
         """);
 
@@ -128,7 +128,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [ {{cardJson}} ] }
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {{cardJson}} ] }
             }
           }
         }
@@ -150,7 +150,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "{{rawCategory}}": { "Class": "character", "Karten": [
+              "{{rawCategory}}": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Kai"} }
               ] }
             }
@@ -179,7 +179,7 @@ public sealed class ParsingTests : IDisposable
         directory.WriteFile("series_1.json", $$"""
         {
           "Serie_1": {
-            "Class": "character",
+            "Class": "character", "Rarity": "common",
             "{{reservedKey}}": {
               "Karten-Nr.": 1,
               "Name": {"de": "Should not be extracted as a card of a category named '{{reservedKey}}'"}
@@ -207,7 +207,7 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_2": {
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 1, "Name": {"de": "Zane"}}
               ] }
             }
@@ -234,7 +234,7 @@ public sealed class ParsingTests : IDisposable
             "Besonderheiten": ["Highlight A", "Highlight B"],
             "Sondereditionen": ["Edition A"],
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -259,7 +259,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Logo": 12345,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -283,8 +283,8 @@ public sealed class ParsingTests : IDisposable
         {
           "Serie_1": {
             "Kategorien": {
-              "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] },
-              "Trap_Cards": { "Class": "trap", "Karten": [ {"Karten-Nr.": 2, "Name": {"de": "Spike Pit"}} ] }
+              "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] },
+              "Trap_Cards": { "Class": "trap", "Rarity": "common", "Karten": [ {"Karten-Nr.": 2, "Name": {"de": "Spike Pit"}} ] }
             }
           }
         }
@@ -305,7 +305,7 @@ public sealed class ParsingTests : IDisposable
           "Serie_1": {
             "Kategorien": {
               "Puzzle_Cards": {
-                "Class": "puzzle-piece",
+                "Class": "puzzle-piece", "Rarity": "common",
                 "Puzzle_One": [ {"Karten-Nr.": 1, "Name": {"de": "Piece A"}} ],
                 "Puzzle_Two": { "Karten": [ {"Karten-Nr.": 2, "Name": {"de": "Piece B"}} ] }
               }
@@ -324,7 +324,7 @@ public sealed class ParsingTests : IDisposable
     [Theory]
     [InlineData("""{ "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
     [InlineData("""[ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ]""")]
-    [InlineData("""{ "Class": "  ", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
+    [InlineData("""{ "Class": "  ", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
     [InlineData("""{ "Class": 7, "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] }""")]
     public void GetSnapshot_FailsFast_NamingTheFile_WhenACategoryHasNoClass(string categoryJson)
     {
@@ -352,7 +352,7 @@ public sealed class ParsingTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"de": "Kai"}} ] } }
           }
         }
         """);

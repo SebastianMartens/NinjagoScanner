@@ -27,7 +27,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
             "Besonderheiten": ["Highlight A"],
             "Sondereditionen": ["Edition A"],
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] }
             }
           }
         }
@@ -58,11 +58,11 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -136,11 +136,11 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         {
           "Serie_10": {
             "SortOrder": 100,
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Ten"}} ] } }
           },
           "Serie_2": {
             "SortOrder": 20,
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Two"}} ] } }
           }
         }
         """);
@@ -176,7 +176,7 @@ public sealed class CardCatalogGrpcServiceTests : IDisposable
         directory.WriteFile("series_1.json", """
         {
           "Serie_1": {
-            "Kategorien": { "Good_Guys": { "Class": "character", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
+            "Kategorien": { "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": "1", "Name": {"de": "Kai"}} ] } }
           }
         }
         """);

@@ -15,6 +15,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Ultra Oni Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Neon Golden Kai"}},
@@ -101,6 +102,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 82, "Name": {"en": "Ultra Crystal King Overlord"}},
           {"Karten-Nr.": 83, "Name": {"en": "Neon Aspheera"}},
@@ -178,6 +180,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Colourful Pose"}},
           {"Karten-Nr.": 155, "Name": {"en": "Looking for Clues"}},
@@ -219,6 +222,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "Waterdragon"}},
           {"Karten-Nr.": 191, "Name": {"en": "Friction"}},
@@ -242,6 +246,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 208, "Name": {"en": "Cole's Dragon Cruiser"}},
           {"Karten-Nr.": 209, "Name": {"en": "Zane's Golden Dragon jet"}},
@@ -265,6 +270,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Crystalized_Heroes_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Crystalized Heroes Puzzle"}},
           {"Karten-Nr.": 227, "Name": {"en": "Crystalized Heroes Puzzle"}},
@@ -301,6 +307,7 @@
       },
       "Platinum_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 253, "Name": {"en": "Oni Lloyd Platinum Edition"}},
           {"Karten-Nr.": 254, "Name": {"en": "Golden Dragon Kai Platinum Edition"}},
@@ -310,6 +317,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Golden Dragon Kai Limited Edition"}, "Fundort": "Starter Pack", "Erscheinungsdatum": "27.12.2022"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Crystalized Kai Limited Edition"}, "Fundort": "LEGO Ninjago Magazin #98", "Erscheinungsdatum": "24.01.2023"},
@@ -345,6 +353,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Mega Oni Lloyd"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Mega Golden Dragon Jay"}},

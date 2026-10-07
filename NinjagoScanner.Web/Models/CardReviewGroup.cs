@@ -12,6 +12,9 @@ public sealed class CardReviewGroup
     public string? SeriesName { get; init; }
     public string? CardNumber { get; init; }
     public string? CardName { get; init; }
+
+    /// <summary>The resolved catalog card's rarity; null for the catch-all group.</summary>
+    public string? Rarity { get; init; }
     public required IReadOnlyList<CardListItem> Photos { get; init; }
 
     public string Key => IsCatchAll

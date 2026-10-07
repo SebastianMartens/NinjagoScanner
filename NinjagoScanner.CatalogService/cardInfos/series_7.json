@@ -15,6 +15,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Wild Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"en": "Abyss Lloyd"}},
@@ -81,6 +82,7 @@
       },
       "Ultra_Double_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 5, "Name": {"en": "Ultra Abyss Lloyd"}},
           {"Karten-Nr.": 6, "Name": {"en": "Ultra Gripe"}},
@@ -98,6 +100,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 74, "Name": {"en": "Kalmaar"}},
           {"Karten-Nr.": 75, "Name": {"en": "Menacing Kalmaar"}},
@@ -165,6 +168,7 @@
       },
       "Epic_Battle_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 136, "Name": {"en": "Epic Lloyd"}},
           {"Karten-Nr.": 137, "Name": {"en": "Epic Cole"}},
@@ -188,6 +192,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 154, "Name": {"en": "Watch Out!"}},
           {"Karten-Nr.": 155, "Name": {"en": "Crash!"}},
@@ -229,6 +234,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 190, "Name": {"en": "BRAKE!"}},
           {"Karten-Nr.": 191, "Name": {"en": "Wreck"}},
@@ -252,6 +258,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 208, "Name": {"en": "Lloyd's Hydro Mech"}},
           {"Karten-Nr.": 209, "Name": {"en": "Ninja Sub Speeder"}},
@@ -275,6 +282,7 @@
       },
       "Puzzle_Cards": {
         "Class": "puzzle-piece",
+        "Rarity": "common",
         "Abyss_Puzzle": [
           {"Karten-Nr.": 226, "Name": {"en": "Abyss Puzzle"}},
           {"Karten-Nr.": 227, "Name": {"en": "Abyss Puzzle"}},
@@ -311,6 +319,7 @@
       },
       "Platinum_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 253, "Name": {"en": "Platinum Lloyd"}},
           {"Karten-Nr.": 254, "Name": {"en": "Platinum Kai"}},
@@ -320,6 +329,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "Abyss Lloyd Limited Edition"}, "Fundort": "Starterpack Serie 7", "Erscheinungsdatum": "03.01.2022"},
           {"Karten-Nr.": "LE2", "Name": {"en": "Spinjitzu Lloyd Limited Edition"}, "Fundort": "Ninjago Legacy Magazin #17", "Erscheinungsdatum": "05.04.2022"},
@@ -352,6 +362,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"en": "Hydroboost Kai"}},
           {"Karten-Nr.": "XXL2", "Name": {"en": "Hydroboost Cole"}},

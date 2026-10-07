@@ -261,31 +261,6 @@ internal sealed class PictureServiceClient
         return ToCardDetailsItem(response.Details);
     }
 
-    public async Task UpdateCardSidecarAsync(
-        string photoId,
-        CollectionCardSidecarUpdate update,
-        CancellationToken cancellationToken = default)
-    {
-        var client = new CardPictureService.CardPictureServiceClient(channel);
-        var collectionId = await GetCollectionIdAsync(cancellationToken);
-
-        var request = new UpdateSidecarRequest
-        {
-            PhotoId = photoId,
-            CollectionId = collectionId,
-            AnalysisStatus = update.AnalysisStatus ?? string.Empty,
-            CardName = update.CardName ?? string.Empty,
-            CardNumber = update.CardNumber ?? string.Empty,
-            SetName = update.SetName ?? string.Empty,
-            Rarity = update.Rarity ?? string.Empty,
-            Language = update.Language ?? string.Empty,
-            ErrorMessage = update.ErrorMessage ?? string.Empty,
-            ReviewStatus = update.ReviewStatus ?? string.Empty
-        };
-
-        await client.UpdateSidecarAsync(request, cancellationToken: cancellationToken);
-    }
-
     public async Task UpdateReviewStatusAsync(string photoId, string reviewStatus, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);
@@ -381,7 +356,6 @@ internal sealed class PictureServiceClient
             CardName = NormalizeNullable(entry.CardName),
             CardNumber = NormalizeNullable(entry.CardNumber),
             SetName = NormalizeNullable(entry.SetName),
-            Rarity = NormalizeNullable(entry.Rarity),
             Language = NormalizeNullable(entry.Language) ?? Languages.Default,
             ReviewStatus = NormalizeNullable(entry.ReviewStatus) ?? ReviewStatuses.Unreviewed
         };

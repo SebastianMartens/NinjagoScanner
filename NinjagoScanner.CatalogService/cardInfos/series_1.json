@@ -12,6 +12,7 @@
     "Kategorien": {
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"en": "Kai"}},
           {"Karten-Nr.": 2, "Name": {"en": "Kai ZX"}},
@@ -67,6 +68,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 51, "Name": {"en": "Garmadon"}},
           {"Karten-Nr.": 52, "Name": {"en": "Ultra Garmadon"}},
@@ -122,6 +124,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 101, "Name": {"en": "Meditation"}},
           {"Karten-Nr.": 102, "Name": {"en": "Red Card"}},
@@ -167,6 +170,7 @@
       },
       "Hero_Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 141, "Name": {"en": "Titanium Dragon"}},
           {"Karten-Nr.": 142, "Name": {"en": "Master Wu Dragon"}},
@@ -186,6 +190,7 @@
       },
       "Villain_Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 155, "Name": {"en": "Morro Dragon"}},
           {"Karten-Nr.": 156, "Name": {"en": "Sky Shark"}},
@@ -205,6 +210,7 @@
       },
       "Evil_Magic_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 169, "Name": {"en": "Nadakhan"}},
           {"Karten-Nr.": 170, "Name": {"en": "Garmadon"}},
@@ -216,6 +222,7 @@
       },
       "Spinjitzu_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 175, "Name": {"en": "Spinjitzu Kai"}},
           {"Karten-Nr.": 176, "Name": {"en": "Spinjitzu Zane"}},
@@ -227,6 +234,7 @@
       },
       "Additional_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 181, "Name": {"en": "Ultra Cole: Scythe of Quakes"}},
           {"Karten-Nr.": 182, "Name": {"en": "Ultra Kai: Sword of Fire"}},
@@ -242,6 +250,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"en": "NRG Kai"}},
           {"Karten-Nr.": "LE2", "Name": {"en": "NRG Zane"}},

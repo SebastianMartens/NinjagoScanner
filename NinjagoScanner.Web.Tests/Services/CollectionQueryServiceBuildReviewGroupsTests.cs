@@ -5,12 +5,12 @@ namespace NinjagoScanner.Web.Tests.Services;
 
 public sealed class CollectionQueryServiceBuildReviewGroupsTests
 {
-    private static readonly IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)> Catalog =
+    private static readonly IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> Catalog =
     [
-        ("Serie 2", "Good Guys", "10", "Ten", 2),
-        ("Serie 2", "Good Guys", "2", "Two", 2),
-        ("Serie 2", "Limited Edition", "LE1", "LE One", 2),
-        ("Serie 10", "Good Guys", "1", "Kai", 10)
+        ("Serie 2", "Good Guys", "10", "Ten", 2, "common"),
+        ("Serie 2", "Good Guys", "2", "Two", 2, "common"),
+        ("Serie 2", "Limited Edition", "LE1", "LE One", 2, "limited"),
+        ("Serie 10", "Good Guys", "1", "Kai", 10, "common")
     ];
 
     private static CardListItem Photo(string photoId, string? setName, string? cardNumber) => new()
@@ -42,6 +42,23 @@ public sealed class CollectionQueryServiceBuildReviewGroupsTests
         Assert.Equal(expected, groups.Select(group => group.CardNumber).ToArray());
         Assert.True(groups[0].IsCatchAll);
         Assert.Equal("p-unknown", Assert.Single(groups[0].Photos).PhotoId);
+    }
+
+    [Fact]
+    public void BuildReviewGroups_TakesRarityFromTheCatalogCard_AndLeavesTheCatchAllWithout()
+    {
+        var photos = new[]
+        {
+            Photo("p-unknown", "Unknown Series", "1"),
+            Photo("p-le1", "Serie 2", "LE1"),
+            Photo("p-2", "Serie 2", "2")
+        };
+
+        var groups = CollectionQueryService.BuildReviewGroups(Catalog, photos);
+
+        Assert.Null(groups.Single(group => group.IsCatchAll).Rarity);
+        Assert.Equal("limited", groups.Single(group => group.CardNumber == "LE1").Rarity);
+        Assert.Equal("common", groups.Single(group => group.CardNumber == "2").Rarity);
     }
 
     [Fact]

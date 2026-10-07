@@ -15,6 +15,7 @@
     "Kategorien": {
       "Ultra_Duel_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 1, "Name": {"de": "Ultra Duell Oni Lloyd"}},
           {"Karten-Nr.": 2, "Name": {"de": "Ultra Duell Kristallkönig"}},
@@ -30,6 +31,7 @@
       },
       "Heroes": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 3, "Name": {"de": "Mutiger Legacy Kai"}},
           {"Karten-Nr.": 4, "Name": {"de": "Level Up Golddrachen-Cole"}},
@@ -113,6 +115,7 @@
       },
       "Platinum_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": 89, "Name": {"de": "Golddrachen-Jay Platin Edition"}},
           {"Karten-Nr.": 90, "Name": {"de": "Golddrachen-Cole Platin Edition"}}
@@ -120,6 +123,7 @@
       },
       "Villains": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 91, "Name": {"de": "Wilder Crystalized Kristallkönig"}},
           {"Karten-Nr.": 92, "Name": {"de": "Level Up Aspheera"}},
@@ -203,6 +207,7 @@
       },
       "Action_Cards": {
         "Class": "action",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 169, "Name": {"de": "Undercover"}},
           {"Karten-Nr.": 170, "Name": {"de": "Überwachung"}},
@@ -226,6 +231,7 @@
       },
       "Trap_Cards": {
         "Class": "trap",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 187, "Name": {"de": "Kristallisiert"}},
           {"Karten-Nr.": 188, "Name": {"de": "Abgestürzt"}},
@@ -240,6 +246,7 @@
       },
       "Vehicle_Cards": {
         "Class": "vehicle",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": 196, "Name": {"de": "Coles Erddrache EVO"}},
           {"Karten-Nr.": 197, "Name": {"de": "Kais Mech-Bike EVO"}},
@@ -254,6 +261,7 @@
       },
       "Limited_Edition_Cards": {
         "Class": "limited edition",
+        "Rarity": "limited",
         "Karten": [
           {"Karten-Nr.": "LE1", "Name": {"de": "Power Oni Lloyd"}, "Fundort": "Starterpack", "Erscheinungsdatum": "08.08.2023"},
           {"Karten-Nr.": "LE2", "Name": {"de": "Power Golddrachen-Cole"}, "Fundort": "LEGO Ninjago Magazin #105", "Erscheinungsdatum": "08.08.2023"},
@@ -281,6 +289,7 @@
       },
       "XXL_Cards": {
         "Class": "character",
+        "Rarity": "common",
         "Karten": [
           {"Karten-Nr.": "XXL1", "Name": {"de": "Level Up Golddrachen Kai"}}
         ]

@@ -23,7 +23,7 @@ public sealed class GamificationServiceTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
                 {"Karten-Nr.": 5, "Name": {"de": "Zane"}},
                 {"Karten-Nr.": 6, "Name": {"de": "Jay"}}
@@ -33,8 +33,13 @@ public sealed class GamificationServiceTests : IAsyncLifetime
           "Serie_10": {
             "SortOrder": 10,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
-                {"Karten-Nr.": 1, "Name": {"de": "Wu"}}
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
+                {"Karten-Nr.": 1, "Name": {"de": "Wu"}},
+                {"Karten-Nr.": 2, "Rarity": "legendary", "Name": {"de": "Golden Dragon"}}
+              ] },
+              "Limited_Edition_Cards": { "Class": "limited edition", "Rarity": "limited", "Karten": [
+                {"Karten-Nr.": "LE1", "Name": {"de": "Sensei Wu LE"}},
+                {"Karten-Nr.": "LE2", "Name": {"de": "Kai LE"}}
               ] }
             }
           }
@@ -124,14 +129,55 @@ public sealed class GamificationServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetProgressAsync_FirstLegendary_MatchesRarityCaseInsensitively()
+    public async Task GetProgressAsync_FirstLegendary_UnlocksWithACatalogLegendaryCard()
     {
-        pictureHost.WritePhoto("photo-1", Sidecar("Serie 2", "4", rarity: "LEGENDARY"));
+        pictureHost.WritePhoto("photo-1", Sidecar("Serie 10", "2"));
 
         var progress = await handle.Service.GetProgressAsync();
 
         var legendary = progress.Single(item => item.Achievement.Id == "first-legendary");
         Assert.True(legendary.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task GetProgressAsync_FirstLegendary_StaysLockedWithoutALegendaryCard()
+    {
+        pictureHost.WritePhoto("photo-1", Sidecar("Serie 2", "4"));
+
+        var progress = await handle.Service.GetProgressAsync();
+
+        var legendary = progress.Single(item => item.Achievement.Id == "first-legendary");
+        Assert.False(legendary.IsUnlocked);
+        Assert.Equal(0, legendary.Current);
+    }
+
+    [Fact]
+    public async Task GetProgressAsync_LimitedHunter_CountsEachOwnedLimitedCardOnce()
+    {
+        pictureHost.WritePhoto("photo-1", Sidecar("Serie 10", "LE1"));
+        // A duplicate copy and a common card must not add to the limited count.
+        pictureHost.WritePhoto("photo-2", Sidecar("Serie 10", "LE1"));
+        pictureHost.WritePhoto("photo-3", Sidecar("Serie 2", "4"));
+        pictureHost.WritePhoto("photo-4", Sidecar("Serie 10", "LE2"));
+
+        var progress = await handle.Service.GetProgressAsync();
+
+        var hunter = progress.Single(item => item.Achievement.Id == "limited-hunter");
+        Assert.Equal(2, hunter.Current);
+        Assert.False(hunter.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task GetProgressAsync_RarityComesFromTheCatalogNotFromTheSidecar()
+    {
+        // A legacy sidecar value must neither unlock nor count anything.
+        pictureHost.WritePhoto("photo-1", Sidecar("Serie 2", "4", rarity: "LEGENDARY"));
+        pictureHost.WritePhoto("photo-2", Sidecar("Serie 2", "5", rarity: "limited edition"));
+
+        var progress = await handle.Service.GetProgressAsync();
+
+        Assert.False(progress.Single(item => item.Achievement.Id == "first-legendary").IsUnlocked);
+        Assert.Equal(0, progress.Single(item => item.Achievement.Id == "limited-hunter").Current);
     }
 
     [Fact]

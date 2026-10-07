@@ -41,8 +41,7 @@ async def load_series_catalog(service_address: str) -> list[SeriesInfo]:
 async def load_catalog_cards(service_address: str) -> list[CatalogCardInfo]:
     """Loads every card across all series via `ListAllCards` - used by stage 3
     (picture-service-catalog-matching) to resolve a card number within a matched series.
-    `card_class` is always `None` for now: `CatalogCardEntry` doesn't carry a class field yet
-    (see catalog-service-card-class, not yet shipped) - see CatalogCardInfo's docstring.
+    `card_class` and `card_rarity` are `None` when CatalogService returns them empty.
     """
     async with grpc.aio.insecure_channel(_strip_scheme(service_address)) as channel:
         client = catalog_pb2_grpc.CardCatalogStub(channel)
@@ -54,6 +53,8 @@ async def load_catalog_cards(service_address: str) -> list[CatalogCardInfo]:
                 card_number=card.card_number,
                 card_name=card.card_name,
                 category=card.category,
+                card_class=getattr(card, "class") or None,
+                card_rarity=card.rarity or None,
             )
             for card in response.cards
         ]

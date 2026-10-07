@@ -574,7 +574,6 @@ async def test_update_sidecar_overwrites_all_editable_fields():
             card_name="Kai",
             card_number="1",
             set_name="Serie 1",
-            rarity="common",
             review_status="verified",
         ),
         FakeServicerContext(),
@@ -640,7 +639,7 @@ async def test_rescanning_does_not_change_review_status():
 
 async def test_rescanning_verified_sidecar_keeps_series_and_card_number():
     service, table, photo_store = make_service(
-        stage1_result={"card_number": "7"}, stage2_result={"card_number": "7", "rarity": "rare"}
+        stage1_result={"card_number": "7"}, stage2_result={"card_number": "7", "rarity": "limited"}
     )
     photo_store.bytes_by_key[("col-a", "p1")] = b"data"
     table.items[("col-a", "p1")] = SidecarRecord(
@@ -655,9 +654,8 @@ async def test_rescanning_verified_sidecar_keeps_series_and_card_number():
     assert updated.set_name == "Serie 1"
     assert updated.card_number == "1"
     assert updated.review_status == "verified"
-    assert updated.rarity is None
     assert updated.detected == {"card_number": "7"}
-    assert updated.derived == {"card_number": "7", "rarity": "rare"}
+    assert updated.derived == {"card_number": "7", "rarity": "limited"}
 
 
 async def test_rescanning_unverified_sidecar_re_resolves_series_and_card_number():
@@ -793,7 +791,7 @@ async def test_reanalyze_photo_preserves_review_status(gemini_api_key, review_st
 
 async def test_reanalyze_photo_verified_sidecar_keeps_series_and_card_number(gemini_api_key):
     service, table, photo_store = make_service(
-        stage1_result={"card_number": "7"}, stage2_result={"card_number": "7", "rarity": "rare"}
+        stage1_result={"card_number": "7"}, stage2_result={"card_number": "7", "rarity": "limited"}
     )
     photo_store.bytes_by_key[("col-a", "p1")] = b"data"
     table.items[("col-a", "p1")] = SidecarRecord(
@@ -804,7 +802,6 @@ async def test_reanalyze_photo_verified_sidecar_keeps_series_and_card_number(gem
 
     updated = table.items[("col-a", "p1")]
     assert (updated.set_name, updated.card_number) == ("Serie 1", "1")
-    assert updated.rarity is None
     assert updated.detected == {"card_number": "7"}
 
 

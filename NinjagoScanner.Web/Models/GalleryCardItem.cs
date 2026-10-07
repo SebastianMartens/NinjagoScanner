@@ -10,6 +10,7 @@ public sealed class GalleryCardItem
     public string? PhotoId { get; init; }
     public string? ImageUrl { get; init; }
     public int PhotoCount { get; init; }
-    public string? Rarity { get; init; }
+    /// <summary>The catalog card's rarity (not a photo's).</summary>
+    public string Rarity { get; init; } = CardRarity.Common;
     public string? ReviewStatus { get; init; }
 }

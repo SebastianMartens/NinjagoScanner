@@ -7,6 +7,7 @@ public sealed class CollectionCardDetails
     public required string Category { get; init; }
     public required string CardNumber { get; init; }
     public required string CardName { get; init; }
+    public string Rarity { get; init; } = CardRarity.Common;
     public int? Year { get; init; }
     public string? Logo { get; init; }
     public string? Theme { get; init; }
@@ -28,22 +29,9 @@ public sealed class CollectionCardSidecarData
     public string? CardName { get; init; }
     public string? CardNumber { get; init; }
     public string? SetName { get; init; }
-    public string? Rarity { get; init; }
     public string? Language { get; init; }
     public string? AttributesJson { get; init; }
     public DateTimeOffset? ScannedAtUtc { get; init; }
-    public string? ErrorMessage { get; init; }
-    public string? ReviewStatus { get; init; }
-}
-
-public sealed class CollectionCardSidecarUpdate
-{
-    public string? AnalysisStatus { get; init; }
-    public string? CardName { get; init; }
-    public string? CardNumber { get; init; }
-    public string? SetName { get; init; }
-    public string? Rarity { get; init; }
-    public string? Language { get; init; }
     public string? ErrorMessage { get; init; }
     public string? ReviewStatus { get; init; }
 }

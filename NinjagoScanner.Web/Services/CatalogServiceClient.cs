@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Net.Client;
 using NinjagoScanner.CatalogService.Protos;
+using NinjagoScanner.Web.Models;
 
 namespace NinjagoScanner.Web.Services;
 
@@ -41,7 +42,7 @@ internal sealed class CatalogServiceClient
             .ToArray();
     }
 
-    public async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder)>> ListCatalogCardsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)>> ListCatalogCardsAsync(CancellationToken cancellationToken = default)
     {
         var client = new CardCatalog.CardCatalogClient(channel);
         var response = await client.ListAllCardsAsync(new Empty(), cancellationToken: cancellationToken);
@@ -55,7 +56,8 @@ internal sealed class CatalogServiceClient
                     Category: string.IsNullOrWhiteSpace(card.Category) ? "Unkategorisiert" : card.Category.Trim(),
                     CardNumber: normalizedNumber,
                     CardName: card.CardName?.Trim() ?? string.Empty,
-                    SortOrder: card.SortOrder
+                    SortOrder: card.SortOrder,
+                    Rarity: CardRarity.Normalize(card.Rarity)
                 );
             })
             .Where(card =>

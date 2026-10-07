@@ -28,7 +28,6 @@ _STRING_ATTRS = {
     "card_name": "CardName",
     "card_number": "CardNumber",
     "set_name": "SetName",
-    "rarity": "Rarity",
     "language": "Language",
     "reasoning_summary": "ReasoningSummary",
     "error_message": "ErrorMessage",

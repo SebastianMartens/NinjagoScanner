@@ -25,7 +25,7 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
           "Serie_2": {
             "SortOrder": 2,
             "Kategorien": {
-              "Good_Guys": { "Class": "character", "Karten": [
+              "Good_Guys": { "Class": "character", "Rarity": "common", "Karten": [
                 {"Karten-Nr.": 4, "Name": {"de": "Cole"}},
                 {"Karten-Nr.": 5, "Name": {"de": "Zane"}}
               ] }
@@ -64,7 +64,6 @@ public sealed class CollectionQueryServiceCardDetailsTests : IAsyncLifetime
           "CardName": "irrelevant",
           "CardNumber": "{{cardNumber}}",
           "SetName": "{{setName}}",
-          "Rarity": "Common",
           "ReviewStatus": "unreviewed"
         }
         """;

@@ -24,7 +24,7 @@ public sealed class CatalogServiceClientKnownSeriesTests : IAsyncLifetime
           "Serie_1": {
             "SortOrder": 10,
             "Kategorien": {
-              "Heroes": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] }
+              "Heroes": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Kai"}} ] }
             }
           }
         }
@@ -34,7 +34,7 @@ public sealed class CatalogServiceClientKnownSeriesTests : IAsyncLifetime
           "Serie_0": {
             "SortOrder": 0,
             "Kategorien": {
-              "Character Cards Deck 1": { "Class": "character", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Spinner Kai"}} ] }
+              "Character Cards Deck 1": { "Class": "character", "Rarity": "common", "Karten": [ {"Karten-Nr.": 1, "Name": {"en": "Spinner Kai"}} ] }
             }
           }
         }
