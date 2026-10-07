@@ -54,11 +54,27 @@ internal sealed class CollectionQueryService(
     {
         var cardsFromCatalog = await catalogServiceClient.ListCatalogCardsAsync(cancellationToken);
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
+        var matchedCards = SelectGalleryCards(cardsFromCatalog, photoEntries, series);
+
+        // One bounded call for exactly the photos this grid shows (one per catalog card of the
+        // selected series), not one URL per photo in the whole collection.
+        var downloadUrls = await pictureServiceClient.GetDownloadUrlsAsync(
+            matchedCards.Where(item => item.MatchedPhoto is not null).Select(item => item.MatchedPhoto!.PhotoId),
+            cancellationToken);
+
+        return BuildGalleryItems(matchedCards, downloadUrls);
+    }
+
+    internal static GalleryMatch[] SelectGalleryCards(
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> cardsFromCatalog,
+        IReadOnlyList<CardEntry> photoEntries,
+        string series)
+    {
         var photosByKey = photoEntries.ToLookup(entry => BuildOwnershipKey(entry.SetName, entry.CardNumber));
 
         var seriesKey = NormalizeSeriesKey(series);
 
-        var matchedCards = cardsFromCatalog
+        return cardsFromCatalog
             .Where(card => string.Equals(NormalizeSeriesKey(card.Series), seriesKey, StringComparison.Ordinal))
             .Select(card =>
             {
@@ -71,19 +87,17 @@ internal sealed class CollectionQueryService(
                         .FirstOrDefault()
                     : null;
 
-                return (Card: card, MatchedPhoto: matchedPhoto, PhotoCount: photoCount);
+                return new GalleryMatch(card, matchedPhoto, photoCount);
             })
             .OrderBy(item => item.Card.SortOrder)
             .ThenBy(item => CardNumberSorting.BuildSortKey(item.Card.CardNumber), StringComparer.Ordinal)
             .ThenBy(item => item.Card.CardName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
 
-        // One bounded call for exactly the photos this grid shows (one per catalog card of the
-        // selected series), not one URL per photo in the whole collection.
-        var downloadUrls = await pictureServiceClient.GetDownloadUrlsAsync(
-            matchedCards.Where(item => item.MatchedPhoto is not null).Select(item => item.MatchedPhoto!.PhotoId),
-            cancellationToken);
-
+    internal static IReadOnlyList<GalleryCardItem> BuildGalleryItems(
+        GalleryMatch[] matchedCards, IReadOnlyDictionary<string, string> downloadUrls)
+    {
         var result = new List<GalleryCardItem>(matchedCards.Length);
         foreach (var (card, matchedPhoto, photoCount) in matchedCards)
         {
@@ -106,11 +120,22 @@ internal sealed class CollectionQueryService(
         return result;
     }
 
+    internal sealed record GalleryMatch(
+        (string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity) Card,
+        CardEntry? MatchedPhoto,
+        int PhotoCount);
+
     public async Task<SeriesSummaryResult> GetSeriesSummaryAsync(CancellationToken cancellationToken = default)
     {
         var cardsFromCatalog = await catalogServiceClient.ListCatalogCardsAsync(cancellationToken);
         var photoEntries = await pictureServiceClient.ListCardEntriesAsync(cancellationToken);
+        return BuildSeriesSummary(cardsFromCatalog, photoEntries);
+    }
 
+    internal static SeriesSummaryResult BuildSeriesSummary(
+        IReadOnlyList<(string Series, string Category, string CardNumber, string CardName, int SortOrder, string Rarity)> cardsFromCatalog,
+        IReadOnlyList<CardEntry> photoEntries)
+    {
         var seriesGroups = cardsFromCatalog
             .GroupBy(card => card.Series, StringComparer.Ordinal)
             .Select(group => new

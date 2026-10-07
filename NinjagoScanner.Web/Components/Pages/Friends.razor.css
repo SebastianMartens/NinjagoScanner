@@ -1,0 +1,18 @@
+.friends-page { display: flex; flex-direction: column; gap: 1.25rem; animation: cv-fadein 0.4s ease; }
+.friends-section { display: flex; flex-direction: column; gap: 0.8rem; }
+
+.friends-message { padding: 0.8rem 1rem; border-radius: var(--cv-radius); border: 1px solid var(--cv-border); }
+.friends-message.is-ok { background: var(--cv-status-ok-bg); color: var(--cv-status-ok-fg); }
+.friends-message.is-error { background: var(--cv-status-failed-bg); color: var(--cv-status-failed-fg); }
+
+.friends-visibility { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.friends-search { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.friends-search input { flex: 1; min-width: 12rem; }
+
+.friends-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.friends-row {
+    display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+    padding: 0.7rem 1rem; border: 1px solid var(--cv-border); border-radius: var(--cv-radius); background: var(--cv-surface);
+}
+.friends-name { font-weight: 700; min-width: 8rem; flex: 1; }
+.friends-state { color: var(--cv-text-soft); font-size: 0.9rem; }

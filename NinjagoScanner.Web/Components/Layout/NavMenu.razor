@@ -1,3 +1,4 @@
+@using System.Security.Claims
 <header class="cv-nav-top">
     <div class="cv-nav-top-inner">
         <a class="cv-brand" href="">
@@ -11,6 +12,9 @@
             <NavLink class="cv-nav-link" href="review">Review</NavLink>
             <NavLink class="cv-nav-link" href="upload">Upload</NavLink>
             <NavLink class="cv-nav-link" href="achievements">Erfolge</NavLink>
+            <NavLink class="cv-nav-link" href="friends">Freunde @if (_pendingFriendRequests > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingFriendRequests} offene Freundschaftsanfragen")">@_pendingFriendRequests</span>}</NavLink>
+            <NavLink class="cv-nav-link" href="trade" Match="NavLinkMatch.All">Tauschen @if (_pendingTrades > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingTrades} offene Tauschvorschläge")">@_pendingTrades</span>}</NavLink>
+            <NavLink class="cv-nav-link" href="trade/log">Tauschprotokoll</NavLink>
             <NavLink class="cv-nav-link" href="about">Über</NavLink>
         </nav>
         <div class="cv-nav-user">
@@ -66,6 +70,18 @@
         <span class="cv-tab-dot"></span>
         <span>Erfolge</span>
     </NavLink>
+    <NavLink class="cv-tab" href="friends">
+        <span class="cv-tab-dot"></span>
+        <span>Freunde @if (_pendingFriendRequests > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingFriendRequests} offene Freundschaftsanfragen")">@_pendingFriendRequests</span>}</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="trade" Match="NavLinkMatch.All">
+        <span class="cv-tab-dot"></span>
+        <span>Tauschen @if (_pendingTrades > 0){<span class="cv-nav-badge" aria-label="@($"{_pendingTrades} offene Tauschvorschläge")">@_pendingTrades</span>}</span>
+    </NavLink>
+    <NavLink class="cv-tab" href="trade/log">
+        <span class="cv-tab-dot"></span>
+        <span>Protokoll</span>
+    </NavLink>
     <NavLink class="cv-tab" href="about">
         <span class="cv-tab-dot"></span>
         <span>Über</span>
@@ -76,16 +92,36 @@
     [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
     [Inject] private ICurrentCollectionContext CurrentCollectionContext { get; set; } = default!;
     [Inject] private GamificationService GamificationService { get; set; } = default!;
+    [Inject] private FriendService FriendService { get; set; } = default!;
+    [Inject] private TradeService TradeService { get; set; } = default!;
 
     private string? _collectionName;
     private RankDefinition? _rank;
     private int _xp;
+    private int _pendingFriendRequests;
+    private int _pendingTrades;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var collection = await CurrentCollectionContext.GetOwnedCollectionAsync(authState.User);
         _collectionName = collection?.Name;
+
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!string.IsNullOrEmpty(userId))
+        {
+            try
+            {
+                _pendingFriendRequests = await FriendService.CountIncomingRequestsAsync(userId);
+                _pendingTrades = await TradeService.CountIncomingPendingAsync(userId);
+            }
+            catch (Exception)
+            {
+                // The badge is a convenience; the nav must render even if the database hiccups.
+                _pendingFriendRequests = 0;
+                _pendingTrades = 0;
+            }
+        }
 
         if (collection is not null)
         {

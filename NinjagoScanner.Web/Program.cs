@@ -151,6 +151,18 @@ builder.Services.AddScoped(provider => new GamificationService(
     provider.GetRequiredService<ICurrentCollectionContext>(),
     provider.GetRequiredService<AuthenticationStateProvider>()));
 builder.Services.AddScoped<GamificationCelebrationCenter>();
+builder.Services.AddScoped<FriendService>();
+builder.Services.AddScoped<FriendAccessService>();
+builder.Services.AddScoped<IForeignCollectionReader>(provider => new PictureServiceForeignCollectionReader(
+    provider.GetRequiredService<PictureServiceClient>()));
+builder.Services.AddScoped<FriendCollectionService>();
+builder.Services.AddScoped<TradeService>();
+builder.Services.AddScoped<TradeLogService>();
+builder.Services.AddScoped<TradeInventoryLoader>();
+builder.Services.AddScoped<ITradeInventoryLoader>(sp => sp.GetRequiredService<TradeInventoryLoader>());
+builder.Services.AddScoped<TradePartnerService>();
+builder.Services.AddScoped<TradeFinderService>();
+builder.Services.AddHostedService<TradeRecoveryService>();
 
 // OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
 // automatically by AddOtlpExporter() from the standard OTel environment variables — see

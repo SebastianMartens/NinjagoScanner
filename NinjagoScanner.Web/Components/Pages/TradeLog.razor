@@ -1,0 +1,106 @@
+@page "/trade/log"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Security.Claims
+@using NinjagoScanner.Web.Data
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject TradeLogService TradeLogService
+
+<PageTitle>Tauschprotokoll</PageTitle>
+
+<div class="trade-log-page">
+    <header class="overview-header">
+        <p class="eyebrow">Ninjago Scanner</p>
+        <h1>Tauschprotokoll</h1>
+        <p class="lede">Alle deine Tauschvorgänge, neueste zuerst. Einträge können nicht verändert werden.</p>
+        <p><a href="trade">Zurück zum Tauschen</a></p>
+    </header>
+
+    @if (isLoading)
+    {
+        <p>Lade Tauschprotokoll...</p>
+    }
+    else if (loadError is not null)
+    {
+        <div class="empty-state">
+            <h2>Tauschprotokoll konnte nicht geladen werden</h2>
+            <p class="table-secondary">@loadError</p>
+        </div>
+    }
+    else if (rows.Count == 0)
+    {
+        <div class="empty-state" id="trade-log-empty">
+            <h2>Noch keine Tauschvorgänge</h2>
+            <p class="table-secondary">Sobald du Karten tauschst, erscheinen sie hier.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="trade-log-list">
+            @foreach (var row in rows)
+            {
+                <li class="trade-log-entry" data-trade-id="@row.TradeId">
+                    <div class="trade-log-head">
+                        <strong>@row.PartnerUserName</strong>
+                        <span class="table-secondary">@row.DateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                        <span class="cv-chip @(row.Outcome == TradeStatus.Completed ? "cv-chip-green" : "cv-chip-muted")">@TradeLabels.Outcome(row.Outcome)</span>
+                    </div>
+                    <div class="trade-log-sides">
+                        <div>
+                            <h4>Gegeben</h4>
+                            <ul>
+                                @foreach (var card in row.Given)
+                                {
+                                    <li>@card.SeriesName Nr. @card.CardNumber &middot; @card.CardName @Tag(card.Rarity)</li>
+                                }
+                            </ul>
+                        </div>
+                        <div>
+                            <h4>Erhalten</h4>
+                            <ul>
+                                @foreach (var card in row.Received)
+                                {
+                                    <li>@card.SeriesName Nr. @card.CardNumber &middot; @card.CardName @Tag(card.Rarity)</li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private bool isLoading = true;
+    private string? loadError;
+    private IReadOnlyList<TradeLogRow> rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        try
+        {
+            rows = await TradeLogService.ListAsync(userId);
+        }
+        catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or InvalidOperationException)
+        {
+            loadError = "Bitte versuche es später erneut.";
+        }
+
+        isLoading = false;
+    }
+
+    private static RenderFragment Tag(string rarity) => builder =>
+    {
+        var badge = NinjagoScanner.Web.Models.CardRarity.BadgeLabel(rarity);
+        if (badge is not null)
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "cv-chip cv-chip-gold");
+            builder.AddContent(2, badge);
+            builder.CloseElement();
+        }
+    };
+}

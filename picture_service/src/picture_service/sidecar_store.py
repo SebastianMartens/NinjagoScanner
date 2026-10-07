@@ -44,6 +44,55 @@ class SidecarStore:
         await self._sidecar_table.delete(collection_id, photo_id)
         self._cache.remove(collection_id, photo_id)
 
+    async def copy_record(
+        self, source_collection_id: str, source_photo_id: str, dest_collection_id: str, dest_photo_id: str
+    ) -> bool:
+        """Reads the source sidecar fresh from the table (bypassing the cache, so a stale entry
+        can't be copied) and writes it unchanged under the destination key. Returns False, writing
+        nothing, when the source has no sidecar."""
+        record = await self._sidecar_table.get(source_collection_id, source_photo_id)
+        if record is None:
+            return False
+        await self.set_record(dest_collection_id, dest_photo_id, record)
+        return True
+
+    async def get_transfer(self, transfer_id: str) -> dict | None:
+        return await self._sidecar_table.get_transfer(transfer_id)
+
+    async def create_transfer(self, transfer_id: str, record: dict) -> bool:
+        return await self._sidecar_table.create_transfer(transfer_id, record)
+
+    async def replace_transfer(
+        self,
+        transfer_id: str,
+        record: dict,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        return await self._sidecar_table.replace_transfer(
+            transfer_id,
+            record,
+            expected_lease_expires_at_ms=expected_lease_expires_at_ms,
+            expected_status=expected_status,
+        )
+
+    async def delete_transfer(
+        self,
+        transfer_id: str,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        return await self._sidecar_table.delete_transfer(
+            transfer_id,
+            expected_lease_expires_at_ms=expected_lease_expires_at_ms,
+            expected_status=expected_status,
+        )
+
+    def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
+        return self._sidecar_table.list_transfers()
+
     async def list_by_collection(self, collection_id: str) -> AsyncIterator[tuple[str, SidecarRecord]]:
         """Enumerates every sidecar record within one collection, populating the cache along
         the way. Used by the bulk Scan RPC, where the table is authoritative for that

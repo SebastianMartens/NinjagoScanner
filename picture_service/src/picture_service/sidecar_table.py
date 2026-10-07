@@ -11,10 +11,15 @@ exact DynamoDB item shape and S3 key layout").
 
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
+
+from boto3.dynamodb.conditions import Attr
+from botocore.exceptions import ClientError
 
 from picture_service.models import SidecarRecord
 
@@ -41,6 +46,17 @@ _SCANNED_AT_UTC_ATTR = "ScannedAtUtc"
 _DETECTED_ATTR = "Detected"
 _DERIVED_ATTR = "Derived"
 _ROTATED_180_ATTR = "Rotated180"
+
+# Completed-transfer records (TransferPhotos idempotency) share the table but live under a
+# partition key that can never be a real collection ID, so per-collection queries never see them.
+TRANSFER_KEY_PREFIX = "TRANSFER#"
+_TRANSFER_SORT_KEY = "transfer"
+_TRANSFER_RESULTS_ATTR = "Results"
+_TRANSFER_STATUS_ATTR = "Status"
+_TRANSFER_LEASE_ATTR = "LeaseExpiresAtMs"
+_TRANSFER_SOURCES_REMOVED_ATTR = "SourcesRemoved"
+_TRANSFER_EXPIRES_AT_ATTR = "ExpiresAt"  # epoch seconds; DynamoDB TTL attribute
+TRANSFER_RECORD_LIFETIME_SECONDS = 30 * 24 * 60 * 60
 
 
 class SidecarTable:
@@ -70,6 +86,89 @@ class SidecarTable:
     async def delete(self, collection_id: str, photo_id: str) -> None:
         table = await self._table()
         await table.delete_item(Key={_COLLECTION_ID_ATTR: collection_id, _PHOTO_ID_ATTR: photo_id})
+
+    async def get_transfer(self, transfer_id: str) -> dict | None:
+        """Returns {"status", "results", "lease_expires_at_ms", "sources_removed"} or None."""
+        table = await self._table()
+        response = await table.get_item(Key=_transfer_key(transfer_id), ConsistentRead=True)
+        item = response.get("Item")
+        return None if item is None else _transfer_from_item(item)
+
+    async def create_transfer(self, transfer_id: str, record: dict) -> bool:
+        """Atomically creates the transfer record; False when one already exists (another
+        attempt, possibly on another machine, owns this transfer_id)."""
+        table = await self._table()
+        try:
+            await table.put_item(
+                Item=_transfer_to_item(transfer_id, record),
+                ConditionExpression=Attr(_COLLECTION_ID_ATTR).not_exists(),
+            )
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return False
+            raise
+        return True
+
+    async def replace_transfer(
+        self,
+        transfer_id: str,
+        record: dict,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        """Overwrites the transfer record. With `expected_lease_expires_at_ms` / `expected_status`
+        the write only succeeds while the stored record still has those values (compare-and-swap
+        for taking over, extending or committing a lease; it also fails when the record is gone).
+        Returns False when the condition did not hold."""
+        table = await self._table()
+        kwargs: dict[str, Any] = {}
+        condition = _transfer_condition(expected_lease_expires_at_ms, expected_status)
+        if condition is not None:
+            kwargs["ConditionExpression"] = condition
+        try:
+            await table.put_item(Item=_transfer_to_item(transfer_id, record), **kwargs)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return False
+            raise
+        return True
+
+    async def delete_transfer(
+        self,
+        transfer_id: str,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        """Deletes the transfer record, optionally only while it still has the given lease/status.
+        Returns False when the condition did not hold."""
+        table = await self._table()
+        kwargs: dict[str, Any] = {}
+        condition = _transfer_condition(expected_lease_expires_at_ms, expected_status)
+        if condition is not None:
+            kwargs["ConditionExpression"] = condition
+        try:
+            await table.delete_item(Key=_transfer_key(transfer_id), **kwargs)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return False
+            raise
+        return True
+
+    async def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
+        table = await self._table()
+        last_evaluated_key = None
+        while True:
+            kwargs: dict[str, Any] = {"FilterExpression": Attr(_COLLECTION_ID_ATTR).begins_with(TRANSFER_KEY_PREFIX)}
+            if last_evaluated_key is not None:
+                kwargs["ExclusiveStartKey"] = last_evaluated_key
+            response = await table.scan(**kwargs)
+            for item in response.get("Items", []):
+                yield item[_COLLECTION_ID_ATTR][len(TRANSFER_KEY_PREFIX) :], _transfer_from_item(item)
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            if last_evaluated_key is None:
+                break
 
     async def list_by_collection(self, collection_id: str) -> AsyncIterator[tuple[str, SidecarRecord]]:
         table = await self._table()
@@ -118,6 +217,8 @@ class SidecarTable:
                 kwargs["ExclusiveStartKey"] = last_evaluated_key
             response = await table.scan(**kwargs)
             for item in response.get("Items", []):
+                if item[_COLLECTION_ID_ATTR].startswith(TRANSFER_KEY_PREFIX):
+                    continue
                 yield item[_COLLECTION_ID_ATTR], item[_PHOTO_ID_ATTR], _from_item(item)
             last_evaluated_key = response.get("LastEvaluatedKey")
             if last_evaluated_key is None:
@@ -197,3 +298,38 @@ def _from_item(item: dict) -> SidecarRecord:
         derived=_decode_attribute_map(derived_raw) if derived_raw is not None else None,
         rotated_180=bool(item.get(_ROTATED_180_ATTR, False)),
     )
+
+
+def _transfer_condition(expected_lease_expires_at_ms: int | None, expected_status: str | None):
+    condition = None
+    if expected_lease_expires_at_ms is not None:
+        condition = Attr(_TRANSFER_LEASE_ATTR).eq(expected_lease_expires_at_ms)
+    if expected_status is not None:
+        status_condition = Attr(_TRANSFER_STATUS_ATTR).eq(expected_status)
+        condition = status_condition if condition is None else condition & status_condition
+    return condition
+
+
+def _transfer_key(transfer_id: str) -> dict[str, str]:
+    return {_COLLECTION_ID_ATTR: TRANSFER_KEY_PREFIX + transfer_id, _PHOTO_ID_ATTR: _TRANSFER_SORT_KEY}
+
+
+def _transfer_to_item(transfer_id: str, record: dict) -> dict[str, Any]:
+    return {
+        **_transfer_key(transfer_id),
+        _TRANSFER_RESULTS_ATTR: json.dumps(record["results"]),
+        _TRANSFER_STATUS_ATTR: record["status"],
+        _TRANSFER_LEASE_ATTR: int(record.get("lease_expires_at_ms", 0)),
+        _TRANSFER_SOURCES_REMOVED_ATTR: bool(record.get("sources_removed", False)),
+        _TRANSFER_EXPIRES_AT_ATTR: int(time.time()) + TRANSFER_RECORD_LIFETIME_SECONDS,
+    }
+
+
+def _transfer_from_item(item: dict[str, Any]) -> dict:
+    # Items written before the status field existed were only ever stored once committed.
+    return {
+        "status": item.get(_TRANSFER_STATUS_ATTR, "committed"),
+        "results": json.loads(item[_TRANSFER_RESULTS_ATTR]),
+        "lease_expires_at_ms": int(item.get(_TRANSFER_LEASE_ATTR, 0)),
+        "sources_removed": bool(item.get(_TRANSFER_SOURCES_REMOVED_ATTR, False)),
+    }

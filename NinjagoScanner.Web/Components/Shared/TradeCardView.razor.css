@@ -1,0 +1,38 @@
+.trade-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 9rem;
+    max-width: 100%;
+    padding: 0 0 0.5rem;
+    border: 1px solid var(--cv-border);
+    border-radius: 12px;
+    background: var(--cv-surface);
+    overflow: hidden;
+}
+
+.trade-card.is-limited { border-color: var(--cv-gold); }
+.trade-card.is-legendary { border-color: var(--cv-purple); box-shadow: 0 0 14px oklch(65% 0.19 300 / 0.35); }
+
+.trade-card-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    background: repeating-linear-gradient(135deg, var(--cv-surface-2), var(--cv-surface-2) 6px, var(--cv-surface) 6px, var(--cv-surface) 12px);
+}
+
+.trade-card-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--cv-text-muted);
+}
+
+.trade-card-caption, .trade-card-series, .trade-card-tags { padding: 0 0.6rem; }
+.trade-card-caption { font-size: 0.82rem; font-weight: 700; color: var(--cv-text); }
+.trade-card-series { font-size: 0.72rem; color: var(--cv-text-muted); }
+.trade-card-tags { display: flex; gap: 0.3rem; flex-wrap: wrap; }
