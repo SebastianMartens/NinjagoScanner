@@ -110,15 +110,22 @@ class SidecarTable:
         return True
 
     async def replace_transfer(
-        self, transfer_id: str, record: dict, *, expected_lease_expires_at_ms: int | None = None
+        self,
+        transfer_id: str,
+        record: dict,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
     ) -> bool:
-        """Overwrites the transfer record. With `expected_lease_expires_at_ms` the write only
-        succeeds while the stored lease still has that value (compare-and-swap for taking over an
-        expired lease); returns False when it lost that race."""
+        """Overwrites the transfer record. With `expected_lease_expires_at_ms` / `expected_status`
+        the write only succeeds while the stored record still has those values (compare-and-swap
+        for taking over, extending or committing a lease; it also fails when the record is gone).
+        Returns False when the condition did not hold."""
         table = await self._table()
         kwargs: dict[str, Any] = {}
-        if expected_lease_expires_at_ms is not None:
-            kwargs["ConditionExpression"] = Attr(_TRANSFER_LEASE_ATTR).eq(expected_lease_expires_at_ms)
+        condition = _transfer_condition(expected_lease_expires_at_ms, expected_status)
+        if condition is not None:
+            kwargs["ConditionExpression"] = condition
         try:
             await table.put_item(Item=_transfer_to_item(transfer_id, record), **kwargs)
         except ClientError as error:
@@ -127,9 +134,27 @@ class SidecarTable:
             raise
         return True
 
-    async def delete_transfer(self, transfer_id: str) -> None:
+    async def delete_transfer(
+        self,
+        transfer_id: str,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        """Deletes the transfer record, optionally only while it still has the given lease/status.
+        Returns False when the condition did not hold."""
         table = await self._table()
-        await table.delete_item(Key=_transfer_key(transfer_id))
+        kwargs: dict[str, Any] = {}
+        condition = _transfer_condition(expected_lease_expires_at_ms, expected_status)
+        if condition is not None:
+            kwargs["ConditionExpression"] = condition
+        try:
+            await table.delete_item(Key=_transfer_key(transfer_id), **kwargs)
+        except ClientError as error:
+            if error.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return False
+            raise
+        return True
 
     async def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
         table = await self._table()
@@ -273,6 +298,16 @@ def _from_item(item: dict) -> SidecarRecord:
         derived=_decode_attribute_map(derived_raw) if derived_raw is not None else None,
         rotated_180=bool(item.get(_ROTATED_180_ATTR, False)),
     )
+
+
+def _transfer_condition(expected_lease_expires_at_ms: int | None, expected_status: str | None):
+    condition = None
+    if expected_lease_expires_at_ms is not None:
+        condition = Attr(_TRANSFER_LEASE_ATTR).eq(expected_lease_expires_at_ms)
+    if expected_status is not None:
+        status_condition = Attr(_TRANSFER_STATUS_ATTR).eq(expected_status)
+        condition = status_condition if condition is None else condition & status_condition
+    return condition
 
 
 def _transfer_key(transfer_id: str) -> dict[str, str]:

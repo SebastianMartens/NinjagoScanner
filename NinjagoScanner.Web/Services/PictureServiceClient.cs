@@ -208,6 +208,44 @@ internal sealed class PictureServiceClient
         return response.Cards;
     }
 
+    /// <summary>
+    /// Every photo of an explicitly named collection (not the acting user's own). Only for trade
+    /// execution, which has already authorized both sides (accepted friends with a trade); never
+    /// call this with a collection id that came from client input.
+    /// </summary>
+    public async Task<IReadOnlyList<CardEntry>> ListCardEntriesForCollectionAsync(
+        string collectionId, CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var response = await client.ListCardsAsync(
+            new ListCardsRequest { CollectionId = collectionId },
+            cancellationToken: cancellationToken);
+
+        return response.Cards;
+    }
+
+    /// <summary>
+    /// One TransferPhotos call moving every listed photo (both directions of a trade) between
+    /// collections with its sidecar, all-or-nothing. <paramref name="transferId"/> makes retries
+    /// idempotent (the trade id). Returns old photo id to new photo id per move; throws
+    /// <see cref="Grpc.Core.RpcException"/> when nothing was moved. Not tied to the acting user.
+    /// </summary>
+    public async Task<IReadOnlyList<PhotoMoveResult>> TransferPhotosAsync(
+        string transferId,
+        IEnumerable<(string SourceCollectionId, string DestCollectionId, string PhotoId)> moves,
+        CancellationToken cancellationToken = default)
+    {
+        var client = new CardPictureService.CardPictureServiceClient(channel);
+        var request = new TransferPhotosRequest { TransferId = transferId };
+        foreach (var (source, dest, photoId) in moves)
+        {
+            request.Moves.Add(new PhotoMove { SourceCollectionId = source, DestCollectionId = dest, PhotoId = photoId });
+        }
+
+        var response = await client.TransferPhotosAsync(request, cancellationToken: cancellationToken);
+        return response.Results;
+    }
+
     public async Task<string> GetDownloadUrlAsync(string photoId, CancellationToken cancellationToken = default)
     {
         var client = new CardPictureService.CardPictureServiceClient(channel);

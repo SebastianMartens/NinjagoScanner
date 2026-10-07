@@ -47,6 +47,10 @@ ModelFactory = Callable[[ScannerConfig, dict], StructuredModel]
 CatalogLoader = Callable[[str], Awaitable[CatalogSnapshot]]
 
 
+class _LeaseLost(Exception):
+    """This attempt's transfer lease was taken over, rolled back or committed by someone else."""
+
+
 class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
     def __init__(
         self,
@@ -174,7 +178,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                 if result.is_transport_failure:
                     stopped_early = True
                     logger.warning(
-                        "Scan wird nach %s abgebrochen: Gemini war ueber die Transportebene nicht erreichbar (%s)",
+                        "Scan wird nach %s abgebrochen: Gemini war über die Transportebene nicht erreichbar (%s)",
                         photo_id,
                         result.error_message,
                     )
@@ -192,7 +196,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             failed=failed_count,
             stopped_early=stopped_early,
             message=(
-                "Scan vorzeitig abgebrochen: Gemini war wiederholt nicht erreichbar. Spaeter erneut versuchen."
+                "Scan vorzeitig abgebrochen: Gemini war wiederholt nicht erreichbar. Später erneut versuchen."
                 if stopped_early
                 else "Batch abgeschlossen."
             ),
@@ -215,7 +219,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
         source_file_name = metadata.source_file_name.strip() or "upload"
         extension = _extension(source_file_name)
         if extension not in SUPPORTED_EXTENSIONS:
-            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Dateityp wird nicht unterstuetzt. Erlaubt: JPG, PNG, BMP, WEBP.")
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Dateityp wird nicht unterstützt. Erlaubt: JPG, PNG, BMP, WEBP.")
 
         chunks = bytearray()
         async for message in request_iterator:
@@ -544,7 +548,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                 await self._sidecar_store.set_record(collection_id, photo_id, repaired)
                 migrated += 1
             except Exception:
-                logger.exception("Sidecar-Migration fuer %s/%s fehlgeschlagen", collection_id, photo_id)
+                logger.exception("Sidecar-Migration für %s/%s fehlgeschlagen", collection_id, photo_id)
                 errors += 1
 
         return pb2.MigrateSidecarsResponse(
@@ -680,12 +684,26 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             await context.abort(grpc.StatusCode.ABORTED, _TRANSFER_BUSY_MESSAGE)
         return await self._execute_transfer(transfer_id, claimed, context, resumed=True)
 
+    async def _extend_lease(self, transfer_id: str, record: dict) -> dict:
+        """Renews the lease as a compare-and-swap on the lease value this attempt holds (and on the
+        record still being pending). Raises _LeaseLost when someone else took the transfer over,
+        the reconciler rolled it back, or it was committed meanwhile. The lease value strictly
+        increases so a stale attempt can never match a newer holder's value."""
+        held = record["lease_expires_at_ms"]
+        renewed = {**record, "lease_expires_at_ms": max(self._now_ms() + _TRANSFER_LEASE_MS, held + 1)}
+        if not await self._sidecar_store.replace_transfer(
+            transfer_id, renewed, expected_lease_expires_at_ms=held, expected_status=_TRANSFER_PENDING
+        ):
+            raise _LeaseLost
+        return renewed
+
     async def _execute_transfer(
         self, transfer_id: str, record: dict, context: grpc.aio.ServicerContext, *, resumed: bool
     ) -> pb2.TransferPhotosResponse:
         results = record["results"]
         missing_source: str | None = None
         failed = False
+        lease_lost = False
         try:
             if resumed:
                 # Sources are only removed after the commit, so a pending transfer's sources must
@@ -698,6 +716,9 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
             if missing_source is None:
                 sidecar_results = []
                 for result in results:
+                    # Fence every step: a stalled attempt whose lease expired must notice before
+                    # it writes anything else.
+                    record = await self._extend_lease(transfer_id, record)
                     await self._photo_store.copy(
                         result["source_collection_id"],
                         result["old_photo_id"],
@@ -719,55 +740,105 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                     if await self._sidecar_store.get(result["dest_collection_id"], result["new_photo_id"]) is None:
                         raise RuntimeError(f"Ziel-Sidecar '{result['new_photo_id']}' fehlt nach dem Schreiben.")
 
-                record = {**record, "status": _TRANSFER_COMMITTED}
-                await self._sidecar_store.replace_transfer(transfer_id, record)
+                # The commit is a compare-and-swap on the lease this attempt still holds: if it was
+                # lost (takeover, reconciler rollback), the destination copies may be gone and
+                # committing would let the source removal destroy the only remaining copy.
+                committed = {**record, "status": _TRANSFER_COMMITTED}
+                if not await self._sidecar_store.replace_transfer(
+                    transfer_id,
+                    committed,
+                    expected_lease_expires_at_ms=record["lease_expires_at_ms"],
+                    expected_status=_TRANSFER_PENDING,
+                ):
+                    raise _LeaseLost
+                record = committed
+        except _LeaseLost:
+            logger.warning("TransferPhotos %s: Lease verloren, Versuch wird abgebrochen", transfer_id)
+            lease_lost = True
         except Exception:
             logger.exception("TransferPhotos %s fehlgeschlagen", transfer_id)
             failed = True
 
+        if lease_lost:
+            await self._discard_orphaned_copies(transfer_id, results)
+            await context.abort(grpc.StatusCode.ABORTED, _TRANSFER_BUSY_MESSAGE)
         if missing_source is not None:
-            await self._rollback_transfer(transfer_id, results)
+            await self._rollback_transfer(transfer_id, record)
             await context.abort(
                 grpc.StatusCode.NOT_FOUND, f"Das Foto '{missing_source}' wurde in der Quellsammlung nicht gefunden."
             )
         if failed:
-            await self._rollback_transfer(transfer_id, results)
+            await self._rollback_transfer(transfer_id, record)
             await context.abort(grpc.StatusCode.INTERNAL, "Die Fotos konnten nicht verschoben werden.")
 
         # Committed: this is a success from here on, whether or not the source removal finishes.
         await self._finish_source_removal(transfer_id, record)
         return _to_transfer_response(results)
 
-    async def _rollback_transfer(self, transfer_id: str, results: list[dict]) -> None:
+    async def _rollback_transfer(self, transfer_id: str, record: dict) -> None:
         """Removes everything the (uncommitted) transfer created in the destinations and drops
-        its record. Skipped when the record is committed (or unreadable): destinations of a
-        committed transfer are live data, and a pending record with its ids is what lets a
+        its record. Only runs while this attempt still holds the pending lease: it renews the
+        lease (compare-and-swap, which also fails for a committed record) before touching the
+        destinations and again between steps, and the final record delete is conditional on the
+        record still being pending under that lease. A pending record with its ids is what lets a
         retry roll forward instead of leaving unreferenced destination objects."""
+        results = record["results"]
         try:
-            current = await self._sidecar_store.get_transfer(transfer_id)
+            held = await self._extend_lease(transfer_id, record)
+        except _LeaseLost:
+            # Committed by an ambiguous write, or taken over / rolled back by someone else: the
+            # destinations are no longer ours to delete.
+            await self._discard_orphaned_copies(transfer_id, results)
+            return
         except Exception:
             logger.exception("Rollback %s: Transfer-Datensatz nicht lesbar, Ziel bleibt unverändert", transfer_id)
             return
-        if current is not None and current["status"] == _TRANSFER_COMMITTED:
-            return
 
         clean = True
-        for result in results:
-            try:
-                await self._sidecar_store.remove(result["dest_collection_id"], result["new_photo_id"])
-                await self._photo_store.delete(result["dest_collection_id"], result["new_photo_id"])
-            except Exception:
-                clean = False
-                logger.exception("Rollback: Zielfoto %s nicht entfernbar", result["new_photo_id"])
-
         try:
+            for result in results:
+                try:
+                    held = await self._extend_lease(transfer_id, held)
+                    await self._sidecar_store.remove(result["dest_collection_id"], result["new_photo_id"])
+                    await self._photo_store.delete(result["dest_collection_id"], result["new_photo_id"])
+                except _LeaseLost:
+                    raise
+                except Exception:
+                    clean = False
+                    logger.exception("Rollback: Zielfoto %s nicht entfernbar", result["new_photo_id"])
             if clean:
-                await self._sidecar_store.delete_transfer(transfer_id)
-            elif current is not None:
+                await self._sidecar_store.delete_transfer(
+                    transfer_id,
+                    expected_lease_expires_at_ms=held["lease_expires_at_ms"],
+                    expected_status=_TRANSFER_PENDING,
+                )
+            else:
                 # Leave the record resumable right away: a retry rolls forward over the leftovers.
-                await self._sidecar_store.replace_transfer(transfer_id, {**current, "lease_expires_at_ms": 0})
+                await self._sidecar_store.replace_transfer(
+                    transfer_id,
+                    {**held, "lease_expires_at_ms": 0},
+                    expected_lease_expires_at_ms=held["lease_expires_at_ms"],
+                    expected_status=_TRANSFER_PENDING,
+                )
+        except _LeaseLost:
+            logger.warning("Rollback %s: Lease verloren, Abbruch ohne weitere Änderungen", transfer_id)
         except Exception:
             logger.exception("Rollback %s: Transfer-Datensatz nicht aktualisierbar", transfer_id)
+
+    async def _discard_orphaned_copies(self, transfer_id: str, results: list[dict]) -> None:
+        """Called by an attempt that lost its lease. Its destination copies are only safe to remove
+        when the transfer's current record no longer references them (record gone after a
+        rollback, or a fresh record with other ids); a committed or resumed record owns them."""
+        try:
+            current = await self._sidecar_store.get_transfer(transfer_id)
+            ours = {(r["dest_collection_id"], r["new_photo_id"]) for r in results}
+            if current is not None and ours & {(r["dest_collection_id"], r["new_photo_id"]) for r in current["results"]}:
+                return
+            for result in results:
+                await self._sidecar_store.remove(result["dest_collection_id"], result["new_photo_id"])
+                await self._photo_store.delete(result["dest_collection_id"], result["new_photo_id"])
+        except Exception:
+            logger.exception("TransferPhotos %s: verwaiste Zielkopien nicht entfernbar", transfer_id)
 
     async def _finish_source_removal(self, transfer_id: str, record: dict) -> bool:
         """Removes the sources of a committed transfer, retrying with backoff. Never raises: the
@@ -816,7 +887,7 @@ class PictureScannerService(pb2_grpc.CardPictureServiceServicer):
                         if await self._sidecar_store.replace_transfer(
                             transfer_id, claimed, expected_lease_expires_at_ms=record["lease_expires_at_ms"]
                         ):
-                            await self._rollback_transfer(transfer_id, record["results"])
+                            await self._rollback_transfer(transfer_id, claimed)
                             handled += 1
             except Exception:
                 logger.exception("Abgleich von Transfer %s fehlgeschlagen", transfer_id)

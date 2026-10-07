@@ -97,9 +97,34 @@ async def test_replace_transfer_compare_and_swap_on_lease(sidecar_table: Sidecar
 async def test_delete_transfer_removes_record(sidecar_table: SidecarTable):
     await sidecar_table.create_transfer("t-1", transfer_record())
 
-    await sidecar_table.delete_transfer("t-1")
+    assert await sidecar_table.delete_transfer("t-1") is True
 
     assert await sidecar_table.get_transfer("t-1") is None
+
+
+async def test_replace_transfer_is_conditional_on_status_and_fails_for_missing_record(sidecar_table: SidecarTable):
+    assert await sidecar_table.replace_transfer("t-1", transfer_record(), expected_lease_expires_at_ms=1000) is False
+    assert await sidecar_table.get_transfer("t-1") is None
+    await sidecar_table.create_transfer("t-1", transfer_record(status="committed", lease=1000))
+
+    assert (
+        await sidecar_table.replace_transfer(
+            "t-1", transfer_record(lease=2000), expected_lease_expires_at_ms=1000, expected_status="pending"
+        )
+        is False
+    )
+    assert (await sidecar_table.get_transfer("t-1"))["status"] == "committed"
+
+
+async def test_delete_transfer_is_conditional_on_lease_and_status(sidecar_table: SidecarTable):
+    await sidecar_table.create_transfer("t-1", transfer_record(lease=1000))
+
+    assert await sidecar_table.delete_transfer("t-1", expected_lease_expires_at_ms=999, expected_status="pending") is False
+    assert await sidecar_table.delete_transfer("t-1", expected_lease_expires_at_ms=1000, expected_status="committed") is False
+    assert await sidecar_table.get_transfer("t-1") is not None
+    assert await sidecar_table.delete_transfer("t-1", expected_lease_expires_at_ms=1000, expected_status="pending") is True
+    assert await sidecar_table.get_transfer("t-1") is None
+    assert await sidecar_table.delete_transfer("t-1", expected_status="pending") is False
 
 
 async def test_legacy_transfer_item_without_status_reads_as_committed(sidecar_table: SidecarTable):

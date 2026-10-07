@@ -153,6 +153,8 @@ builder.Services.AddScoped(provider => new GamificationService(
 builder.Services.AddScoped<GamificationCelebrationCenter>();
 builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<FriendAccessService>();
+builder.Services.AddScoped<TradeService>();
+builder.Services.AddHostedService<TradeRecoveryService>();
 
 // OTLP endpoint/headers (OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS) are read
 // automatically by AddOtlpExporter() from the standard OTel environment variables — see

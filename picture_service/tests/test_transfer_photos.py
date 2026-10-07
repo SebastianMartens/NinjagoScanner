@@ -53,18 +53,20 @@ class FailingSourceDeletePhotoStore(FakePhotoStore):
 class FailingTransferCommitTable(FakeSidecarTable):
     """The claim (create) works, but every later write of the transfer record fails."""
 
-    async def replace_transfer(self, transfer_id, record, *, expected_lease_expires_at_ms=None) -> bool:
-        raise RuntimeError("record write failed")
+    async def replace_transfer(self, transfer_id, record, **kwargs) -> bool:
+        if record["status"] == "committed":
+            raise RuntimeError("record write failed")
+        return await super().replace_transfer(transfer_id, record, **kwargs)
 
 
 class AmbiguousCommitTable(FakeSidecarTable):
     """The commit is stored but the caller still sees an error (timeout after the write)."""
 
-    async def replace_transfer(self, transfer_id, record, *, expected_lease_expires_at_ms=None) -> bool:
-        await super().replace_transfer(transfer_id, record, expected_lease_expires_at_ms=expected_lease_expires_at_ms)
-        if record["status"] == "committed" and not record["sources_removed"]:
+    async def replace_transfer(self, transfer_id, record, **kwargs) -> bool:
+        stored = await super().replace_transfer(transfer_id, record, **kwargs)
+        if stored and record["status"] == "committed" and not record["sources_removed"]:
             raise RuntimeError("timeout after write")
-        return True
+        return stored
 
 
 class FlakySourceDeletePhotoStore(FakePhotoStore):
@@ -619,10 +621,10 @@ async def test_pending_transfer_with_live_lease_is_not_touched_by_another_attemp
 
 async def test_losing_the_lease_takeover_race_aborts_without_touching_anything():
     class LosingTakeoverTable(FakeSidecarTable):
-        async def replace_transfer(self, transfer_id, record, *, expected_lease_expires_at_ms=None) -> bool:
+        async def replace_transfer(self, transfer_id, record, *, expected_lease_expires_at_ms=None, **kwargs) -> bool:
             if expected_lease_expires_at_ms is not None:
                 return False
-            return await super().replace_transfer(transfer_id, record)
+            return await super().replace_transfer(transfer_id, record, **kwargs)
 
     table = LosingTakeoverTable()
     service, _, photo_store = make_service(sidecar_table=table, now_ms=lambda: 1_000_000)
@@ -731,6 +733,21 @@ async def test_unknown_source_collection_creates_nothing_and_leaves_no_record():
     assert table.transfers == {}
 
 
+async def test_failed_transfer_into_never_seen_destination_leaves_no_copies_and_no_record():
+    # Unknown destinations are valid (created implicitly), but a failure must not leave a trace there.
+    photo_store = FailingCopyPhotoStore(fail_on_copy=2)
+    service, table, _ = make_service(photo_store=photo_store)
+    for pid in ("p1", "p2"):
+        seed(table, photo_store, SRC, pid, SidecarRecord(card_name=pid))
+
+    code = await transfer_aborts(service, request(moves=[("col-a", "brand-new-collection", p) for p in ("p1", "p2")]))
+
+    assert code == grpc.StatusCode.INTERNAL
+    assert set(photo_store.bytes_by_key) == {(SRC, "p1"), (SRC, "p2")}
+    assert set(table.items) == {(SRC, "p1"), (SRC, "p2")}
+    assert table.transfers == {}
+
+
 async def test_destination_without_photos_yet_is_valid():
     service, table, photo_store = make_service()
     seed(table, photo_store, SRC, "p1", SidecarRecord())
@@ -806,3 +823,192 @@ async def test_after_reconciler_rollback_the_same_transfer_id_starts_over():
 
     assert response.results[0].new_photo_id != "n1"
     assert (SRC, "p1") not in photo_store.bytes_by_key
+
+
+# --- Lease fencing: a stalled attempt must never commit or roll back over a newer owner ---
+
+
+class StalledVerifyPhotoStore(FakePhotoStore):
+    """Stalls the first attempt right after it verified its destination copy (before the commit),
+    returning the stale verification result - like a process paused by GC or a slow network."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entered = asyncio.Event()
+        self.gate = asyncio.Event()
+        self.stalled = False
+        self.raise_after_gate = False
+
+    async def exists(self, collection_id, photo_id) -> bool:
+        result = await super().exists(collection_id, photo_id)
+        if collection_id == DST and not self.stalled:
+            self.stalled = True
+            self.entered.set()
+            await self.gate.wait()
+            if self.raise_after_gate:
+                raise RuntimeError("S3 exists failed after stall")
+        return result
+
+
+async def start_stalled_attempt(clock):
+    store = StalledVerifyPhotoStore()
+    service_a, table, _ = make_service(photo_store=store, now_ms=lambda: clock[0])
+    seed(table, store, SRC, "p1", SidecarRecord(card_name="Kai"), b"img")
+    task = asyncio.create_task(transfer_aborts(service_a, request()))
+    await store.entered.wait()
+    return service_a, table, store, task
+
+
+async def test_stalled_attempt_cannot_commit_after_reconciler_rolled_back_and_loses_nothing():
+    clock = [1_000_000]
+    _, table, store, task = await start_stalled_attempt(clock)
+    clock[0] += 120_000  # A's lease expired while it was stalled
+    reconciler, _, _ = make_service(sidecar_table=table, photo_store=store, now_ms=lambda: clock[0])
+
+    assert await reconciler.reconcile_transfers() == 1
+    assert table.transfers == {}
+    assert [k for k in store.bytes_by_key if k[0] == DST] == []
+    store.gate.set()
+
+    assert await task == grpc.StatusCode.ABORTED
+    assert (SRC, "p1") in store.bytes_by_key and (SRC, "p1") in table.items  # source never removed
+    assert table.transfers == {}  # the stale commit did not resurrect a record
+    assert_nothing_moved(table, store)
+
+
+async def test_stalled_attempts_late_destination_writes_are_discarded_after_reconciler_rollback():
+    clock = [1_000_000]
+    _, table, store, task = await start_stalled_attempt(clock)
+    clock[0] += 120_000
+    reconciler, _, _ = make_service(sidecar_table=table, photo_store=store, now_ms=lambda: clock[0])
+    await reconciler.reconcile_transfers()
+    # A's stale in-flight writes land after the rollback.
+    store.bytes_by_key[(DST, "late")] = b"x"
+    table.items[(DST, "late")] = SidecarRecord()
+    store.gate.set()
+
+    await task
+
+    assert [k for k in table.items if k[0] == DST] == [(DST, "late")]  # unrelated data untouched
+    assert (SRC, "p1") in store.bytes_by_key
+
+
+async def test_stalled_attempt_after_takeover_and_completion_by_another_attempt_keeps_the_other_result():
+    clock = [1_000_000]
+    _, table, store, task = await start_stalled_attempt(clock)
+    clock[0] += 120_000
+    other, _, _ = make_service(sidecar_table=table, photo_store=store, now_ms=lambda: clock[0])
+
+    winner = await transfer(other, request())  # takes over the expired lease and completes
+    new_id = winner.results[0].new_photo_id
+    assert (SRC, "p1") not in store.bytes_by_key
+    store.gate.set()
+
+    assert await task == grpc.StatusCode.ABORTED
+    assert [k for k in store.bytes_by_key if k[0] == DST] == [(DST, new_id)]  # B's copy survives
+    assert table.items[(DST, new_id)].card_name == "Kai"
+    assert table.transfers["t-1"]["status"] == "committed"
+    assert table.transfers["t-1"]["results"][0]["new_photo_id"] == new_id
+    replay = await transfer(other, request())
+    assert replay.results[0].new_photo_id == new_id
+
+
+@pytest.mark.parametrize("status", ["pending", "committed"])
+async def test_stalled_attempt_failing_after_losing_the_lease_does_not_roll_back_the_new_owner(status):
+    clock = [1_000_000]
+    _, table, store, task = await start_stalled_attempt(clock)
+    new_id = table.transfers["t-1"]["results"][0]["new_photo_id"]
+    # Another attempt took the transfer over (new lease value) and is working on / committed it.
+    table.transfers["t-1"] = {**table.transfers["t-1"], "lease_expires_at_ms": 9_999_999, "status": status}
+    store.raise_after_gate = True
+    store.gate.set()
+
+    assert await task == grpc.StatusCode.INTERNAL
+
+    assert (DST, new_id) in store.bytes_by_key
+    assert (DST, new_id) in table.items
+    assert table.transfers["t-1"]["lease_expires_at_ms"] == 9_999_999
+    assert table.transfers["t-1"]["status"] == status
+
+
+async def test_rollback_record_delete_is_conditional_on_the_lease_it_holds():
+    class TakeoverDuringRollbackTable(FakeSidecarTable):
+        """Another attempt claims the transfer right after the rollback started."""
+
+        async def delete(self, collection_id, photo_id) -> None:
+            if collection_id == DST and self.transfers.get("t-1"):
+                self.transfers["t-1"] = {**self.transfers["t-1"], "lease_expires_at_ms": 9_999_999}
+            await super().delete(collection_id, photo_id)
+
+    photo_store = FailingCopyPhotoStore(fail_on_copy=1)
+    table = TakeoverDuringRollbackTable()
+    service, _, _ = make_service(sidecar_table=table, photo_store=photo_store, now_ms=lambda: 1_000_000)
+    seed(table, photo_store, SRC, "p1", SidecarRecord(card_name="Kai"))
+
+    assert await transfer_aborts(service, request()) == grpc.StatusCode.INTERNAL
+
+    # The conditional record delete lost to the new owner, so its record survived.
+    assert table.transfers["t-1"]["lease_expires_at_ms"] == 9_999_999
+    assert (SRC, "p1") in photo_store.bytes_by_key
+
+
+async def test_lease_is_extended_between_copy_steps_so_a_long_transfer_is_not_taken_over():
+    clock = [1_000_000]
+    observed: list[grpc.StatusCode] = []
+    moves = [("col-a", "col-b", p) for p in ("p1", "p2", "p3")]
+
+    class SlowCopyPhotoStore(FakePhotoStore):
+        copies = 0
+        competitor = None
+
+        async def copy(self, *args) -> None:
+            await super().copy(*args)
+            clock[0] += 50_000  # each copy takes 50s; the initial 60s lease alone would expire
+            SlowCopyPhotoStore.copies += 1
+            if SlowCopyPhotoStore.copies == 2:
+                observed.append(await transfer_aborts(SlowCopyPhotoStore.competitor, request(moves=moves)))
+
+    store = SlowCopyPhotoStore()
+    service, table, _ = make_service(photo_store=store, now_ms=lambda: clock[0])
+    SlowCopyPhotoStore.competitor, _, _ = make_service(sidecar_table=table, photo_store=store, now_ms=lambda: clock[0])
+    for pid in ("p1", "p2", "p3"):
+        seed(table, store, SRC, pid, SidecarRecord(card_name=pid))
+
+    response = await transfer(service, request(moves=moves))
+
+    assert observed == [grpc.StatusCode.ABORTED]  # 100s in, the extended lease is still live
+    assert len(response.results) == 3
+    assert [k for k in store.bytes_by_key if k[0] == SRC] == []
+    assert len([k for k in store.bytes_by_key if k[0] == DST]) == 3
+    assert table.transfers["t-1"]["status"] == "committed"
+
+
+async def test_lease_value_strictly_increases_even_with_a_frozen_clock():
+    service, table, photo_store = make_service(now_ms=lambda: 1_000_000)
+    seed(table, photo_store, SRC, "p1", SidecarRecord())
+    seed(table, photo_store, SRC, "p2", SidecarRecord())
+
+    await transfer(service, request(moves=[("col-a", "col-b", "p1"), ("col-a", "col-b", "p2")]))
+
+    assert table.transfers["t-1"]["lease_expires_at_ms"] > 1_000_000 + 60_000
+
+
+async def test_reconciler_rollback_is_skipped_when_the_lease_was_renewed_meanwhile():
+    class RenewedDuringClaimTable(FakeSidecarTable):
+        """The original owner renews its lease between the reconciler's read and its claim."""
+
+        async def replace_transfer(self, transfer_id, record, **kwargs) -> bool:
+            if kwargs.get("expected_lease_expires_at_ms") == 5 and "t-1" in self.transfers:
+                self.transfers["t-1"] = {**self.transfers["t-1"], "lease_expires_at_ms": 2_000_000}
+            return await super().replace_transfer(transfer_id, record, **kwargs)
+
+    table = RenewedDuringClaimTable()
+    service, _, photo_store = make_service(sidecar_table=table, now_ms=lambda: 1_000_000)
+    seed(table, photo_store, SRC, "p1", SidecarRecord())
+    table.transfers["t-1"] = pending_record([("col-a", "col-b", "p1")], ["n1"], lease_expires_at_ms=5)
+    photo_store.bytes_by_key[(DST, "n1")] = b"in progress"
+
+    assert await service.reconcile_transfers() == 0
+
+    assert (DST, "n1") in photo_store.bytes_by_key
+    assert table.transfers["t-1"]["lease_expires_at_ms"] == 2_000_000

@@ -63,14 +63,32 @@ class SidecarStore:
         return await self._sidecar_table.create_transfer(transfer_id, record)
 
     async def replace_transfer(
-        self, transfer_id: str, record: dict, *, expected_lease_expires_at_ms: int | None = None
+        self,
+        transfer_id: str,
+        record: dict,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
     ) -> bool:
         return await self._sidecar_table.replace_transfer(
-            transfer_id, record, expected_lease_expires_at_ms=expected_lease_expires_at_ms
+            transfer_id,
+            record,
+            expected_lease_expires_at_ms=expected_lease_expires_at_ms,
+            expected_status=expected_status,
         )
 
-    async def delete_transfer(self, transfer_id: str) -> None:
-        await self._sidecar_table.delete_transfer(transfer_id)
+    async def delete_transfer(
+        self,
+        transfer_id: str,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        return await self._sidecar_table.delete_transfer(
+            transfer_id,
+            expected_lease_expires_at_ms=expected_lease_expires_at_ms,
+            expected_status=expected_status,
+        )
 
     def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
         return self._sidecar_table.list_transfers()

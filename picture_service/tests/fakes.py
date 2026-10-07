@@ -37,19 +37,49 @@ class FakeSidecarTable:
         self.transfers[transfer_id] = copy.deepcopy(record)
         return True
 
-    async def replace_transfer(
-        self, transfer_id: str, record: dict, *, expected_lease_expires_at_ms: int | None = None
-    ) -> bool:
+    def _transfer_condition_holds(self, transfer_id, expected_lease_expires_at_ms, expected_status) -> bool:
         current = self.transfers.get(transfer_id)
-        if expected_lease_expires_at_ms is not None and (
-            current is None or current["lease_expires_at_ms"] != expected_lease_expires_at_ms
-        ):
+        if expected_lease_expires_at_ms is None and expected_status is None:
+            return True
+        if current is None:
+            return False
+        if expected_lease_expires_at_ms is not None and current["lease_expires_at_ms"] != expected_lease_expires_at_ms:
+            return False
+        return expected_status is None or current["status"] == expected_status
+
+    def _transfer_condition_holds(self, transfer_id, expected_lease_expires_at_ms, expected_status) -> bool:
+        current = self.transfers.get(transfer_id)
+        if expected_lease_expires_at_ms is None and expected_status is None:
+            return True
+        if current is None:
+            return False
+        if expected_lease_expires_at_ms is not None and current["lease_expires_at_ms"] != expected_lease_expires_at_ms:
+            return False
+        return expected_status is None or current["status"] == expected_status
+
+    async def replace_transfer(
+        self,
+        transfer_id: str,
+        record: dict,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        if not self._transfer_condition_holds(transfer_id, expected_lease_expires_at_ms, expected_status):
             return False
         self.transfers[transfer_id] = copy.deepcopy(record)
         return True
 
-    async def delete_transfer(self, transfer_id: str) -> None:
-        self.transfers.pop(transfer_id, None)
+    async def delete_transfer(
+        self,
+        transfer_id: str,
+        *,
+        expected_lease_expires_at_ms: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
+        if not self._transfer_condition_holds(transfer_id, expected_lease_expires_at_ms, expected_status):
+            return False
+        return self.transfers.pop(transfer_id, None) is not None
 
     async def list_transfers(self) -> AsyncIterator[tuple[str, dict]]:
         for transfer_id, record in list(self.transfers.items()):
