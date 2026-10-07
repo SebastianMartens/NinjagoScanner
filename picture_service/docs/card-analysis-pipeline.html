@@ -1,0 +1,219 @@
+<title>Card Analysis Pipeline</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one wide flow diagram on top, then three stage notes and the stage 3 scoring table. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5d6676;
+  --line: #c9cfda;
+  --llm: #4b4fc4;
+  --llm-tint: #e8e9fa;
+  --det: #0b7a6b;
+  --det-tint: #dff3ef;
+  --bad: #b3341f;
+  --bad-tint: #fbe7e3;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161f; --surface: #1a2030; --fg: #e6e9f0; --muted: #98a1b3; --line: #3a4358;
+    --llm: #9da1ff; --llm-tint: #25284d; --det: #4fd1bb; --det-tint: #15332e;
+    --bad: #ff8a74; --bad-tint: #3d1f1a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161f; --surface: #1a2030; --fg: #e6e9f0; --muted: #98a1b3; --line: #3a4358;
+  --llm: #9da1ff; --llm-tint: #25284d; --det: #4fd1bb; --det-tint: #15332e;
+  --bad: #ff8a74; --bad-tint: #3d1f1a; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.page { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 56px; display: flex; flex-direction: column; gap: 32px; }
+h1 { font-size: 1.9rem; line-height: 1.15; margin: 0; font-weight: 600; text-wrap: balance; }
+h2 { font-size: 1.1rem; margin: 0; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.goal { display: flex; flex-direction: column; gap: 12px; }
+.goal .lead { font-size: 1.05rem; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+.scroll svg { display: block; min-width: 860px; width: 100%; height: auto; color: var(--fg); }
+figcaption { color: var(--muted); font-size: 13.5px; max-width: 90ch; }
+svg text { font-family: var(--font-body); fill: currentColor; }
+svg .m { font-family: var(--font-mono); }
+.stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--llm); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stage.det { border-top-color: var(--det); }
+.stage dl { margin: 0; display: grid; grid-template-columns: 4.6rem 1fr; gap: 6px 10px; font-size: 14px; }
+.stage dt { font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding-top: 2px; }
+.stage dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tag { font-family: var(--font-mono); font-size: 11.5px; padding: 1px 7px; border-radius: 3px; background: var(--llm-tint); color: var(--llm); align-self: flex-start; }
+.det .tag { background: var(--det-tint); color: var(--det); }
+.scoring { display: flex; flex-direction: column; gap: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 500; }
+td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.tablewrap table { min-width: 560px; }
+tr:last-child td { border-bottom: 0; }
+</style>
+
+<main class="page">
+  <section class="goal">
+    <span class="eyebrow">picture_service · AI Analysis</span>
+    <h1>From a card photo to judged card details</h1>
+    <p class="lead">The goal is to turn one stored photo of a Ninjago trading card into the <strong>Judged</strong> section of its sidecar: the series, card number, card name and language, plus an Analysis Status that says whether that worked.</p>
+    <p>The AI model only reads what is visible. It never decides which catalog card a photo is. Two model calls extract and interpret attributes, then a deterministic scorer compares them with the real catalog and picks the card. That keeps the final answer tied to cards that exist in CatalogService, and makes it reproducible for a given set of attributes.</p>
+  </section>
+
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1080 400" role="img" aria-label="Three-stage card analysis: a photo goes through LLM attribute detection, LLM attribute derivation, then deterministic catalog matching, producing the Judged sidecar result. Model errors and unmatched cards produce a failed status.">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+        <marker id="ah-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--bad)"/></marker>
+      </defs>
+
+      <!-- input -->
+      <rect x="20" y="100" width="100" height="100" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.5"/>
+      <text x="70" y="136" text-anchor="middle" font-size="13" font-weight="600">Card photo</text>
+      <text x="70" y="156" text-anchor="middle" font-size="11" class="m">JPEG PNG</text>
+      <text x="70" y="171" text-anchor="middle" font-size="11" class="m">WebP BMP</text>
+      <text x="70" y="188" text-anchor="middle" font-size="11" fill="var(--muted)" style="fill:var(--muted)">bytes from S3</text>
+
+      <!-- stage 1 -->
+      <rect x="175" y="90" width="170" height="120" rx="4" fill="var(--llm-tint)" stroke="var(--llm)" stroke-width="2"/>
+      <text x="190" y="113" font-size="11" class="m" style="fill:var(--llm)">STAGE 1 · LLM VISION</text>
+      <text x="190" y="136" font-size="14" font-weight="600">Detect attributes</text>
+      <text x="190" y="158" font-size="12">photo only, no catalog</text>
+      <text x="190" y="175" font-size="12">flat key-value map</text>
+      <text x="190" y="192" font-size="11" class="m" style="fill:var(--muted)">card_name, card_number …</text>
+
+      <!-- stage 2 -->
+      <rect x="410" y="90" width="170" height="120" rx="4" fill="var(--llm-tint)" stroke="var(--llm)" stroke-width="2"/>
+      <text x="425" y="113" font-size="11" class="m" style="fill:var(--llm)">STAGE 2 · LLM TEXT</text>
+      <text x="425" y="136" font-size="14" font-weight="600">Derive attributes</text>
+      <text x="425" y="158" font-size="12">reads stage 1 output only</text>
+      <text x="425" y="175" font-size="12">no image, no catalog</text>
+      <text x="425" y="192" font-size="11" class="m" style="fill:var(--muted)">class, card_name_en, language</text>
+
+      <!-- stage 3 -->
+      <rect x="645" y="90" width="170" height="120" rx="4" fill="var(--det-tint)" stroke="var(--det)" stroke-width="2"/>
+      <text x="660" y="113" font-size="11" class="m" style="fill:var(--det)">STAGE 3 · NO LLM</text>
+      <text x="660" y="136" font-size="14" font-weight="600">Match catalog</text>
+      <text x="660" y="158" font-size="12">score every card, all series</text>
+      <text x="660" y="175" font-size="12">number 50 · class 20 · name 30</text>
+      <text x="660" y="192" font-size="11" class="m" style="fill:var(--muted)">needs ≥ 50, one clear best</text>
+
+      <!-- result -->
+      <rect x="880" y="90" width="180" height="120" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="2"/>
+      <text x="895" y="113" font-size="11" class="m" style="fill:var(--muted)">SIDECAR · JUDGED</text>
+      <text x="895" y="136" font-size="14" font-weight="600">Judged details</text>
+      <text x="895" y="158" font-size="12" class="m">set_name</text>
+      <text x="895" y="174" font-size="12" class="m">card_number, card_name</text>
+      <text x="895" y="190" font-size="12" class="m">language, status: ok</text>
+
+      <!-- main flow arrows -->
+      <line x1="120" y1="150" x2="173" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="147" y="141" text-anchor="middle" font-size="11" class="m">image</text>
+      <line x1="345" y1="150" x2="408" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="377" y="134" text-anchor="middle" font-size="11" class="m">detected</text>
+      <text x="377" y="146" text-anchor="middle" font-size="11" class="m" style="fill:var(--muted)">map</text>
+      <line x1="580" y1="150" x2="643" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="612" y="134" text-anchor="middle" font-size="11" class="m">derived</text>
+      <text x="612" y="146" text-anchor="middle" font-size="11" class="m" style="fill:var(--muted)">map</text>
+      <line x1="815" y1="150" x2="878" y2="150" stroke="currentColor" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="847" y="134" text-anchor="middle" font-size="11" class="m">winner</text>
+      <text x="847" y="146" text-anchor="middle" font-size="11" class="m" style="fill:var(--muted)">card</text>
+
+      <!-- inputs into stage 3 -->
+      <rect x="520" y="14" width="190" height="48" rx="4" fill="var(--surface)" stroke="var(--det)" stroke-width="1.5"/>
+      <text x="535" y="34" font-size="12.5" font-weight="600">Catalog snapshot</text>
+      <text x="535" y="51" font-size="11" class="m" style="fill:var(--muted)">via CatalogService gRPC</text>
+      <line x1="700" y1="62" x2="700" y2="88" stroke="var(--det)" stroke-width="1.5" marker-end="url(#ah)"/>
+      <text x="708" y="78" font-size="11" class="m">all cards</text>
+
+      <rect x="760" y="14" width="190" height="48" rx="4" fill="var(--surface)" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="775" y="34" font-size="12.5" font-weight="600">Verified match</text>
+      <text x="775" y="51" font-size="11" class="m" style="fill:var(--muted)">human-confirmed, if any</text>
+      <line x1="790" y1="62" x2="790" y2="88" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+      <text x="798" y="78" font-size="11" class="m">skips scoring</text>
+
+      <!-- failure paths -->
+      <rect x="175" y="300" width="640" height="60" rx="4" fill="var(--bad-tint)" stroke="var(--bad)" stroke-width="1.5"/>
+      <text x="195" y="324" font-size="13" font-weight="600" style="fill:var(--bad)">analysis_status = failed</text>
+      <text x="195" y="344" font-size="11.5" class="m" style="fill:var(--fg)">error_message · raw_model_response · transport failure flag · stages 1+2 attributes kept</text>
+      <line x1="260" y1="210" x2="260" y2="298" stroke="var(--bad)" stroke-width="1.5" marker-end="url(#ah-bad)"/>
+      <text x="268" y="262" font-size="11" class="m" style="fill:var(--bad)">API error / not JSON</text>
+      <line x1="495" y1="210" x2="495" y2="298" stroke="var(--bad)" stroke-width="1.5" marker-end="url(#ah-bad)"/>
+      <text x="503" y="262" font-size="11" class="m" style="fill:var(--bad)">API error / not JSON</text>
+      <line x1="730" y1="210" x2="730" y2="298" stroke="var(--bad)" stroke-width="1.5" marker-end="url(#ah-bad)"/>
+      <text x="738" y="262" font-size="11" class="m" style="fill:var(--bad)">no match / tie</text>
+
+      <!-- legend -->
+      <rect x="880" y="262" width="14" height="14" fill="var(--llm-tint)" stroke="var(--llm)" stroke-width="1.5"/>
+      <text x="902" y="274" font-size="12">LLM call</text>
+      <rect x="880" y="286" width="14" height="14" fill="var(--det-tint)" stroke="var(--det)" stroke-width="1.5"/>
+      <text x="902" y="298" font-size="12">deterministic code</text>
+      <rect x="880" y="310" width="14" height="14" fill="var(--bad-tint)" stroke="var(--bad)" stroke-width="1.5"/>
+      <text x="902" y="322" font-size="12">stops the pipeline</text>
+    </svg>
+    </div>
+    <figcaption>A stage only runs if the one before it succeeded. Stages 1 and 2 are the only places an LLM is used, and each stage makes a single call through LangChain (the model provider SDK underneath handles retries). The model behind it is configurable and the pipeline does not depend on a specific one. Stage 3 is plain code that compares stage 2's output with the catalog. A human-verified series and card number are carried through re-analysis unchanged.</figcaption>
+  </figure>
+
+  <section class="stages" aria-label="The three stages">
+    <article class="stage">
+      <span class="tag">Stage 1 · LLM vision</span>
+      <h2>Detect attributes</h2>
+      <dl>
+        <dt>In</dt><dd>The photo and its file name (for the image MIME type). No catalog, so the model cannot guess toward a known card.</dd>
+        <dt>Does</dt><dd>Asks the vision model to report what it sees for a fixed list: vehicle, trap and action tags, defense/tempo/attack/power values, text box, card name, card number, shiny finish, puzzle-piece, and whether any card is visible at all.</dd>
+        <dt>Out</dt><dd>A flat map of scalar values. Nested values and nulls are dropped.</dd>
+        <dt>Fails</dt><dd>Model API error, empty reply, or invalid JSON. The result is <code>failed</code> and the raw reply is kept.</dd>
+      </dl>
+    </article>
+
+    <article class="stage">
+      <span class="tag">Stage 2 · LLM text</span>
+      <h2>Derive attributes</h2>
+      <dl>
+        <dt>In</dt><dd>Only stage 1's map, written out as <code>key: value</code> lines. The model does not see the photo again.</dd>
+        <dt>Does</dt><dd>Reasons over the values: sets a coarse <code>class</code> (character, action, vehicle, trap, puzzle-piece, limited edition, art), copies card number and name, adds an English name for German or Polish cards, and guesses the language.</dd>
+        <dt>Out</dt><dd>A second flat map. A <code>class</code> outside the allowed set is removed.</dd>
+        <dt>Fails</dt><dd>Same as stage 1. The stage 1 attributes stay on the failed result.</dd>
+      </dl>
+    </article>
+
+    <article class="stage det">
+      <span class="tag">Stage 3 · deterministic</span>
+      <h2>Match against the catalog</h2>
+      <dl>
+        <dt>In</dt><dd>Stage 2's map and the catalog snapshot loaded from CatalogService. Stage 1's raw attributes are not used.</dd>
+        <dt>Does</dt><dd>Scores every catalog card in every series. No series is guessed first. The best card's series becomes the resolved series.</dd>
+        <dt>Out</dt><dd>Series, card number, catalog card name, language, and status <code>ok</code>.</dd>
+        <dt>Fails</dt><dd>No card reaches 50 points, or the top score is shared by different series/number pairs. The result is <code>failed</code> with "Keine passende Karte gefunden."</dd>
+      </dl>
+    </article>
+  </section>
+
+  <section class="scoring">
+    <h2>How stage 3 scores one catalog card (max 100)</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Signal</th><th>Points</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td>Card number</td><td class="n">50</td><td>Equal after normalizing (<code>007</code>, <code>7</code>, <code>7.0</code> are card 7). Earns nothing if both sides have a class and the classes differ, because then the number or the class is probably misread.</td></tr>
+          <tr><td>Class</td><td class="n">20</td><td>The derived class equals the catalog card's class.</td></tr>
+          <tr><td>Card name</td><td class="n">0 – 30</td><td>Exact normalized match gives 30. A similar name gives 30 scaled by similarity, nothing below 0.6. Cards in another language are also compared by the English name from stage 2, and the better similarity counts.</td></tr>
+          <tr><td>Threshold</td><td class="n">≥ 50</td><td>A number alone is enough. Class plus exact name is enough. Class plus a partial name is not. The winner must be the single best candidate; the same series and number listed under two categories counts as one card.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="color:var(--muted);font-size:13.5px">Stage 3 always returns <code>ok</code> for a resolved match. The code does not yet set <code>uncertain</code> here.</p>
+  </section>
+</main>
