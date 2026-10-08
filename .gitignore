@@ -1992,3 +1992,6 @@ node_modules/zod/v4-mini/index.d.cts
 node_modules/zod/v4-mini/index.d.ts
 node_modules/zod/v4-mini/index.js
 node_modules/zod/v4-mini/package.json
+
+# dev.ps1 local stack state (logs, pids, local Web database)
+.dev/

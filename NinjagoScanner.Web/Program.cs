@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using NinjagoScanner.Web;
 using NinjagoScanner.Web.Components;
 using NinjagoScanner.Web.Data;
+using NinjagoScanner.Web.Seeding;
 using NinjagoScanner.Web.Services;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
@@ -33,6 +34,9 @@ builder.Services.AddRazorComponents()
 builder.Services.AddRazorPages();
 
 var dbPath = WebConfig.ResolveAuthDatabasePath(builder.Configuration);
+var seedRequested = SeedMode.IsRequested(args);
+if (seedRequested)
+    SeedMode.EnsureNotDefaultDatabase(dbPath);
 var dbDirectory = Path.GetDirectoryName(dbPath);
 if (!string.IsNullOrEmpty(dbDirectory))
     Directory.CreateDirectory(dbDirectory);
@@ -151,6 +155,7 @@ builder.Services.AddScoped(provider => new GamificationService(
     provider.GetRequiredService<ICurrentCollectionContext>(),
     provider.GetRequiredService<AuthenticationStateProvider>()));
 builder.Services.AddScoped<GamificationCelebrationCenter>();
+builder.Services.AddScoped<LocalSeeder>();
 builder.Services.AddScoped<FriendService>();
 builder.Services.AddScoped<FriendAccessService>();
 builder.Services.AddScoped<IForeignCollectionReader>(provider => new PictureServiceForeignCollectionReader(
@@ -198,6 +203,14 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    if (seedRequested)
+    {
+        var manifest = SeedManifest.Load(SeedMode.ResolveManifestPath(builder.Configuration));
+        await scope.ServiceProvider.GetRequiredService<LocalSeeder>().SeedAsync(manifest);
+        Console.WriteLine($"Seeded {dbPath} ({manifest.Users.Count} users).");
+        return;
+    }
 }
 
 // Configure the HTTP request pipeline.

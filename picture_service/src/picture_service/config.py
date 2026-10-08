@@ -151,3 +151,11 @@ def resolve_aws_region() -> str:
     if not value:
         raise RuntimeError("AWS_REGION must be configured - the AWS region for S3/DynamoDB.")
     return value
+
+
+def resolve_aws_endpoint_url() -> str | None:
+    """Optional S3/DynamoDB endpoint override (e.g. a local moto server). None = default AWS
+    endpoints. Passed explicitly as `endpoint_url=` rather than relying on botocore's implicit
+    AWS_ENDPOINT_URL handling, so aioboto3 behaviour is certain."""
+    value = _env("AWS_ENDPOINT_URL")
+    return value or None

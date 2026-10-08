@@ -37,6 +37,8 @@ uv run python -m picture_service.main   # run the service - http://localhost:808
 
 For the Web app to have full functionality (Gemini scan, catalog data), `CatalogService` and `picture_service` must also be running. VS Code has a `Launch All (CatalogService + PictureService + Web)` compound launch config (PictureService via the Python launch entry — requires the `ms-python.debugpy` extension), and a `build`/`watch`/`publish` task set, in `.vscode/`.
 
+**One-command local stack:** `./dev.ps1 up` (also `down`/`status`/`logs <catalog|picture|web>`/`reset`) starts moto (local S3/DynamoDB, in `docker-compose.yml`) and the Aspire Dashboard, seeds both from `testdata/` (fixture photos, curated `sidecars.json`, `manifest.json` with fixed users/collection IDs — Web's own `dotnet run -- seed` mode creates the SQLite side in `.dev/web/users.db`), and runs the three services detached (logs `.dev/logs/`). PictureService honours an optional `AWS_ENDPOINT_URL` for S3/DynamoDB (unset = real AWS); `dev.ps1` sets it plus dummy credentials and refuses to start if `AWS_PROFILE`/AWS credentials are set in the shell, so it can never reach prod. Gemini stays real and opt-in (`GEMINI_API_KEY`; no fake analyzer). See `openspec/changes/local-dev-environment/` and the README's "Local dev stack" section.
+
 If `dotnet build` fails on the Web project with a locked `NinjagoScanner.Web.exe`, an instance of the app is still running — stop it first.
 
 Gemini API key for PictureService (required for scanning): env vars only (`GEMINI_API_KEY`, `GEMINI_MODEL`) — see `picture_service/src/picture_service/config.py`. Default model is `gemini-2.5-flash`.

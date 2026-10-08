@@ -32,6 +32,25 @@ This repository contains three independently runnable services that communicate 
 
 The .NET solution at the root is `NinjagoScanner.slnx` (not a `.sln`); `picture_service/` is a separate `uv`-managed Python project outside it.
 
+### Local dev stack (one command)
+
+The quickest way to run everything locally, against disposable local AWS and with observability, is `dev.ps1` (Windows PowerShell, needs Docker running):
+
+```powershell
+./dev.ps1 up        # moto (local S3/DynamoDB) + Aspire Dashboard in Docker, seed, then CatalogService/PictureService/Web
+./dev.ps1 status
+./dev.ps1 logs picture -Follow   # catalog | picture | web
+./dev.ps1 reset     # wipe and reseed moto + the local Web database, restart the services
+./dev.ps1 down
+```
+
+- Web: http://localhost:5080 — sign in as `alice` or `bob` (password in `testdata/manifest.json`; they are friends and have one pending trade). Aspire Dashboard (traces/metrics/logs): http://localhost:18888.
+- Data is deterministic: `testdata/` holds ~25 fixture card photos with curated sidecars (including `failed`, `uncertain`, `incorrect`, unmapped, duplicate and unreviewed cases) and the fixed users/collection IDs. moto data lives in memory, and the local Web database is `.dev/web/users.db` — never `NinjagoScanner.Web/Data/users.db`.
+- It cannot touch production: `dev.ps1` refuses to start if `AWS_PROFILE`/`AWS_ACCESS_KEY_ID`/`AWS_SESSION_TOKEN` is set in your shell, and PictureService is pointed at moto through `AWS_ENDPOINT_URL` with dummy credentials.
+- Gemini is opt-in: set `GEMINI_API_KEY` in your shell or `picture_service/.env` to enable photo analysis. Without it, uploading a new photo fails with "GEMINI_API_KEY ist nicht gesetzt."; the seeded photos work either way.
+- Ports: Web 5080, CatalogService 5073, PictureService 8090, moto 5000. Logs are in `.dev/logs/`, PIDs in `.dev/pids/`.
+- Refreshing the fixtures (rare): `scripts/pick_fixtures.py` copies and downscales photos from `cardFotos/`, `scripts/label_fixtures.py` labels them with a real Gemini run (CatalogService running) — then curate `testdata/sidecars.json` by hand.
+
 ### Project structure
 
 ```text

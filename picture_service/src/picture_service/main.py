@@ -29,7 +29,12 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from picture_service._generated import picture_service_pb2_grpc as pb2_grpc
-from picture_service.config import resolve_aws_region, resolve_photos_bucket_name, resolve_sidecar_table_name
+from picture_service.config import (
+    resolve_aws_endpoint_url,
+    resolve_aws_region,
+    resolve_photos_bucket_name,
+    resolve_sidecar_table_name,
+)
 from picture_service.photo_store import PhotoStore
 from picture_service.picture_scanner_service import PictureScannerService
 from picture_service.sidecar_store import SidecarStore
@@ -124,10 +129,11 @@ async def _serve() -> None:
     health_check_port_raw = os.environ.get("HEALTH_CHECK_PORT")
 
     session = aioboto3.Session(region_name=resolve_aws_region())
+    endpoint_url = resolve_aws_endpoint_url()
 
     async with contextlib.AsyncExitStack() as aws_clients:
-        s3_client = await aws_clients.enter_async_context(session.client("s3"))
-        dynamodb_resource = await aws_clients.enter_async_context(session.resource("dynamodb"))
+        s3_client = await aws_clients.enter_async_context(session.client("s3", endpoint_url=endpoint_url))
+        dynamodb_resource = await aws_clients.enter_async_context(session.resource("dynamodb", endpoint_url=endpoint_url))
 
         photo_store = PhotoStore(s3_client, resolve_photos_bucket_name())
         sidecar_table = SidecarTable(dynamodb_resource, resolve_sidecar_table_name())

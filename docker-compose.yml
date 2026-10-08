@@ -10,3 +10,12 @@ services:
       - "18889:18889" # OTLP/gRPC (unused by this repo's services, exposed for completeness)
       - "18890:18890" # OTLP/HTTP - what CatalogService/Web/PictureService(C#)/picture_service export
     restart: unless-stopped
+
+  # Local S3 + DynamoDB emulator for dev.ps1 (see openspec/changes/local-dev-environment/).
+  # picture_service points at it through AWS_ENDPOINT_URL=http://localhost:5000. Data is
+  # in-memory only, so `dev.ps1 reset` (or restarting this container) wipes it.
+  moto:
+    image: motoserver/moto:latest
+    ports:
+      - "5000:5000"
+    restart: unless-stopped

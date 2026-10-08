@@ -1,0 +1,70 @@
+{
+  "password": "Test-1234",
+  "users": [
+    {
+      "userName": "alice",
+      "collectionId": "a11ce00000000000000000000000a11c",
+      "photoIds": [
+        "fixture-01",
+        "fixture-02",
+        "fixture-03",
+        "fixture-04",
+        "fixture-05",
+        "fixture-06",
+        "fixture-07",
+        "fixture-08",
+        "fixture-09",
+        "fixture-10",
+        "fixture-11",
+        "fixture-12",
+        "fixture-13",
+        "fixture-14",
+        "fixture-25"
+      ]
+    },
+    {
+      "userName": "bob",
+      "collectionId": "b0b0000000000000000000000000b0b0",
+      "photoIds": [
+        "fixture-15",
+        "fixture-16",
+        "fixture-17",
+        "fixture-18",
+        "fixture-19",
+        "fixture-20",
+        "fixture-21",
+        "fixture-22",
+        "fixture-23",
+        "fixture-24"
+      ]
+    }
+  ],
+  "friendship": {
+    "requester": "alice",
+    "addressee": "bob",
+    "status": "Accepted"
+  },
+  "pendingTrade": {
+    "id": "7ade000000000000000000000000dead",
+    "proposer": "alice",
+    "recipient": "bob",
+    "items": [
+      {
+        "side": "FromProposer",
+        "photoId": "fixture-03",
+        "seriesName": "Serie 1",
+        "cardNumber": "78",
+        "cardName": "Clancee",
+        "rarity": "Common"
+      },
+      {
+        "side": "FromRecipient",
+        "photoId": "fixture-16",
+        "seriesName": "Serie 10",
+        "cardNumber": "132",
+        "cardName": "Mean Morro",
+        "rarity": "Common"
+      }
+    ]
+  }
+}

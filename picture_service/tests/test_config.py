@@ -1,5 +1,6 @@
 from picture_service.config import (
     ScannerConfig,
+    resolve_aws_endpoint_url,
     resolve_aws_region,
     resolve_photos_bucket_name,
     resolve_sidecar_table_name,
@@ -17,6 +18,7 @@ ENV_KEYS = (
     "SIDECAR_TABLE_NAME",
     "AWS_REGION",
     "AWS_DEFAULT_REGION",
+    "AWS_ENDPOINT_URL",
 )
 
 
@@ -165,3 +167,23 @@ def test_resolve_aws_region_missing_raises(monkeypatch):
         assert False, "expected RuntimeError"
     except RuntimeError:
         pass
+
+
+def test_resolve_aws_endpoint_url_is_none_when_unset(monkeypatch):
+    _clear_env(monkeypatch)
+
+    assert resolve_aws_endpoint_url() is None
+
+
+def test_resolve_aws_endpoint_url_returns_configured_value(monkeypatch):
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "http://localhost:5000")
+
+    assert resolve_aws_endpoint_url() == "http://localhost:5000"
+
+
+def test_resolve_aws_endpoint_url_treats_empty_as_unset(monkeypatch):
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "")
+
+    assert resolve_aws_endpoint_url() is None

@@ -9,6 +9,11 @@ This is purely a local dev convenience. It isn't referenced by any deployed envi
 
 ## Usage
 
+The easiest way is `./dev.ps1 up` (repo root): it starts this dashboard together with the rest of the
+local stack and sets `OTEL_EXPORTER_OTLP_ENDPOINT` for every service automatically - see the README's
+"Local dev stack" section. The manual steps below are only needed when you run individual services
+yourself (e.g. from a debugger).
+
 ```powershell
 docker compose up -d       # from the repo root
 ```
