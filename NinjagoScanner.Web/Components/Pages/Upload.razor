@@ -3,6 +3,7 @@
 @implements IDisposable
 @using System.Globalization
 @inject PictureServiceClient PictureServiceClient
+@inject IPhotoUploadPreparer PhotoUploadPreparer
 @inject CollectionQueryService CollectionQueryService
 @inject GamificationService GamificationService
 @inject GamificationCelebrationCenter CelebrationCenter
@@ -256,11 +257,15 @@
 
             var files = batchFiles.Select(file => new BatchUploadFile(file.Name, async token =>
             {
+                // Shrunk in the browser here, inside the delegate, so files skipped by name are
+                // never resized. Falls back to the original file if shrinking fails.
+                var prepared = await PhotoUploadPreparer.PrepareAsync(file, token);
+
                 // A file above the limit must reach PictureServiceClient's German size check
                 // rather than fail inside OpenReadStream, so the stream is opened with at least
                 // the file's own size; nothing is read until the client has validated it.
-                await using var stream = file.OpenReadStream(Math.Max(maxUploadBytes, file.Size), token);
-                await PictureServiceClient.UploadPhotoForBatchAsync(file.Name, file.Size, stream, token);
+                await using var stream = prepared.OpenReadStream(Math.Max(maxUploadBytes, prepared.Size), token);
+                await PictureServiceClient.UploadPhotoForBatchAsync(file.Name, prepared.Size, stream, token);
             })).ToList();
 
             var upload = new BatchUpload(files, existingNames);
@@ -364,8 +369,12 @@
             // Streams the photo bytes straight to PictureService over gRPC - they never pass
             // through browser-to-storage; PictureService assigns the photo ID and triggers
             // AI Analysis once the stream completes.
-            await using var stream = selectedFile.OpenReadStream(maxUploadBytes);
-            var card = await PictureServiceClient.UploadPhotoAsync(selectedFile.Name, selectedFile.Size, stream);
+            // JPEG/PNG photos are shrunk in the browser first (falling back to the original on
+            // any failure), so only the shrunk bytes cross the SignalR circuit and the size limit
+            // applies to what is actually uploaded.
+            var prepared = await PhotoUploadPreparer.PrepareAsync(selectedFile, disposeCancellation.Token);
+            await using var stream = prepared.OpenReadStream(maxUploadBytes);
+            var card = await PictureServiceClient.UploadPhotoAsync(selectedFile.Name, prepared.Size, stream);
 
             successMessage = $"Upload erfolgreich: {card.SourceFileName} (Status: {card.AnalysisStatus}).";
             selectedFile = null;

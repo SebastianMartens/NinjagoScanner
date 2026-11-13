@@ -217,9 +217,10 @@ Default: `Data/users.db` on Windows, `/data/users.db` elsewhere.
 1. Start the web application on a machine on the local network (e.g. `dotnet run --urls "http://0.0.0.0:5000"`), with CatalogService and `picture_service` also running and reachable.
 2. Open the app on the Android phone via the machine's LAN address.
 3. Sign in, go to `/upload`, and choose camera or gallery.
-4. The photo is streamed to PictureService (`UploadPhoto`), which stores it in S3 and triggers the Gemini scan automatically — no manual scan step needed.
+4. JPEG and PNG photos are first shrunk in the phone's browser to at most 1366 px on the longest side (aspect ratio kept, never enlarged, EXIF orientation applied to the pixels), so normally only the smaller copy is uploaded. This applies to the single-photo input and to the batch input. WEBP and BMP are uploaded unchanged; if shrinking fails or doesn't make the file smaller, the original is uploaded (a Warning is logged in the Web app).
+5. The photo is streamed to PictureService (`UploadPhoto`), which stores it in S3 and triggers the Gemini scan automatically — no manual scan step needed.
 
-Optionally, the maximum upload file size can be configured:
+Optionally, the maximum upload file size can be configured. It applies to the file that is actually uploaded, i.e. the shrunk photo when shrinking succeeded:
 
 - `CardPhotos:MaxUploadBytes`
 - `CARD_PHOTOS_MAX_UPLOAD_BYTES`
