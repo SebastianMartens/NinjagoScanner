@@ -2,11 +2,11 @@ All tasks are Web-only (`NinjagoScanner.Web`, `NinjagoScanner.Web.Tests`). There
 
 ## 1. Test seam
 
-- [ ] 1.1 Add a hand-written `FakeBrowserFile : IBrowserFile` under `NinjagoScanner.Web.Tests/Fixtures/`. Configurable `Name`/`Size`/`ContentType`/content, and a configurable `RequestImageFileAsync` behaviour: return a given fake file, throw, never complete, or return a file of size 0. It also records the `(format, maxWidth, maxHeight)` it was called with. Verify: `dotnet build NinjagoScanner.slnx` succeeds.
+- [x] 1.1 Add a hand-written `FakeBrowserFile : IBrowserFile` under `NinjagoScanner.Web.Tests/Fixtures/`. Configurable `Name`/`Size`/`ContentType`/content. (Implementation note: `RequestImageFileAsync` is an extension method that throws for any `IBrowserFile` other than Blazor's own type, so it can't be faked on the file. `PhotoUploadPreparer` takes the resize as an internal delegate instead, defaulting to the built-in call. The tests configure that delegate to return a file, throw, never complete or return size 0, and record the `(format, maxWidth, maxHeight)` it was called with.) Verify: `dotnet build NinjagoScanner.slnx` succeeds.
 
 ## 2. Preparation service (design Decision 2)
 
-- [ ] 2.1 Write failing xunit tests `PhotoUploadPreparerTests` in `NinjagoScanner.Web.Tests/Services/` for:
+- [x] 2.1 Write failing xunit tests `PhotoUploadPreparerTests` in `NinjagoScanner.Web.Tests/Services/` for:
   - (a) a `.jpg` file calls `RequestImageFileAsync("image/jpeg", 1366, 1366)` and returns the resized file when it is smaller
   - (b) `.jpeg` behaves like (a), with case-insensitive extensions (`IMG.JPG`)
   - (c) `.png` uses `"image/png"`
@@ -18,17 +18,17 @@ All tasks are Web-only (`NinjagoScanner.Web`, `NinjagoScanner.Web.Tests`). There
   - (i) cancelling the caller's token propagates `OperationCanceledException` and does not fall back
 
   Verify: `dotnet test NinjagoScanner.Web.Tests --filter "FullyQualifiedName~PhotoUploadPreparerTests"` compiles and the tests fail.
-- [ ] 2.2 Implement `Services/PhotoUploadPreparer.cs`. Use a 1366 px constant, about a 20 s default timeout (injectable for tests), `.WaitAsync(timeout, token)` around `RequestImageFileAsync`, the "smaller wins" rule, and a Warning log per fallback with its reason (no file name). Register it in `Program.cs` in DI as scoped or singleton (it holds no state). Verify: all `PhotoUploadPreparerTests` pass.
+- [x] 2.2 Implement `Services/PhotoUploadPreparer.cs`. Use a 1366 px constant, about a 20 s default timeout (injectable for tests), `.WaitAsync(timeout, token)` around `RequestImageFileAsync`, the "smaller wins" rule, and a Warning log per fallback with its reason (no file name). Register it in `Program.cs` in DI as scoped or singleton (it holds no state). Verify: all `PhotoUploadPreparerTests` pass.
 
 ## 3. Wire into `/upload`
 
-- [ ] 3.1 In `Upload.razor` `UploadSelectedFileAsync`, prepare `selectedFile` before opening the stream. Open the **prepared** file's stream and pass its `Size` to `UploadPhotoAsync`. The size limit then applies to the uploaded bytes. Keep the existing `OpenReadStream(maxUploadBytes)` semantics on the prepared file. Verify: `dotnet build NinjagoScanner.slnx` succeeds, and the manual check in 5.3 passes.
-- [ ] 3.2 In `StartBatchUploadAsync`, call the preparer inside each `BatchUploadFile` delegate (so skipped files are never resized) and open the stream with `Math.Max(maxUploadBytes, prepared.Size)`. Pass `prepared.Size` to `UploadPhotoForBatchAsync`. Verify: `dotnet build` succeeds, `BatchUploadTests` and `PictureServiceClientBatchUploadTests` still pass, and the manual check in 5.4 passes.
-- [ ] 3.3 Run the full .NET suite. Verify: `dotnet test NinjagoScanner.slnx` is green. In particular `PictureServiceClientUploadValidationTests` passes unchanged, because the client API did not change.
+- [x] 3.1 In `Upload.razor` `UploadSelectedFileAsync`, prepare `selectedFile` before opening the stream. Open the **prepared** file's stream and pass its `Size` to `UploadPhotoAsync`. The size limit then applies to the uploaded bytes. Keep the existing `OpenReadStream(maxUploadBytes)` semantics on the prepared file. Verify: `dotnet build NinjagoScanner.slnx` succeeds, and the manual check in 5.3 passes.
+- [x] 3.2 In `StartBatchUploadAsync`, call the preparer inside each `BatchUploadFile` delegate (so skipped files are never resized) and open the stream with `Math.Max(maxUploadBytes, prepared.Size)`. Pass `prepared.Size` to `UploadPhotoForBatchAsync`. Verify: `dotnet build` succeeds, `BatchUploadTests` and `PictureServiceClientBatchUploadTests` still pass, and the manual check in 5.4 passes.
+- [x] 3.3 Run the full .NET suite. Verify: `dotnet test NinjagoScanner.slnx` is green. In particular `PictureServiceClientUploadValidationTests` passes unchanged, because the client API did not change.
 
 ## 4. Docs
 
-- [ ] 4.1 Update the README "Mobile upload (Android)" section. Photos are shrunk in the browser to at most 1366 px (JPEG/PNG) before upload, and `CardPhotos:MaxUploadBytes` applies to the uploaded (shrunk) file. Verify: review the README diff.
+- [x] 4.1 Update the README "Mobile upload (Android)" section. Photos are shrunk in the browser to at most 1366 px (JPEG/PNG) before upload, and `CardPhotos:MaxUploadBytes` applies to the uploaded (shrunk) file. Verify: review the README diff.
 
 ## 5. Manual verification with `./dev.ps1 up`
 
