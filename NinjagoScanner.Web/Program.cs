@@ -146,7 +146,7 @@ builder.Services.AddScoped(provider => new PictureServiceClient(
     provider.GetRequiredService<ICurrentCollectionContext>(),
     provider.GetRequiredService<AuthenticationStateProvider>()));
 // Stateless; shrinks JPEG/PNG photos in the browser before the /upload page streams them (#11).
-builder.Services.AddSingleton<PhotoUploadPreparer>();
+builder.Services.AddSingleton<IPhotoUploadPreparer, PhotoUploadPreparer>();
 builder.Services.AddScoped(provider => new CollectionQueryService(
     provider.GetRequiredService<CatalogServiceClient>(),
     provider.GetRequiredService<PictureServiceClient>()));

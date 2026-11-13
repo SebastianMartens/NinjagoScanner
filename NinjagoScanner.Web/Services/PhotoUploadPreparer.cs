@@ -11,7 +11,7 @@ namespace NinjagoScanner.Web.Services;
 /// than the original, the original file is returned and a Warning is logged - an upload never
 /// fails just because shrinking failed. Holds no per-user state.
 /// </summary>
-public sealed class PhotoUploadPreparer
+public sealed class PhotoUploadPreparer : IPhotoUploadPreparer
 {
     /// <summary>Longest side of an uploaded photo in pixels; larger photos are scaled down, smaller ones never enlarged.</summary>
     public const int MaxLongestSidePixels = 1366;
@@ -40,8 +40,7 @@ public sealed class PhotoUploadPreparer
         this.resizeImage = resizeImage;
     }
 
-    /// <summary>Returns the file to upload: the shrunk copy when that worked and is smaller, otherwise <paramref name="original"/>.</summary>
-    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled.</exception>
+    /// <inheritdoc />
     public async Task<IBrowserFile> PrepareAsync(IBrowserFile original, CancellationToken cancellationToken = default)
     {
         var format = GetResizeFormat(original.Name);
