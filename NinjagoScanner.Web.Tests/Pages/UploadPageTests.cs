@@ -133,9 +133,8 @@ public sealed class UploadPageTests : IAsyncLifetime
 
         // The photo is shrunk automatically before upload (#37), so neither the original size
         // nor the upload limit is shown.
-        var selection = cut.Find(".upload-selection");
-        Assert.Contains("IMG_0005.jpg", selection.TextContent);
-        Assert.DoesNotContain("KB", cut.Markup);
+        var selectionText = string.Join(' ', cut.Find(".upload-selection").TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        Assert.Equal("Ausgewählt: IMG_0005.jpg", selectionText);
         Assert.DoesNotContain("Maximale Dateigrösse", cut.Markup);
     }
 
