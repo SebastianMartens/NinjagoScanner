@@ -124,6 +124,20 @@ public sealed class UploadPageTests : IAsyncLifetime
         Assert.Empty(pictureHost.Uploads);
     }
 
+    [Fact]
+    public void Single_ShowsTheSelectedFileNameWithoutAnyFileSize()
+    {
+        var cut = ctx.Render<Upload>();
+
+        cut.FindComponents<InputFile>()[0].UploadFiles(Photo("IMG_0005.jpg", OriginalBytes));
+
+        // The photo is shrunk automatically before upload (#37), so neither the original size
+        // nor the upload limit is shown.
+        var selectionText = string.Join(' ', cut.Find(".upload-selection").TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        Assert.Equal("Ausgewählt: IMG_0005.jpg", selectionText);
+        Assert.DoesNotContain("Maximale Dateigrösse", cut.Markup);
+    }
+
     private sealed class StubPhotoUploadPreparer : IPhotoUploadPreparer
     {
         public Func<IBrowserFile, IBrowserFile> Prepare { get; set; } = original => original;
