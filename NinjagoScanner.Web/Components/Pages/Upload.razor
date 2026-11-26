@@ -31,13 +31,9 @@
         @if (selectedFile is not null)
         {
             <p class="upload-selection">
-                Ausgewählt: <strong>@selectedFile.Name</strong> (@FormatFileSize(selectedFile.Size))
+                Ausgewählt: <strong>@selectedFile.Name</strong>
             </p>
         }
-
-        <p class="upload-limit">
-            Maximale Dateigrösse: @FormatFileSize(maxUploadBytes)
-        </p>
 
         <div class="upload-actions">
             <button class="btn btn-primary" type="button" @onclick="UploadSelectedFileAsync" disabled="@(isUploading || selectedFile is null)">
@@ -444,20 +440,5 @@
         {
             return null;
         }
-    }
-
-    private static string FormatFileSize(long bytes)
-    {
-        if (bytes >= 1024 * 1024)
-        {
-            return $"{bytes / (1024d * 1024d):0.##} MB";
-        }
-
-        if (bytes >= 1024)
-        {
-            return $"{bytes / 1024d:0.##} KB";
-        }
-
-        return $"{bytes} B";
     }
 }
